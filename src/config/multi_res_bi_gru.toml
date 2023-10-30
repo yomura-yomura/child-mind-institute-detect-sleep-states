@@ -1,0 +1,28 @@
+model_architecture = "multi_res_bi_gru"
+
+[model]
+input_size = 10
+hidden_size = 64
+out_size = 2
+n_layers = 5
+max_chunk_size = 500_000
+
+[dataset]
+sigma = 108
+
+[train]
+num_epochs = 20
+train_batch_size = 1
+valid_batch_size = 1
+learning_rate = 0.001
+n_folds = 5
+
+early_stopping_patience = 5
+save_top_k_models = 3
+
+[train.optimizer]
+lr = 0.001
+weight_decay = 0
+
+[train.optimizer.scheduler]
+eta_min = 2e-8
