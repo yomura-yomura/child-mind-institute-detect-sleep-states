@@ -43,21 +43,23 @@ def get_series_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.Data
         return pd.read_parquet(path)
 
 
-def get_submission_df(preds, series_id: str | Sequence[str], calc_type: Literal["max-along-type", "top-probs"]):
+def get_submission_df(preds, series_id: str | Sequence[str], steps, calc_type: Literal["max-along-type", "top-probs"]):
     if calc_type == "max-along-type":
+        assert False
+        preds = np.concatenate(preds, axis=0)
         indices = np.argmax(preds, axis=1)
 
         if isinstance(series_id, str):
             pass
         else:
-            series_id = series_id[indices > 0]
+            series_id = np.repeat(np.expand_dims(series_id, axis=1), indices.shape[1], axis=1)[indices > 0].flatten()
 
         submission_df = pd.DataFrame(
             {
                 "series_id": series_id,
-                "step": np.where(indices > 0)[0],
+                "step": steps[indices > 0].flatten(),
                 "event": indices[indices > 0],
-                "score": np.max(preds[indices > 0], axis=1),
+                "score": np.max(preds, axis=2)[indices > 0],
             }
         )
         submission_df["event"] = submission_df["event"].map({v: k for k, v in event_mapping.items()})
@@ -91,29 +93,60 @@ def get_submission_df(preds, series_id: str | Sequence[str], calc_type: Literal[
             submission_df.sort_values(["night", "score"], ascending=[True, False]).groupby(["event", "night"]).head(1)
         )
     elif calc_type == "top-probs":
-        n_days = max(1, round(len(preds) * 5 / (24 * 60 * 60)))
-        onset_indices = np.argsort(preds[:, 1])[-n_days:]
-        wakeup_indices = np.argsort(preds[:, 2])[-n_days:]
+        n_days = max(1, round(steps.max() * 5 / (24 * 60 * 60)))
+
+        def rolling(a, window, axis, writable: bool = False):
+            shape = a.shape[:axis] + (a.shape[axis] - window + 1, window) + a.shape[axis + 1 :]
+            strides = a.strides[:axis] + (a.strides[axis],) + a.strides[axis:]
+            rolling = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=writable)
+            return rolling
+
+        window = 40 + 1
+
+        assert preds.shape[-1] >= 2
+        interest = slice((window - 1) // 2, -(window - 1) // 2)
+        corrected_preds_list = []
+        for i in range(2):
+            max_preds = np.max(rolling(preds[..., -i], window=window, axis=1), axis=2)
+            max_preds[preds[:, interest, -i] != max_preds] = 0
+            corrected_preds = np.zeros(preds.shape[:-1], dtype=preds.dtype)
+            corrected_preds[:, interest] = max_preds
+            corrected_preds_list.append(corrected_preds)
+
+        onset_indices = np.argsort(corrected_preds_list[0], axis=1)[:, -n_days:]
+        wakeup_indices = np.argsort(corrected_preds_list[1], axis=1)[:, -n_days:]
+        # print(corrected_preds_list[0][0][wakeup_indices[0]])
+
+        series_id = np.repeat(np.expand_dims(series_id, axis=1), preds.shape[1], axis=1)
 
         submission_df = pd.concat(
             [
                 pd.DataFrame(
                     {
-                        "series_id": series_id[onset_indices],
-                        "step": onset_indices + 1,
+                        "series_id": np.take_along_axis(series_id, onset_indices, axis=1).flatten(),
+                        "step": np.take_along_axis(steps, onset_indices, axis=1).flatten(),
                         "event": "onset",
-                        "score": preds[onset_indices, 1],
+                        "score": np.take_along_axis(preds[..., -2], onset_indices, axis=1).flatten(),
                     }
                 ),
                 pd.DataFrame(
                     {
-                        "series_id": series_id[wakeup_indices],
-                        "step": wakeup_indices + 1,
+                        "series_id": np.take_along_axis(series_id, wakeup_indices, axis=1).flatten(),
+                        "step": np.take_along_axis(steps, wakeup_indices, axis=1).flatten(),
                         "event": "wakeup",
-                        "score": preds[wakeup_indices, 2],
+                        "score": np.take_along_axis(preds[..., -1], wakeup_indices, axis=1).flatten(),
                     }
                 ),
             ]
         )
         submission_df = submission_df.sort_values(["series_id", "step"]).reset_index(drop=True)
+    else:
+        raise ValueError(f"unexpected {calc_type=}")
+
+    submission_df = (
+        submission_df.sort_values(["series_id", "step", "event", "score"], ascending=[True, True, True, False])
+        .groupby(["series_id", "step", "event"])
+        .head(1)
+    )
+
     return submission_df

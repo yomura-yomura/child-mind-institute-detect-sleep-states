@@ -1,3 +1,5 @@
+import pathlib
+
 import polars as pl
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
@@ -5,34 +7,42 @@ from child_mind_institute_detect_sleep_states.data.comp_dataset import event_map
 
 df_dict = child_mind_institute_detect_sleep_states.data.comp_dataset.get_df_dict("train", as_polars=True)
 
-df = (
-    df_dict["series"]
-    .with_columns(
-        [
-            pl.col("step").cast(pl.UInt32),
-            pl.col("timestamp").str.to_datetime(time_unit="ms"),
-            pl.col("anglez").cast(pl.Float32),
-            pl.col("enmo").cast(pl.Float32),
-        ]
-    )
-    .join(
-        df_dict["event"].with_columns(
+data_dir_path = pathlib.Path("data")
+
+
+all_dataset_path = data_dir_path / "all.parquet"
+
+if all_dataset_path.exists():
+    df = pl.read_parquet(all_dataset_path)
+else:
+    df = (
+        df_dict["series"]
+        .with_columns(
             [
                 pl.col("step").cast(pl.UInt32),
                 pl.col("timestamp").str.to_datetime(time_unit="ms"),
-                pl.col("event").map_dict(event_mapping).cast(pl.UInt8),
-                pl.col("night").cast(pl.UInt32),
+                pl.col("anglez").cast(pl.Float32),
+                pl.col("enmo").cast(pl.Float32),
             ]
-        ),
-        on=["series_id", "step", "timestamp"],
-        how="left",
+        )
+        .join(
+            df_dict["event"].with_columns(
+                [
+                    pl.col("step").cast(pl.UInt32),
+                    pl.col("timestamp").str.to_datetime(time_unit="ms"),
+                    pl.col("event").map_dict(event_mapping).cast(pl.UInt8),
+                    pl.col("night").cast(pl.UInt32),
+                ]
+            ),
+            on=["series_id", "step", "timestamp"],
+            how="left",
+        )
+        .filter(pl.col("step").is_not_nan())
+        .with_columns([pl.col("event").fill_null(0)])
+        .sort(by=["series_id", "step"], descending=False)
+        .collect()
     )
-    .filter(pl.col("step").is_not_nan())
-    .with_columns([pl.col("event").fill_null(0)])
-    .sort(by=["series_id", "step"], descending=False)
-    .collect()
-)
-df.write_parquet("all.parquet")
+    df.write_parquet(all_dataset_path)
 
 
 df = df.to_pandas()
@@ -47,7 +57,8 @@ df = df.drop(columns=["event"])
 
 # sigma = 1
 # sigma = 12
-sigma = 720
+# sigma = 12 * 60
+sigma = 12 * 9
 
 steps = np.arange(-sigma * 10, sigma * 10 + 1)
 norm_probs = scipy.stats.norm.pdf(steps, loc=0, scale=sigma)
@@ -56,7 +67,8 @@ sel = norm_probs > 1e-5
 norm_probs = norm_probs[sel]
 steps = steps[sel]
 
-norm_probs /= norm_probs.max()
+# normalize to 1
+# norm_probs /= norm_probs.max()
 
 sigma_in_min = len(norm_probs) * 12 / 60
 print(f"{sigma_in_min = :.1f} min")
@@ -93,30 +105,31 @@ for col in cols:
     df[col] = df[col].fillna(0)
 
 
-summed = df[cols].sum(axis=1)
-df[cols] /= summed.to_numpy()[:, np.newaxis]
+# normalize
+# summed = df[cols].sum(axis=1)
+# df[cols] /= summed.to_numpy()[:, np.newaxis]
 
-df.to_parquet(f"all-corrected-sigma{sigma}.parquet")
-
-
-def get_sampled_df(df: pl.DataFrame):
-    # sampled_df = df.filter(pl.col("event") > 0).select(["series_id", "step", "enmo", "event"])
-    sampled_df = df.filter((pl.col("event_onset") > 0) | (pl.col("event_wakeup") > 0)).select(
-        ["series_id", "step", "enmo", *cols]
-    )
-
-    sampled_df = pl.concat(
-        [
-            sampled_df,
-            df.filter((pl.col("event_onset") == 0) & (pl.col("event_wakeup") == 0))
-            .select(["series_id", "step", "enmo", *cols])
-            .sample(n=len(sampled_df), seed=42),
-        ]
-    )
-    return sampled_df
+df.to_parquet(data_dir_path / f"all-corrected-sigma{sigma}.parquet")
 
 
-df = pl.DataFrame(df)
-get_sampled_df(df).write_parquet("sampled-corrected.parquet")
+# def get_sampled_df(df: pl.DataFrame):
+#     # sampled_df = df.filter(pl.col("event") > 0).select(["series_id", "step", "enmo", "event"])
+#     sampled_df = df.filter((pl.col("event_onset") > 0) | (pl.col("event_wakeup") > 0)).select(
+#         ["series_id", "step", "enmo", *cols]
+#     )
+#
+#     sampled_df = pl.concat(
+#         [
+#             sampled_df,
+#             df.filter((pl.col("event_onset") == 0) & (pl.col("event_wakeup") == 0))
+#             .select(["series_id", "step", "enmo", *cols])
+#             .sample(n=len(sampled_df), seed=42),
+#         ]
+#     )
+#     return sampled_df
+#
+#
+# df = pl.DataFrame(df)
+# get_sampled_df(df).write_parquet("sampled-corrected.parquet")
 
 # px.histogram(sampled_df, x="series_id", color="event", barmode="group").show()

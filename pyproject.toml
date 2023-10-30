@@ -20,7 +20,8 @@ dev = [
 #    "tensorboardX~=2.6.2.2",
 #    "tensorboard~=2.4.1",
     "lightning~=2.1.0",
-    "wandb~=0.15.12"
+    "wandb~=0.15.12",
+    "toml~=0.10.2"
 ]
 pycharm = [
 #    "git+https://github.com/yomura-yomura/plotly_utility",
