@@ -161,6 +161,8 @@ class UserWiseDataset(Dataset):
     def __init__(
         self,
         df: pl.LazyFrame,
+        agg_interval: int,
+        feature_names: list[str],
         in_memory: bool = True,
     ):
         self.unique_series_ids = (
@@ -171,6 +173,9 @@ class UserWiseDataset(Dataset):
 
         if self.in_memory:
             self.df = self.df.collect()
+
+        self.agg_interval = agg_interval
+        self.feature_names = feature_names
 
     def __len__(self):
         return len(self.unique_series_ids)
@@ -187,25 +192,32 @@ class UserWiseDataset(Dataset):
 
         # round to 1min
 
-        features = reshape(features, (-1, 12, 2))
+        features = reshape(features, (-1, self.agg_interval, 2))
+
+        features_list = []
+        if "mean" in self.feature_names:
+            features_list.append(np.mean(features, axis=1))
+        if "std" in self.feature_names:
+            features_list.append(np.std(features, axis=1))
+        if "median" in self.feature_names:
+            features_list.append(np.median(features, axis=1))
+        if "max" in self.feature_names:
+            features_list.append(np.max(features, axis=1))
+        if "min" in self.feature_names:
+            features_list.append(np.min(features, axis=1))
+
         features = np.stack(
-            [
-                np.mean(features, axis=1),
-                np.std(features, axis=1),
-                np.median(features, axis=1),
-                np.max(features, axis=1),
-                np.min(features, axis=1),
-            ],
+            features_list,
             axis=2,
         ).reshape(
             len(features), -1
         )  # (step, feature)
 
-        labels = reshape(labels, (-1, 12, 3))
+        labels = reshape(labels, (-1, self.agg_interval, 3))
         labels = np.mean(labels, axis=1)
         labels = labels[:, 1:]  # only wakeup and onset
 
-        steps = reshape(steps, (-1, 12))[:, 12 // 2]
+        steps = reshape(steps, (-1, self.agg_interval))[:, self.agg_interval // 2]
 
         labels = (labels - np.mean(labels, axis=0, keepdims=True)) / (np.std(labels, axis=0, keepdims=True) + 1e-16)
 

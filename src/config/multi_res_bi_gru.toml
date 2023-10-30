@@ -9,6 +9,12 @@ max_chunk_size = 500_000
 
 [dataset]
 sigma = 108
+#agg_interval = 12  # 5sec/pt
+agg_interval = 6  # 5sec/pt
+features = [
+    "max", "min", "mean", "std", "median"
+]
+
 
 [train]
 num_epochs = 20

@@ -10,7 +10,6 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 from lightning.pytorch.loggers import WandbLogger
 
 import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
-import child_mind_institute_detect_sleep_states.score.event_detection_ap
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
@@ -31,7 +30,7 @@ data_dir_path = pathlib.Path("data")
 
 # exp_name = "remove-0.3-nan"
 # exp_name = "remove-0.8-nan"
-exp_name = "remove-0.8-nan-test"
+exp_name = "remove-0.8-nan-interval-6"
 
 wandb_group_name = f"{config['model_architecture']}-{exp_name}"
 
@@ -84,7 +83,9 @@ for i_fold in range(config["train"]["n_folds"]):
         #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
         #     )
         # )
-        pl.scan_parquet(p).filter(pl.col("series_id").is_in(target_series_ids))
+        pl.scan_parquet(p).filter(pl.col("series_id").is_in(target_series_ids)),
+        agg_interval=config["dataset"]["agg_interval"],
+        feature_names=config["dataset"]["features"],
     )
 
     p = fold_dir_path / "valid.parquet"
@@ -94,7 +95,9 @@ for i_fold in range(config["train"]["n_folds"]):
         #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
         #     )
         # )
-        pl.scan_parquet(p)
+        pl.scan_parquet(p),
+        agg_interval=config["dataset"]["agg_interval"],
+        feature_names=config["dataset"]["features"],
     )
     # print(
     #     pl.scan_parquet(p)
