@@ -15,7 +15,6 @@ features = [
     "max", "min", "mean", "std", "median"
 ]
 
-
 [train]
 num_epochs = 20
 train_batch_size = 1

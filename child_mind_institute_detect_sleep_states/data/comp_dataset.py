@@ -1,12 +1,10 @@
-import pathlib
 from typing import Literal, Sequence, TypeAlias, overload
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
-project_root_path = pathlib.Path(__file__).parent.parent.parent
-data_dir_path = project_root_path / "data"
+from .. import pj_struct_paths
 
 DatasetType: TypeAlias = Literal["train", "test"]
 
@@ -28,7 +26,7 @@ def get_df_dict(dataset_type: DatasetType, as_polars: bool = False) -> dict[str,
 
 
 def get_event_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.DataFrame | pl.LazyFrame:
-    path = data_dir_path / "child-mind-institute-detect-sleep-states" / f"{dataset_type}_events.csv"
+    path = pj_struct_paths.get_kaggle_dataset_dir_path() / f"{dataset_type}_events.csv"
     if as_polars:
         return pl.scan_csv(path)
     else:
@@ -36,7 +34,7 @@ def get_event_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.DataF
 
 
 def get_series_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.DataFrame | pl.LazyFrame:
-    path = data_dir_path / "child-mind-institute-detect-sleep-states" / f"{dataset_type}_series.parquet"
+    path = pj_struct_paths.get_kaggle_dataset_dir_path() / f"{dataset_type}_series.parquet"
     if as_polars:
         return pl.scan_parquet(path)
     else:

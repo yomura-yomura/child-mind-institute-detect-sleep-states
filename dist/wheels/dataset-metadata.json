@@ -1,0 +1,9 @@
+{
+  "title": "CMI-DSS Python Wheel",
+  "id": "ranchantan/cmi-dss-required-libs-python-wheels",
+  "licenses": [
+    {
+      "name": "CC0-1.0"
+    }
+  ]
+}
