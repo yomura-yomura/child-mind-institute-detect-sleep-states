@@ -14,10 +14,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
 args = parser.parse_args(["config/multi_res_bi_gru.toml"])
 
-with open(args.config_path) as f:
-    config = toml.load(f)
-    print(config)
-
 # ckpt_path = sorted(pathlib.Path("models/test-#1-of-5/").glob("last-v*.ckpt"), key=lambda p: int(p.name[6:-5]))[-1]
 # ckpt_path = "models/test-#1-of-5/last-v16.ckpt"
 # ckpt_path = "models/test-#1-of-5/last-v38.ckpt"
@@ -44,18 +40,23 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 import child_mind_institute_detect_sleep_states.score.event_detection_ap
 
 
-def main(exp_name_dir_path):
+def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
     score_list = []
+
+    with open(exp_name_dir_path / "config.toml") as f:
+        config = toml.load(f)
+        print(config)
 
     for i_fold in range(config["train"]["n_folds"]):
         ckpt_dir_path = exp_name_dir_path / f"fold{i_fold + 1}"
         submission_path = ckpt_dir_path / "submission.csv"
 
-        if submission_path.exists():
+        if not recreate and submission_path.exists():
             submission_df = pd.read_csv(submission_path)
         else:
             trainer = lp.Trainer()
 
+            print(f"load from {ckpt_dir_path}")
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module.load_from_checkpoint(
                 ckpt_dir_path / "best.ckpt", cfg=config
             )
@@ -65,9 +66,14 @@ def main(exp_name_dir_path):
             valid_dataset = (
                 child_mind_institute_detect_sleep_states.model.sleep_stage_classification.dataset.UserWiseDataset(
                     pl.scan_parquet(p),
+                    agg_interval=config["dataset"]["agg_interval"],
+                    feature_names=config["dataset"]["features"],
+                    use_labels=False,
                 )
             )
-            valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset, batch_size=1, shuffle=False)
+            valid_loader = torch.utils.data.DataLoader(
+                dataset=valid_dataset, batch_size=1, shuffle=False, num_workers=3
+            )
 
             preds_list = trainer.predict(module, valid_loader)
             # preds = torch.concat(preds).numpy()
@@ -75,10 +81,10 @@ def main(exp_name_dir_path):
             submission_df_list = []
             prob_df_list = []
             for preds, batch in zip(preds_list, tqdm(valid_loader)):
-                *_, uid, steps = batch
+                _, uid, steps, *_ = batch
 
                 submission_df_list.append(
-                    cmi_dss.data.comp_dataset.get_submission_df(
+                    child_mind_institute_detect_sleep_states.data.comp_dataset.get_submission_df(
                         preds.numpy(), uid, steps.numpy(), calc_type="top-probs"
                     )
                 )
@@ -110,7 +116,7 @@ def main(exp_name_dir_path):
             event_df,
             submission_df,
         )
-        print(f"{score = :.3f}")
+        print(f"#{i_fold + 1} of {config['train']['n_folds']}: {score = :.3f}")
         score_list.append(score)
 
     mean_score_str, *scores_str = map("{:.3f}".format, (np.mean(score_list), *score_list))
@@ -118,8 +124,8 @@ def main(exp_name_dir_path):
     return score_list
 
 
-# main(model_path / config["model_architecture"] / exp_name)
+main(model_path / "multi_res_bi_gru" / "remove-0.8-nan-interval-6", recreate=True)
 
-for p in (model_path / config["model_architecture"]).glob("*"):
-    print(p)
-    main(p)
+# for p in (model_path / "multi_res_bi_gru").glob("*"):
+#     print(p)
+#     main(p, recreate=True)

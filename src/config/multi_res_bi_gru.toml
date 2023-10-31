@@ -1,4 +1,5 @@
 model_architecture = "multi_res_bi_gru"
+exp_name = "0.8-nan-3-interval"
 
 [model]
 input_size = 10
@@ -10,9 +11,10 @@ max_chunk_size = 500_000
 [dataset]
 sigma = 108
 #agg_interval = 12  # 5sec/pt
-agg_interval = 6  # 5sec/pt
+agg_interval = 3  # 5sec/pt
 features = [
-    "max", "min", "mean", "std", "median"
+    "max", "min",
+    "mean", "std", "median"
 ]
 
 [train]
@@ -31,3 +33,6 @@ weight_decay = 0
 
 [train.optimizer.scheduler]
 eta_min = 2e-8
+
+[eval]
+window = 40  # minutes on half side
