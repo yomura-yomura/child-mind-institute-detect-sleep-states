@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 GPU_BATCH_SIZE = 1
 
@@ -79,8 +78,8 @@ class FOGEncoder(nn.Module):
         self.sequence_len = CFG["block_size"] // CFG["patch_size"]
         self.pos_encoding = nn.Parameter(torch.randn(1, self.sequence_len, CFG["fog_model_dim"]) * 0.02)
 
-    def forward(self, x, training=True):
-        x = x / 25.0
+    def forward(self, x):
+        x /= 25.0
         x = self.first_linear(x)
         # if training:  # augmentation by randomly roll of the position encoding tensor
         #     random_pos_encoding = torch.roll(
