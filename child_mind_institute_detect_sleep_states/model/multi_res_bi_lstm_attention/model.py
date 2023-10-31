@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+GPU_BATCH_SIZE = 1
+
 
 # Define the loss function
 class LossFunction(nn.Module):
@@ -42,10 +44,10 @@ class EncoderLayer(nn.Module):
         self.mha = nn.MultiheadAttention(
             embed_dim=CFG["fog_model_dim"], num_heads=CFG["fog_model_num_heads"], dropout=CFG["fog_model_mha_dropout"]
         )
-        self.add = nn.Identity()
         self.layernorm = nn.LayerNorm(CFG["fog_model_dim"])
         self.seq = nn.Sequential(
-            nn.Linear(CFG["fog_model_dim"], CFG["fog_model_dim"], activation="relu"),
+            nn.Linear(CFG["fog_model_dim"], CFG["fog_model_dim"]),
+            nn.ReLU(),
             nn.Dropout(CFG["fog_model_encoder_dropout"]),
             nn.Linear(CFG["fog_model_dim"], CFG["fog_model_dim"]),
             nn.Dropout(CFG["fog_model_encoder_dropout"]),
@@ -53,9 +55,9 @@ class EncoderLayer(nn.Module):
 
     def forward(self, x):
         attn_output, _ = self.mha(x, x, x)
-        x = self.add(x, attn_output)
+        x = x + attn_output
         x = self.layernorm(x)
-        x = self.add(x, self.seq(x))
+        x = x + self.seq(x)
         x = self.layernorm(x)
         return x
 
@@ -80,15 +82,16 @@ class FOGEncoder(nn.Module):
     def forward(self, x, training=True):
         x = x / 25.0
         x = self.first_linear(x)
-        if training:
-            random_pos_encoding = torch.roll(
-                self.pos_encoding.repeat(GPU_BATCH_SIZE, 1, 1),
-                shifts=torch.randint(-self.sequence_len, 0, (GPU_BATCH_SIZE,)),
-                dims=1,
-            )
-            x = self.add(x, random_pos_encoding)
-        else:
-            x = self.add(x, self.pos_encoding.repeat(GPU_BATCH_SIZE, 1, 1))
+        # if training:  # augmentation by randomly roll of the position encoding tensor
+        #     random_pos_encoding = torch.roll(
+        #         self.pos_encoding.repeat(GPU_BATCH_SIZE, 1, 1),
+        #         shifts=torch.randint(-self.sequence_len, 0, (GPU_BATCH_SIZE,)),
+        #         dims=1,
+        #     )
+        #     x = x + random_pos_encoding
+        # else:
+        x = x + self.pos_encoding.repeat(GPU_BATCH_SIZE, 1, 1)
+
         x = self.first_dropout(x)
         for i in range(CFG["fog_model_num_encoder_layers"]):
             x = self.enc_layers[i](x)
