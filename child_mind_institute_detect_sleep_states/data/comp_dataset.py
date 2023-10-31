@@ -41,7 +41,22 @@ def get_series_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.Data
         return pd.read_parquet(path)
 
 
-def get_submission_df(preds, series_id: str | Sequence[str], steps, calc_type: Literal["max-along-type", "top-probs"]):
+def rolling(a, window, axis, writable: bool = False):
+    shape = a.shape[:axis] + (a.shape[axis] - window + 1, window) + a.shape[axis + 1 :]
+    strides = a.strides[:axis] + (a.strides[axis],) + a.strides[axis:]
+    rolling = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=writable)
+    return rolling
+
+
+def get_submission_df(
+    preds,
+    series_id: str | Sequence[str],
+    steps,
+    *,
+    calc_type: Literal["max-along-type", "top-probs"],
+    step_interval: int,
+    time_window: int,
+):
     if calc_type == "max-along-type":
         assert False
         preds = np.concatenate(preds, axis=0)
@@ -93,13 +108,8 @@ def get_submission_df(preds, series_id: str | Sequence[str], steps, calc_type: L
     elif calc_type == "top-probs":
         n_days = max(1, round(steps.max() * 5 / (24 * 60 * 60)))
 
-        def rolling(a, window, axis, writable: bool = False):
-            shape = a.shape[:axis] + (a.shape[axis] - window + 1, window) + a.shape[axis + 1 :]
-            strides = a.strides[:axis] + (a.strides[axis],) + a.strides[axis:]
-            rolling = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=writable)
-            return rolling
-
-        window = 40 + 1
+        # step_interval = steps[0][0] * 2
+        window = int(time_window * 12 / step_interval + 1)
 
         assert preds.shape[-1] >= 2
         interest = slice((window - 1) // 2, -(window - 1) // 2)
