@@ -1,129 +1,25 @@
+import os
 import pathlib
-import sys
 from typing import TypeAlias
 
 import numpy as np
-import pandas as pd
+import numpy.lib.recfunctions
+import polars as pl
 import torch
 from numpy.typing import NDArray
-from tqdm.auto import tqdm
+from torch.utils.data import Dataset
+from tqdm.auto import tqdm, trange
 
 from ...data.comp_dataset import event_mapping
 
-Batch: TypeAlias = tuple[torch.Tensor, torch.Tensor, np.str_, torch.Tensor]
+Batch: TypeAlias = tuple[torch.Tensor, np.str_, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, np.str_, torch.Tensor]
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent.parent
 
-__all__ = ["Batch", "Dataset", "UserWiseDataset", "TimeWindowDataset", "get_dataset", "get_data", "preprocess"]
-
-sys.path.append(str(project_root_path / "lib"))
-
-from sleep_stage_classification.code.LSTM import Dataset
-
-sys.path.pop(-1)
+__all__ = ["Batch", "UserWiseDataset", "TimeWindowDataset"]
 
 
 target_columns = [f"event_{k}" for k in event_mapping]
-
-
-def preprocess(
-    df_: pd.DataFrame,
-    prev_steps_in_epoch: int,
-    n_prev_time: int,
-    *,
-    next_steps_in_epoch: int = 1,
-    n_interval_steps: int = 1,
-    remove_nan: bool = True,
-) -> tuple[NDArray[np.float_], NDArray[np.float_], NDArray[np.int_]]:
-    indices = (
-        np.arange(len(df_) - prev_steps_in_epoch - next_steps_in_epoch)[:, np.newaxis]
-        + np.arange(prev_steps_in_epoch + next_steps_in_epoch)[np.newaxis, :]
-    )
-
-    enmo, angle = (
-        np.swapaxes(
-            np.take(
-                pd.concat([df_[key].shift(-i * n_interval_steps) for i in range(n_prev_time)], axis=1).to_numpy(),
-                indices,
-                axis=0,
-            ),
-            axis1=1,
-            axis2=2,
-        )  # records, n_prev_time, steps_in_epochs
-        for key in ["enmo", "anglez"]
-    )
-
-    # selected_event_df = reference_df_[reference_df_["series_id"].isin([series_id])]
-    labels_ = df_[target_columns].to_numpy()[indices[:, -next_steps_in_epoch]]
-
-    if remove_nan:
-        sel = ~np.any(np.isnan(enmo), axis=(1, 2))
-        enmo = enmo[sel]
-        labels_ = labels_[sel]
-
-    return enmo, angle, labels_
-
-
-def get_dataset(
-    df: pd.DataFrame,
-    device: str | torch.device,
-    *,
-    prev_steps_in_epoch: int,
-    next_steps_in_epoch: int,
-    n_prev_time: int,
-    n_interval_steps: int = 1,
-):
-    return Dataset(
-        *get_data(
-            df,
-            prev_steps_in_epoch=prev_steps_in_epoch,
-            next_steps_in_epoch=next_steps_in_epoch,
-            n_prev_time=n_prev_time,
-            n_interval_steps=n_interval_steps,
-        ),
-        device=device,
-    )
-
-
-def get_data(
-    df: pd.DataFrame, *, prev_steps_in_epoch: int, next_steps_in_epoch: int, n_prev_time: int, n_interval_steps: int = 1
-) -> tuple[NDArray[np.float_], NDArray[np.int_], NDArray[np.str_]]:
-    series_id_list = []
-    data_list = []
-    label_list = []
-    for series_id, step_df in tqdm(df.groupby("series_id")):  # noqa
-        enmo, angle, labels = preprocess(
-            step_df,
-            prev_steps_in_epoch=prev_steps_in_epoch,
-            next_steps_in_epoch=next_steps_in_epoch,
-            n_prev_time=n_prev_time,
-            n_interval_steps=n_interval_steps,
-            remove_nan=True,
-        )
-        if len(enmo) == 0:
-            continue
-        enmo = enmo[:, -1, :][..., np.newaxis, :]
-        angle = angle[:, -1, :][..., np.newaxis, :]
-
-        data = np.concatenate([enmo, angle], axis=-2)
-
-        n_records = len(enmo)
-        assert n_records == len(enmo) == len(labels)
-        series_id_list.append(np.array([series_id] * n_records, dtype=str))
-        data_list.append(data)
-        label_list.append(labels)
-    return (
-        np.concatenate(data_list, axis=0),
-        np.concatenate(label_list, axis=0),
-        np.concatenate(series_id_list, axis=0),
-    )
-
-
-import os
-
-import numpy.lib.recfunctions
-import polars as pl
-from numpy.typing import NDArray
 
 
 def reshape(a, new_shape, drop=True) -> NDArray:
@@ -161,18 +57,31 @@ class UserWiseDataset(Dataset):
     def __init__(
         self,
         df: pl.LazyFrame,
+        *,
         agg_interval: int,
         feature_names: list[str],
+        use_labels: bool = True,
         in_memory: bool = True,
     ):
         self.unique_series_ids = (
             df.select(pl.col("series_id").unique(maintain_order=True)).collect().to_numpy().flatten()
         )
-        self.df = df.select(pl.col(["series_id", "step", "enmo", "anglez", *target_columns]))
-        self.in_memory = in_memory
+        self.use_labels = use_labels
 
-        if self.in_memory:
+        common_columns = ["series_id", "step", "enmo", "anglez"]
+        if self.use_labels:
+            self.df = df.select(pl.col([*common_columns, *target_columns]))
+        else:
+            self.df = df.select(pl.col(common_columns))
+
+        self.df_list_in_memory = None
+        if in_memory:
             self.df = self.df.collect()
+            self.df_list_in_memory = [
+                self._get_target_df(i)[1].to_pandas()
+                for i in trange(len(self.unique_series_ids), desc="moving df into memory")
+            ]
+            self.df = None
 
         self.agg_interval = agg_interval
         self.feature_names = feature_names
@@ -181,16 +90,10 @@ class UserWiseDataset(Dataset):
         return len(self.unique_series_ids)
 
     def __getitem__(self, idx: int) -> Batch:
-        target_series_id = self.unique_series_ids[idx]
-        target_df = self.df.filter(pl.col("series_id") == target_series_id).sort("step")
-        if not self.in_memory:
-            target_df = target_df.collect()
+        target_series_id, target_df = self._get_target_df(idx)
 
         features = target_df[["enmo", "anglez"]].to_numpy()
-        labels = target_df[target_columns].to_numpy().astype(np.float32)
         steps = target_df["step"].to_numpy().astype(np.int64)
-
-        # round to 1min
 
         features = reshape(features, (-1, self.agg_interval, 2))
 
@@ -213,15 +116,27 @@ class UserWiseDataset(Dataset):
             len(features), -1
         )  # (step, feature)
 
-        labels = reshape(labels, (-1, self.agg_interval, 3))
-        labels = np.mean(labels, axis=1)
-        labels = labels[:, 1:]  # only wakeup and onset
-
         steps = reshape(steps, (-1, self.agg_interval))[:, self.agg_interval // 2]
 
-        labels = (labels - np.mean(labels, axis=0, keepdims=True)) / (np.std(labels, axis=0, keepdims=True) + 1e-16)
+        if self.use_labels:
+            labels = target_df[target_columns].to_numpy().astype(np.float32)
+            labels = reshape(labels, (-1, self.agg_interval, 3))
+            labels = np.mean(labels, axis=1)
+            labels = labels[:, 1:]  # only wakeup and onset
+            labels = (labels - np.mean(labels, axis=0, keepdims=True)) / (np.std(labels, axis=0, keepdims=True) + 1e-16)
+            return torch.from_numpy(features), target_series_id, torch.from_numpy(steps), torch.from_numpy(labels)
+        else:
+            return torch.from_numpy(features), target_series_id, torch.from_numpy(steps)
 
-        return torch.from_numpy(features), torch.from_numpy(labels), target_series_id, torch.from_numpy(steps)
+    def _get_target_df(self, idx) -> tuple[np.str_, pl.DataFrame]:
+        target_series_id = self.unique_series_ids[idx]
+        if self.df_list_in_memory is None:
+            target_df = self.df.filter(pl.col("series_id") == target_series_id).sort("step")
+            if isinstance(target_df, pl.LazyFrame):
+                target_df = target_df.collect()
+        else:
+            target_df = self.df_list_in_memory[idx]
+        return target_series_id, target_df
 
 
 class TimeWindowDataset(Dataset):
