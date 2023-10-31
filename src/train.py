@@ -15,10 +15,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
 parser.add_argument("--n-devices", "-n", type=int, default=1)
 args = parser.parse_args(
-    [
-        # "config/sleep_stage_classification.toml"
-        "config/multi_res_bi_gru.toml"
-    ]
+    # [
+    #     # "config/sleep_stage_classification.toml"
+    #     "config/multi_res_bi_gru.toml"
+    # ]
 )
 
 with open(args.config_path) as f:
@@ -30,7 +30,8 @@ data_dir_path = pathlib.Path("data")
 
 # exp_name = "remove-0.3-nan"
 # exp_name = "remove-0.8-nan"
-exp_name = "remove-0.8-nan-interval-6"
+# exp_name = "remove-0.8-nan-interval-6"
+exp_name = config["exp_name"]
 
 wandb_group_name = f"{config['model_architecture']}-{exp_name}"
 
@@ -98,6 +99,7 @@ for i_fold in range(config["train"]["n_folds"]):
         pl.scan_parquet(p),
         agg_interval=config["dataset"]["agg_interval"],
         feature_names=config["dataset"]["features"],
+        use_labels=True,
     )
     # print(
     #     pl.scan_parquet(p)
@@ -108,10 +110,10 @@ for i_fold in range(config["train"]["n_folds"]):
     # )
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset, batch_size=config["train"]["train_batch_size"], shuffle=True
+        dataset=train_dataset, batch_size=config["train"]["train_batch_size"], shuffle=True, num_workers=8
     )
     valid_loader = torch.utils.data.DataLoader(
-        dataset=valid_dataset, batch_size=config["train"]["valid_batch_size"], shuffle=False
+        dataset=valid_dataset, batch_size=config["train"]["valid_batch_size"], shuffle=False, num_workers=8
     )
 
     match config["model_architecture"]:
@@ -166,6 +168,16 @@ for i_fold in range(config["train"]["n_folds"]):
             if previous and self._should_remove_checkpoint(trainer, previous, filepath):
                 self._remove_checkpoint(trainer, previous)
 
+    exp_name_dir_path = model_path / config["model_architecture"] / exp_name
+
+    config_path = exp_name_dir_path / "config.toml"
+    # if config_path.exists():
+    #     continue
+
+    config_path.parent.mkdir(exist_ok=True, parents=True)
+    with open(config_path, "w") as f:
+        toml.dump(config, f)
+
     trainer = L.Trainer(
         devices=args.n_devices,
         max_epochs=config["train"]["num_epochs"],
@@ -180,7 +192,7 @@ for i_fold in range(config["train"]["n_folds"]):
                 patience=config["train"]["early_stopping_patience"],
             ),
             ModelCheckpointWithSymlinkToBest(
-                dirpath=model_path / config["model_architecture"] / exp_name / f"fold{i_fold + 1}",
+                dirpath=exp_name_dir_path / f"fold{i_fold + 1}",
                 filename="{epoch}-{EventDetectionAP:.3f}",
                 monitor="EventDetectionAP",
                 mode="max",
