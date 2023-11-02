@@ -3,27 +3,36 @@ import copy
 import lightning as L
 import numpy as np
 import pandas as pd
+import polars as pl
 import torch
+import torch.utils.data
+from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 from torch import nn
 
+from ... import pj_struct_paths
 from ...data.comp_dataset import get_event_df, get_submission_df
 from ...score import calc_event_detection_ap
+from ..dataset import UserWiseDataset
+from .config import Config
 from .model import MultiResidualBiGRU
 
-__all__ = ["Module"]
+__all__ = ["Module", "DataModule"]
 
 
 class Module(L.LightningModule):
-    def __init__(self, cfg):
+    def __init__(self, config: Config):
         super().__init__()
 
-        cfg = copy.deepcopy(cfg)
-
-        self.optimizer_params = cfg["train"]["optimizer"]
-        self.max_chunk_size = cfg["model"].pop("max_chunk_size")
-        self.model = MultiResidualBiGRU(**cfg["model"])
-        self.eval_time_window = cfg["eval"]["window"]
-        self.step_interval = cfg["dataset"]["agg_interval"]
+        self.optimizer_params = config["train"]["optimizer"]
+        self.max_chunk_size = config["model"]["max_chunk_size"]
+        self.model = MultiResidualBiGRU(
+            input_size=2 * len(config["dataset"]["features"]),
+            hidden_size=config["model"]["hidden_size"],
+            out_size=config["model"]["out_size"],
+            n_layers=config["model"]["n_layers"],
+        )
+        self.eval_time_window = config["eval"]["window"]
+        self.step_interval = config["dataset"]["agg_interval"]
 
         self.preds_list: list = []
         self.ids_list: list = []
@@ -115,9 +124,80 @@ class Module(L.LightningModule):
         self.steps_list.clear()
 
     def configure_optimizers(self):
-        optimizer_params = self.optimizer_params.copy()
+        optimizer_params = copy.deepcopy(self.optimizer_params)
+
         scheduler_params = optimizer_params.pop("scheduler")
+        scheduler_params["T_max"] = self.trainer.estimated_stepping_batches
 
         optimizer = torch.optim.Adam(self.model.parameters(), **optimizer_params)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **scheduler_params)
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
+
+
+class DataModule(L.LightningDataModule):
+    def __init__(self, df: pl.DataFrame | pl.LazyFrame, config: Config, i_fold: int):
+        super().__init__()
+
+        if isinstance(df, pl.DataFrame):
+            n_total_records = df.select(pl.count())[0, 0]
+        else:
+            n_total_records = df.select(pl.count()).collect()[0, 0]
+
+        self.df = df.with_columns(index=pl.Series(np.arange(n_total_records, dtype=np.uint32)))
+
+        fold_dir_path = pj_struct_paths.get_data_dir_path() / "cmi-dss-train-k-fold-indices" / "base"
+        self.fold_indices_npz_data = np.load(
+            fold_dir_path / config["train"]["fold_type"] / f"sigma{config['dataset']['sigma']}" / f"fold{i_fold}.npz"
+        )
+        self.config = config
+
+        self.train_dataset = None
+        self.valid_dataset = None
+
+        event_df = get_event_df("train")
+        nan_fraction_df = event_df.groupby("series_id")["step"].apply(
+            lambda steps: steps.isna().sum()
+        ) / event_df.groupby("series_id")["step"].apply(len)
+        self.target_series_ids = list(nan_fraction_df[nan_fraction_df < 0.8].index)
+
+    def setup(self, stage: str) -> None:
+        if stage == "fit":
+            train_df = self.df.filter(pl.col("index").is_in(self.fold_indices_npz_data["train"])).drop("index")
+            self.train_dataset = UserWiseDataset(
+                # pl.scan_parquet(p).filter(
+                #     pl.col("series_id").is_in(
+                #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
+                #     )
+                # )
+                # pl.scan_parquet(p).filter(pl.col("series_id").is_in(target_series_ids)),
+                train_df.filter(pl.col("series_id").is_in(self.target_series_ids)),
+                agg_interval=self.config["dataset"]["agg_interval"],
+                feature_names=self.config["dataset"]["features"],
+            )
+
+        if stage in ("fit", "validate"):
+            valid_df = self.df.filter(pl.col("index").is_in(self.fold_indices_npz_data["valid"])).drop("index")
+            self.valid_dataset = UserWiseDataset(
+                # pl.scan_parquet(p).filter(
+                #     pl.col("series_id").is_in(
+                #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
+                #     )
+                # )
+                # pl.scan_parquet(p),
+                valid_df,
+                agg_interval=self.config["dataset"]["agg_interval"],
+                feature_names=self.config["dataset"]["features"],
+            )
+
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        return torch.utils.data.DataLoader(
+            dataset=self.train_dataset, batch_size=self.config["train"]["train_batch_size"], shuffle=True, num_workers=8
+        )
+
+    def val_dataloader(self) -> EVAL_DATALOADERS:
+        return torch.utils.data.DataLoader(
+            dataset=self.valid_dataset,
+            batch_size=self.config["train"]["valid_batch_size"],
+            shuffle=False,
+            num_workers=8,
+        )

@@ -1,5 +1,4 @@
 import os
-import pathlib
 from typing import TypeAlias
 
 import numpy as np
@@ -11,13 +10,12 @@ from torch.utils.data import Dataset
 from tqdm.auto import tqdm, trange
 
 from ...data.comp_dataset import event_mapping
-
-Batch: TypeAlias = tuple[torch.Tensor, np.str_, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, np.str_, torch.Tensor]
-
-project_root_path = pathlib.Path(__file__).parent.parent.parent.parent
+from . import features as _features
 
 __all__ = ["Batch", "UserWiseDataset", "TimeWindowDataset"]
 
+
+Batch: TypeAlias = tuple[torch.Tensor, np.str_, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, np.str_, torch.Tensor]
 
 target_columns = [f"event_{k}" for k in event_mapping]
 
@@ -56,16 +54,18 @@ def reshape(a, new_shape, drop=True) -> NDArray:
 class UserWiseDataset(Dataset):
     def __init__(
         self,
-        df: pl.LazyFrame,
+        df: pl.LazyFrame | pl.DataFrame,
         *,
         agg_interval: int,
         feature_names: list[str],
         use_labels: bool = True,
         in_memory: bool = True,
     ):
-        self.unique_series_ids = (
-            df.select(pl.col("series_id").unique(maintain_order=True)).collect().to_numpy().flatten()
-        )
+        series_id_df = df.select(pl.col("series_id").unique(maintain_order=True))
+        if isinstance(series_id_df, pl.LazyFrame):
+            series_id_df = series_id_df.collect()
+        self.unique_series_ids = series_id_df.to_numpy().flatten()
+
         self.use_labels = use_labels
 
         common_columns = ["series_id", "step", "enmo", "anglez"]
@@ -76,7 +76,8 @@ class UserWiseDataset(Dataset):
 
         self.df_list_in_memory = None
         if in_memory:
-            self.df = self.df.collect()
+            if isinstance(self.df, pl.LazyFrame):
+                self.df = self.df.collect()
             self.df_list_in_memory = [
                 self._get_target_df(i)[1].to_pandas()
                 for i in trange(len(self.unique_series_ids), desc="moving df into memory")
@@ -108,6 +109,17 @@ class UserWiseDataset(Dataset):
             features_list.append(np.max(features, axis=1))
         if "min" in self.feature_names:
             features_list.append(np.min(features, axis=1))
+        if "fft" in self.feature_names:
+            features_list.append(
+                _features.fft_signal_clean(
+                    np.mean(features, axis=1),
+                    step_interval=self.agg_interval,
+                    # filter_percent=99.7,
+                    # filter_percent=99,
+                    filter_upper_period=12 * 60 * 3,
+                    axis=0,
+                )
+            )
 
         features = np.stack(
             features_list,

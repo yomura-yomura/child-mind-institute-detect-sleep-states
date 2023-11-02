@@ -1,20 +1,25 @@
 model_architecture = "multi_res_bi_gru"
-exp_name = "0.8-nan-3-interval"
+exp_name = "0.8-nan-12-interval"
+#exp_name = "0.8-nan-12-interval-with-fft"
 
 [model]
-input_size = 10
 hidden_size = 64
 out_size = 2
 n_layers = 5
+
 max_chunk_size = 500_000
 
 [dataset]
 sigma = 108
-#agg_interval = 12  # 5sec/pt
-agg_interval = 3  # 5sec/pt
+agg_interval = 12  # 5sec/pt
+#agg_interval = 3  # 5sec/pt
 features = [
-    "max", "min",
-    "mean", "std", "median"
+    "max",
+    "min",
+    "mean",
+    "std",
+    "median",
+#    "fft",
 ]
 
 [train]
@@ -22,13 +27,15 @@ num_epochs = 20
 train_batch_size = 1
 valid_batch_size = 1
 learning_rate = 0.001
+
+fold_type = "group"
+#fold_type = "stratified_group"
 n_folds = 5
 
 early_stopping_patience = 5
 save_top_k_models = 3
 
 [train.optimizer]
-lr = 0.001
 weight_decay = 0
 
 [train.optimizer.scheduler]

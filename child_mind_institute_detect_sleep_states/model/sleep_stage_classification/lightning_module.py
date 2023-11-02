@@ -1,6 +1,6 @@
 import pathlib
 
-import lightning.pytorch as lp
+import lightning as L
 import numpy as np
 import pandas as pd
 import torch
@@ -8,7 +8,7 @@ from lightning.pytorch.utilities.types import STEP_OUTPUT, OptimizerLRScheduler
 
 from ...data.comp_dataset import get_event_df, get_submission_df
 from ...score import calc_event_detection_ap
-from .dataset import Batch
+from ..dataset import Batch
 from .model import CharGRULSTM
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent
@@ -17,7 +17,7 @@ project_root_path = pathlib.Path(__file__).parent.parent.parent
 __all__ = ["Module"]
 
 
-class Module(lp.LightningModule):
+class Module(L.LightningModule):
     def __init__(
         self,
         n_features: int,

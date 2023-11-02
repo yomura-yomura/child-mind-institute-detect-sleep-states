@@ -16,7 +16,7 @@ def get_project_root_path() -> pathlib.Path:
 
 def get_data_dir_path() -> pathlib.Path:
     if _data_dir_path is None:
-        return get_project_root_path() / "sleep-critical-point-prepare-data"
+        return get_project_root_path() / "data"
     else:
         return _data_dir_path
 

@@ -4,20 +4,21 @@ import pathlib
 import lightning as L
 import polars as pl
 import toml
-import torch.utils.data
 import wandb
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 
-import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
+from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
+from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger, get_versioning_wandb_group_name
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
 parser.add_argument("--n-devices", "-n", type=int, default=1)
+parser.add_argument("-f", default=False, action="store_true")
 args = parser.parse_args(
     # [
     #     # "config/sleep_stage_classification.toml"
-    #     "config/multi_res_bi_gru.toml"
+    #     "config/multi_res_bi_gru.toml",
+    #     "-f",
     # ]
 )
 
@@ -25,82 +26,50 @@ with open(args.config_path) as f:
     config = toml.load(f)
     print(config)
 
-data_dir_path = pathlib.Path("data")
+data_dir_path = pathlib.Path("data") / "base"
 
 
-# exp_name = "remove-0.3-nan"
-# exp_name = "remove-0.8-nan"
-# exp_name = "remove-0.8-nan-interval-6"
 exp_name = config["exp_name"]
 
 wandb_group_name = f"{config['model_architecture']}-{exp_name}"
+wandb_group_name = get_versioning_wandb_group_name(wandb_group_name)
+# wandb_group_name = f"{wandb_group_name}_v6"
 
-api = wandb.Api()
-possible_exp_names = set(
-    run._attrs["group"]
-    for run in api.runs(
-        "ranchan/child-mind-institute-detect-sleep-states",
-        filters={"group": {"$regex": rf"^{wandb_group_name}(_v\d+)?$"}},
-    )
-)
+model_path = pathlib.Path("models")
 
-if len(possible_exp_names) == 0:
-    target_version = 0
-else:
-    target_version = 1
+exp_name_dir_path = model_path / config["model_architecture"] / config["train"]["fold_type"] / exp_name
 
-possible_exp_names -= {wandb_group_name}
-if len(possible_exp_names) > 0:
-    target_version += max(int(name[len(f"{wandb_group_name}_v") :]) for name in possible_exp_names)
-
-if target_version > 0:
-    wandb_group_name = f"{wandb_group_name}_v{target_version}"
+config_path = exp_name_dir_path / "config.toml"
+if not args.f and config_path.exists():
+    raise FileExistsError(config_path)
 
 
-print(f"{wandb_group_name = }")
+config_path.parent.mkdir(exist_ok=True, parents=True)
+with open(config_path, "w") as f:
+    toml.dump(config, f)
+
+fold_dir_path = pathlib.Path("cmi-dss-train-k-fold-indices") / "base"
+
+
+df = pl.scan_parquet(data_dir_path / f"all-corrected-sigma{config['dataset']['sigma']}.parquet")
 
 
 for i_fold in range(config["train"]["n_folds"]):
     # if i_fold <= 0:
     #     continue
+    if (exp_name_dir_path / f"fold{i_fold + 1}").exists():
+        continue
 
-    fold_dir_path = data_dir_path / f"sigma{config['dataset']['sigma']}" / f"fold{i_fold}"
-
-    name = f"{config['model_architecture']}-{exp_name}-#{i_fold + 1}-of-{config['train']['n_folds']}"
+    name = "-".join(
+        [
+            config["model_architecture"],
+            config["train"]["fold_type"],
+            exp_name,
+            f"#{i_fold + 1}-of-{config['train']['n_folds']}",
+        ]
+    )
     print(name)
 
-    import child_mind_institute_detect_sleep_states.data
-
-    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
-    nan_fraction_df = event_df.groupby("series_id")["step"].apply(lambda steps: steps.isna().sum()) / event_df.groupby(
-        "series_id"
-    )["step"].apply(len)
-    target_series_ids = list(nan_fraction_df[nan_fraction_df < 0.8].index)
-
-    p = fold_dir_path / "train.parquet"
-    train_dataset = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.dataset.UserWiseDataset(
-        # pl.scan_parquet(p).filter(
-        #     pl.col("series_id").is_in(
-        #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
-        #     )
-        # )
-        pl.scan_parquet(p).filter(pl.col("series_id").is_in(target_series_ids)),
-        agg_interval=config["dataset"]["agg_interval"],
-        feature_names=config["dataset"]["features"],
-    )
-
-    p = fold_dir_path / "valid.parquet"
-    valid_dataset = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.dataset.UserWiseDataset(
-        # pl.scan_parquet(p).filter(
-        #     pl.col("series_id").is_in(
-        #         list(pl.scan_parquet(p).select(pl.col("series_id").unique()).head(3).collect()["series_id"])
-        #     )
-        # )
-        pl.scan_parquet(p),
-        agg_interval=config["dataset"]["agg_interval"],
-        feature_names=config["dataset"]["features"],
-        use_labels=True,
-    )
     # print(
     #     pl.scan_parquet(p)
     #     .select(pl.col("series_id").unique().is_in(target_series_ids))
@@ -109,74 +78,25 @@ for i_fold in range(config["train"]["n_folds"]):
     #     .value_counts()
     # )
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset=train_dataset, batch_size=config["train"]["train_batch_size"], shuffle=True, num_workers=8
-    )
-    valid_loader = torch.utils.data.DataLoader(
-        dataset=valid_dataset, batch_size=config["train"]["valid_batch_size"], shuffle=False, num_workers=8
-    )
-
     match config["model_architecture"]:
         case "multi_res_bi_gru":
             import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
 
-            config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
+            data_module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.DataModule(df, config, i_fold)
+
+            # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(data_module.train_dataset)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module(config)
-        case "sleep_stage_classification":
-            module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
-                # n_features=2,
-                n_features=10,
-                learning_rate=config["train"]["learning_rate"],
-                wakeup_weight=config["train"]["weight"],
-                onset_weight=config["train"]["weight"],
-            )
+        # case "sleep_stage_classification":
+        #     import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
+        #
+        #     module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
+        #         n_features=2 * len(config["dataset"]["features"]),
+        #         learning_rate=config["train"]["learning_rate"],
+        #         wakeup_weight=config["train"]["weight"],
+        #         onset_weight=config["train"]["weight"],
+        #     )
         case _ as model_architecture:
             raise ValueError(f"{model_architecture=} not expected")
-
-    model_path = pathlib.Path("models")
-
-    from torch import Tensor
-
-    class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
-        CHECKPOINT_NAME_BEST = "best"
-
-        def _save_last_checkpoint(self, trainer: "L.Trainer", monitor_candidates: dict[str, Tensor]) -> None:
-            """
-            save last+best checkpoint
-            """
-
-            # save last
-            super()._save_last_checkpoint(trainer, monitor_candidates)
-
-            # save best below
-            filepath = self.format_checkpoint_name(monitor_candidates, self.CHECKPOINT_NAME_BEST)
-
-            if self._enable_version_counter:
-                version_cnt = self.STARTING_VERSION
-                while self.file_exists(filepath, trainer) and filepath != getattr(self, "previous_best_model_path", ""):
-                    filepath = self.format_checkpoint_name(
-                        monitor_candidates, self.CHECKPOINT_NAME_BEST, ver=version_cnt
-                    )
-                    version_cnt += 1
-
-            # set the last model path before saving because it will be part of the state.
-            previous, self.previous_best_model_path = getattr(self, "previous_best_model_path", ""), filepath
-            if self._fs.protocol == "file" and self._last_checkpoint_saved and self.save_top_k != 0:
-                self._link_checkpoint(trainer, self.best_model_path, filepath)
-            else:
-                self._save_checkpoint(trainer, filepath)
-            if previous and self._should_remove_checkpoint(trainer, previous, filepath):
-                self._remove_checkpoint(trainer, previous)
-
-    exp_name_dir_path = model_path / config["model_architecture"] / exp_name
-
-    config_path = exp_name_dir_path / "config.toml"
-    # if config_path.exists():
-    #     continue
-
-    config_path.parent.mkdir(exist_ok=True, parents=True)
-    with open(config_path, "w") as f:
-        toml.dump(config, f)
 
     trainer = L.Trainer(
         devices=args.n_devices,
@@ -205,7 +125,7 @@ for i_fold in range(config["train"]["n_folds"]):
     )
 
     print("fitting")
-    trainer.fit(model=module, train_dataloaders=train_loader, val_dataloaders=valid_loader)
+    trainer.fit(module, data_module)
 
     wandb.finish()
 

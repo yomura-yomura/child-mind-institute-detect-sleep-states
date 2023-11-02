@@ -6,38 +6,15 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import toml
-
-import child_mind_institute_detect_sleep_states as cmi_dss
-import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
-
-parser = argparse.ArgumentParser()
-parser.add_argument("config_path", type=pathlib.Path)
-args = parser.parse_args(["config/multi_res_bi_gru.toml"])
-
-# ckpt_path = sorted(pathlib.Path("models/test-#1-of-5/").glob("last-v*.ckpt"), key=lambda p: int(p.name[6:-5]))[-1]
-# ckpt_path = "models/test-#1-of-5/last-v16.ckpt"
-# ckpt_path = "models/test-#1-of-5/last-v38.ckpt"
-
-import pathlib
-
-import sklearn.model_selection
-import torch.utils.data
-
-import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
-
-data_dir_path = pathlib.Path("data")
-model_path = pathlib.Path("models")
-
-# exp_name = "base"
-# exp_name = "remove-nan"
-# exp_name = "remove-0.3-nan"
-exp_name = "remove-0.8-nan"
-
-
 from tqdm.auto import tqdm
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
+import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
+import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
 import child_mind_institute_detect_sleep_states.score.event_detection_ap
+
+data_dir_path = pathlib.Path("data")
+model_path = pathlib.Path("models")
 
 
 def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
@@ -46,6 +23,8 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
     with open(exp_name_dir_path / "config.toml") as f:
         config = toml.load(f)
         print(config)
+
+    df = pl.scan_parquet(data_dir_path / "base" / f"all-corrected-sigma{config['dataset']['sigma']}.parquet")
 
     for i_fold in range(config["train"]["n_folds"]):
         ckpt_dir_path = exp_name_dir_path / f"fold{i_fold + 1}"
@@ -58,34 +37,45 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
 
             print(f"load from {ckpt_dir_path}")
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module.load_from_checkpoint(
-                ckpt_dir_path / "best.ckpt", cfg=config
+                ckpt_dir_path / "best.ckpt", config=config
             )
 
-            fold_dir_path = data_dir_path / f"sigma{config['dataset']['sigma']}" / f"fold{i_fold}"
-            p = fold_dir_path / "valid.parquet"
-            valid_dataset = (
-                child_mind_institute_detect_sleep_states.model.sleep_stage_classification.dataset.UserWiseDataset(
-                    pl.scan_parquet(p),
-                    agg_interval=config["dataset"]["agg_interval"],
-                    feature_names=config["dataset"]["features"],
-                    use_labels=False,
-                )
-            )
-            valid_loader = torch.utils.data.DataLoader(
-                dataset=valid_dataset, batch_size=1, shuffle=False, num_workers=3
-            )
+            # fold_dir_path = (
+            #     data_dir_path
+            #     / "base"
+            #     / config["train"]["fold_type"]
+            #     / f"sigma{config['dataset']['sigma']}"
+            #     / f"fold{i_fold}"
+            # )
+            # p = fold_dir_path / "valid.parquet"
+            # valid_dataset = child_mind_institute_detect_sleep_states.model.dataset.UserWiseDataset(
+            #     pl.scan_parquet(p),
+            #     agg_interval=config["dataset"]["agg_interval"],
+            #     feature_names=config["dataset"]["features"],
+            #     use_labels=False,
+            # )
+            # valid_loader = torch.utils.data.DataLoader(
+            #     dataset=valid_dataset, batch_size=1, shuffle=False, num_workers=3
+            # )
+            data_module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.DataModule(df, config, i_fold)
+            data_module.setup("validate")
 
-            preds_list = trainer.predict(module, valid_loader)
+            preds_list = trainer.predict(module, data_module.val_dataloader())
             # preds = torch.concat(preds).numpy()
 
             submission_df_list = []
             prob_df_list = []
-            for preds, batch in zip(preds_list, tqdm(valid_loader)):
+            for preds, batch in zip(preds_list, tqdm(data_module.val_dataloader())):
                 _, uid, steps, *_ = batch
 
                 submission_df_list.append(
                     child_mind_institute_detect_sleep_states.data.comp_dataset.get_submission_df(
-                        preds.numpy(), uid, steps.numpy(), calc_type="top-probs"
+                        preds.numpy(),
+                        uid,
+                        steps.numpy(),
+                        calc_type="top-probs",
+                        step_interval=config["dataset"]["agg_interval"],
+                        time_window=config["eval"]["window"],
                     )
                 )
                 prob_df_list.append(
@@ -106,12 +96,12 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
             submission_df = pd.concat(submission_df_list).sort_values(["series_id", "step", "event"])
             submission_df.to_csv(submission_path, index=False)
 
-        event_df = cmi_dss.data.comp_dataset.get_event_df("train")
+        event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
         event_df = event_df[event_df["series_id"].isin(submission_df["series_id"].unique())][
             ["series_id", "event", "step", "night"]
         ]
         event_df = event_df.dropna()
-        score = cmi_dss.score.calc_event_detection_ap(
+        score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
             # event_df, submission_df2[submission_df2["series_id"].isin(event_df["series_id"])]
             event_df,
             submission_df,
@@ -124,8 +114,18 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
     return score_list
 
 
-main(model_path / "multi_res_bi_gru" / "remove-0.8-nan-interval-6", recreate=True)
+if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("config_path", type=pathlib.Path)
+    # args = parser.parse_args(
+    #     ["config/multi_res_bi_gru.toml"]
+    # )
 
-# for p in (model_path / "multi_res_bi_gru").glob("*"):
-#     print(p)
-#     main(p, recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "remove-0.8-nan-interval-6", recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "0.8-nan-3-interval", recreate=True)
+    main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval-with-fft", recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval", recreate=True)
+
+    # for p in (model_path / "multi_res_bi_gru").glob("*"):
+    #     print(p)
+    #     main(p, recreate=True)

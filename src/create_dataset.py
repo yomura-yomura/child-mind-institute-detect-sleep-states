@@ -3,18 +3,31 @@ import pathlib
 import polars as pl
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
+import child_mind_institute_detect_sleep_states.pj_struct_paths
 from child_mind_institute_detect_sleep_states.data.comp_dataset import event_mapping
+
+data_dir_path = pathlib.Path("data")
+# data_dir_path /= "base"
+data_dir_path /= "with_part_id"
+data_dir_path.mkdir(exist_ok=True, parents=True)
+
+child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
+    kaggle_dataset_dir_path=child_mind_institute_detect_sleep_states.pj_struct_paths.get_data_dir_path()
+    / "train-series-with-partid"
+)
 
 df_dict = child_mind_institute_detect_sleep_states.data.comp_dataset.get_df_dict("train", as_polars=True)
 
-data_dir_path = pathlib.Path("data")
+df_dict["series"] = df_dict["series"].drop(columns=["series_id"]).drop_nulls("part_id").rename({"part_id": "series_id"})
 
 
 all_dataset_path = data_dir_path / "all.parquet"
 
 if all_dataset_path.exists():
+    print(f"load {all_dataset_path}")
     df = pl.read_parquet(all_dataset_path)
 else:
+    print(f"create {all_dataset_path}")
     df = (
         df_dict["series"]
         .with_columns(
@@ -110,26 +123,3 @@ for col in cols:
 # df[cols] /= summed.to_numpy()[:, np.newaxis]
 
 df.to_parquet(data_dir_path / f"all-corrected-sigma{sigma}.parquet")
-
-
-# def get_sampled_df(df: pl.DataFrame):
-#     # sampled_df = df.filter(pl.col("event") > 0).select(["series_id", "step", "enmo", "event"])
-#     sampled_df = df.filter((pl.col("event_onset") > 0) | (pl.col("event_wakeup") > 0)).select(
-#         ["series_id", "step", "enmo", *cols]
-#     )
-#
-#     sampled_df = pl.concat(
-#         [
-#             sampled_df,
-#             df.filter((pl.col("event_onset") == 0) & (pl.col("event_wakeup") == 0))
-#             .select(["series_id", "step", "enmo", *cols])
-#             .sample(n=len(sampled_df), seed=42),
-#         ]
-#     )
-#     return sampled_df
-#
-#
-# df = pl.DataFrame(df)
-# get_sampled_df(df).write_parquet("sampled-corrected.parquet")
-
-# px.histogram(sampled_df, x="series_id", color="event", barmode="group").show()
