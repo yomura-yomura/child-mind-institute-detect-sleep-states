@@ -14,7 +14,7 @@ from ...data.comp_dataset import get_event_df, get_submission_df
 from ...score import calc_event_detection_ap
 from ..dataset import UserWiseDataset
 from .config import Config
-from .model import MultiResidualBiGRU
+from .model import MultiResidualBiLSTM
 
 __all__ = ["Module", "DataModule"]
 
@@ -25,7 +25,7 @@ class Module(L.LightningModule):
 
         self.optimizer_params = config["train"]["optimizer"]
         self.max_chunk_size = config["model"]["max_chunk_size"]
-        self.model = MultiResidualBiGRU(
+        self.model = MultiResidualBiLSTM(
             input_size=2 * len(config["dataset"]["features"]),
             hidden_size=config["model"]["hidden_size"],
             out_size=config["model"]["out_size"],
