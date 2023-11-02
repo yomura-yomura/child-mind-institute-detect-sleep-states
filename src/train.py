@@ -86,15 +86,20 @@ for i_fold in range(config["train"]["n_folds"]):
 
             # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(data_module.train_dataset)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module(config)
-        # case "sleep_stage_classification":
-        #     import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
-        #
-        #     module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
-        #         n_features=2 * len(config["dataset"]["features"]),
-        #         learning_rate=config["train"]["learning_rate"],
-        #         wakeup_weight=config["train"]["weight"],
-        #         onset_weight=config["train"]["weight"],
-        #     )
+            
+        case "multi_res_bi_lstm":
+            import child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm
+
+            config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
+            module = child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm.Module(config)
+        case "sleep_stage_classification":
+            module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
+                # n_features=2,
+                n_features=10,
+                learning_rate=config["train"]["learning_rate"],
+                wakeup_weight=config["train"]["weight"],
+                onset_weight=config["train"]["weight"],
+            )
         case _ as model_architecture:
             raise ValueError(f"{model_architecture=} not expected")
 
