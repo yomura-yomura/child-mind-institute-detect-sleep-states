@@ -6,9 +6,13 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 import child_mind_institute_detect_sleep_states.pj_struct_paths
 from child_mind_institute_detect_sleep_states.data.comp_dataset import event_mapping
 
+
 data_dir_path = pathlib.Path("data")
-# data_dir_path /= "base"
-data_dir_path /= "with_part_id"
+
+# train_dataset_type = "base"
+train_dataset_type = "with_part_id"
+
+data_dir_path /= train_dataset_type
 data_dir_path.mkdir(exist_ok=True, parents=True)
 
 child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
@@ -18,7 +22,10 @@ child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
 
 df_dict = child_mind_institute_detect_sleep_states.data.comp_dataset.get_df_dict("train", as_polars=True)
 
-df_dict["series"] = df_dict["series"].drop(columns=["series_id"]).drop_nulls("part_id").rename({"part_id": "series_id"})
+if train_dataset_type == "with_part_id":
+    df_dict["series"] = (
+        df_dict["series"].drop(columns=["series_id"]).drop_nulls("part_id").rename({"part_id": "series_id"})
+    )
 
 
 all_dataset_path = data_dir_path / "all.parquet"

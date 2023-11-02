@@ -9,10 +9,11 @@ __all__ = ["WandbLogger", "get_versioning_wandb_group_name"]
 
 def get_versioning_wandb_group_name(wandb_group_name: str) -> str:
     api = wandb.Api()
+
     possible_exp_names = set(
         run._attrs["group"]
         for run in api.runs(
-            "ranchan/child-mind-institute-detect-sleep-states",
+            f"{api.default_entity}/child-mind-institute-detect-sleep-states",
             filters={"group": {"$regex": rf"^{wandb_group_name}(_v\d+)?$"}},
         )
     )

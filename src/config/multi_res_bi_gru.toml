@@ -21,6 +21,8 @@ features = [
     "median",
 #    "fft",
 ]
+#train_dataset_type = "base"
+train_dataset_type = "with_part_id"
 
 [train]
 num_epochs = 20

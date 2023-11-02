@@ -10,6 +10,10 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger, get_versioning_wandb_group_name
 
+this_dir_path = pathlib.Path(__file__).parent
+project_root_path = this_dir_path.parent
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
 parser.add_argument("--n-devices", "-n", type=int, default=1)
@@ -26,8 +30,6 @@ with open(args.config_path) as f:
     config = toml.load(f)
     print(config)
 
-data_dir_path = pathlib.Path("data") / "base"
-
 
 exp_name = config["exp_name"]
 
@@ -35,9 +37,15 @@ wandb_group_name = f"{config['model_architecture']}-{exp_name}"
 wandb_group_name = get_versioning_wandb_group_name(wandb_group_name)
 # wandb_group_name = f"{wandb_group_name}_v6"
 
-model_path = pathlib.Path("models")
 
-exp_name_dir_path = model_path / config["model_architecture"] / config["train"]["fold_type"] / exp_name
+exp_name_dir_path = (
+    this_dir_path
+    / "models"
+    / config["model_architecture"]
+    / config["dataset"]["train_dataset_type"]
+    / config["train"]["fold_type"]
+    / exp_name
+)
 
 config_path = exp_name_dir_path / "config.toml"
 if not args.f and config_path.exists():
@@ -48,9 +56,10 @@ config_path.parent.mkdir(exist_ok=True, parents=True)
 with open(config_path, "w") as f:
     toml.dump(config, f)
 
-fold_dir_path = pathlib.Path("cmi-dss-train-k-fold-indices") / "base"
+fold_dir_path = project_root_path / "data" / "cmi-dss-train-k-fold-indices" / "base"
 
 
+data_dir_path = this_dir_path / "data" / config["dataset"]["train_dataset_type"]
 df = pl.scan_parquet(data_dir_path / f"all-corrected-sigma{config['dataset']['sigma']}.parquet")
 
 
@@ -63,6 +72,7 @@ for i_fold in range(config["train"]["n_folds"]):
     name = "-".join(
         [
             config["model_architecture"],
+            config["dataset"]["train_dataset_type"],
             config["train"]["fold_type"],
             exp_name,
             f"#{i_fold + 1}-of-{config['train']['n_folds']}",
