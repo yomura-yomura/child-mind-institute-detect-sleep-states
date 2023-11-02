@@ -90,7 +90,7 @@ for i_fold in range(config["train"]["n_folds"]):
         case "multi_res_bi_lstm":
             import child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm
 
-            config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
+            #config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm.Module(config)
         case "sleep_stage_classification":
             module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
