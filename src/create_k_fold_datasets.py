@@ -24,10 +24,11 @@ with open(args.config_path) as f:
 data_dir_path = pathlib.Path("data")
 data_dir_path /= "base"
 # data_dir_path /= "with_part_id"
-fold_type = "group"
-# fold_type = "stratified_group"
+# fold_type = "group"
+fold_type = "stratified_group"
 
-df = pl.scan_parquet(data_dir_path / f"all-corrected-sigma{config['dataset']['sigma']}.parquet")
+df = pl.scan_parquet(data_dir_path / f"all.parquet")
+
 # n_total_records = df.select(pl.count()).collect()[0, 0]
 # df = df.with_columns(index=pl.Series(np.arange(n_total_records, dtype=np.uint32)))
 
@@ -67,22 +68,14 @@ dst_data_dir_path = pathlib.Path("cmi-dss-train-k-fold-indices") / data_dir_path
 
 
 for i_fold, (train_indices, valid_indices) in enumerate(kf_iter):
-    # indices_dict = {"train": train_indices, "valid": valid_indices}
-    # for dataset_type in ["train", "valid"]:
-    #     p = (
-    #         data_dir_path
-    #         / fold_type
-    #         / f"sigma{config['dataset']['sigma']}"
-    #         / f"fold{i_fold}"
-    #         / f"{dataset_type}.parquet"
-    #     )
-    #     if not p.exists():
-    #         print(f"create {p}")
-    #         p.parent.mkdir(parents=True, exist_ok=True)
-    #         df.filter(pl.col("index").is_in(indices_dict[dataset_type])).drop("index").collect().write_parquet(p)
-    p = dst_data_dir_path / fold_type / f"sigma{config['dataset']['sigma']}" / f"fold{i_fold}.npz"
+    p = dst_data_dir_path / fold_type / f"fold{i_fold}.npz"
     p.parent.mkdir(exist_ok=True, parents=True)
     print(p)
-    np.savez(p, train=train_indices, valid=valid_indices)
+
+    train_sel = np.zeros(len(series_id), dtype=bool)
+    train_sel[train_indices] = True
+    valid_sel = np.zeros(len(series_id), dtype=bool)
+    valid_sel[valid_indices] = True
+    np.savez_compressed(p, train=train_sel, valid=valid_sel)
     # with open(p, "w") as f:
     #     json.dump({"train": train_indices.tolist(), "valid": valid_indices.tolist()}, f)

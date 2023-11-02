@@ -146,9 +146,7 @@ class DataModule(L.LightningDataModule):
         self.df = df.with_columns(index=pl.Series(np.arange(n_total_records, dtype=np.uint32)))
 
         fold_dir_path = pj_struct_paths.get_data_dir_path() / "cmi-dss-train-k-fold-indices" / "base"
-        self.fold_indices_npz_data = np.load(
-            fold_dir_path / config["train"]["fold_type"] / f"sigma{config['dataset']['sigma']}" / f"fold{i_fold}.npz"
-        )
+        self.fold_indices_npz_data = np.load(fold_dir_path / config["train"]["fold_type"] / f"fold{i_fold}.npz")
         self.config = config
 
         self.train_dataset = None
@@ -162,7 +160,9 @@ class DataModule(L.LightningDataModule):
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
-            train_df = self.df.filter(pl.col("index").is_in(self.fold_indices_npz_data["train"])).drop("index")
+            train_df = self.df.filter(pl.col("index").is_in(np.where(self.fold_indices_npz_data["train"])[0])).drop(
+                "index"
+            )
             self.train_dataset = UserWiseDataset(
                 # pl.scan_parquet(p).filter(
                 #     pl.col("series_id").is_in(
@@ -176,7 +176,9 @@ class DataModule(L.LightningDataModule):
             )
 
         if stage in ("fit", "validate"):
-            valid_df = self.df.filter(pl.col("index").is_in(self.fold_indices_npz_data["valid"])).drop("index")
+            valid_df = self.df.filter(pl.col("index").is_in(np.where(self.fold_indices_npz_data["valid"])[0])).drop(
+                "index"
+            )
             self.valid_dataset = UserWiseDataset(
                 # pl.scan_parquet(p).filter(
                 #     pl.col("series_id").is_in(

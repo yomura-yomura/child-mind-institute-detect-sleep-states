@@ -77,29 +77,28 @@ for i_fold in range(config["train"]["n_folds"]):
     #     .to_pandas()
     #     .value_counts()
     # )
+    import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
+
+    data_module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.DataModule(df, config, i_fold)
 
     match config["model_architecture"]:
         case "multi_res_bi_gru":
-            import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
-
-            data_module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.DataModule(df, config, i_fold)
-
             # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(data_module.train_dataset)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module(config)
-            
+
         case "multi_res_bi_lstm":
             import child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm
 
-            config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
+            # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm.Module(config)
-        case "sleep_stage_classification":
-            module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
-                # n_features=2,
-                n_features=10,
-                learning_rate=config["train"]["learning_rate"],
-                wakeup_weight=config["train"]["weight"],
-                onset_weight=config["train"]["weight"],
-            )
+        # case "sleep_stage_classification":
+        #     module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(
+        #         # n_features=2,
+        #         n_features=10,
+        #         learning_rate=config["train"]["learning_rate"],
+        #         wakeup_weight=config["train"]["weight"],
+        #         onset_weight=config["train"]["weight"],
+        #     )
         case _ as model_architecture:
             raise ValueError(f"{model_architecture=} not expected")
 
@@ -133,10 +132,3 @@ for i_fold in range(config["train"]["n_folds"]):
     trainer.fit(module, data_module)
 
     wandb.finish()
-
-    # break
-
-# preds = trainer.predict(module, valid_loader)
-# preds = torch.concat(preds)
-# print(f"{preds = }")
-# print(f"{preds.numpy().max(axis=0) = }")
