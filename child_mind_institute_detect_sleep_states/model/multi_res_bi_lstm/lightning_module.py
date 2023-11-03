@@ -50,12 +50,11 @@ class Module(L.LightningModule):
 
         for i in range(0, seq_len, self.max_chunk_size):
             features_chunk = features[:, i : i + self.max_chunk_size].float().to(self.device, non_blocking=True)
-            y_pred, (h,c) = self.model(features_chunk,h,c)
+            y_pred, (h, c) = self.model(features_chunk, h, c)
             h = [hi.detach() for hi in h]
             c = [ci.detach() for ci in c]
             pred[:, i : i + self.max_chunk_size] = y_pred
         return pred
-
 
     def training_step(self, batch, batch_idx):
         _, _, _, y_batch = batch

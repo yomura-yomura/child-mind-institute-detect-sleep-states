@@ -2,6 +2,8 @@ from typing import Literal, TypeAlias, TypedDict
 
 from typing_extensions import Required
 
+from ..dataset import FeatureNames
+
 __all__ = [
     "Config",
     "ModelConfig",
@@ -9,7 +11,6 @@ __all__ = [
     "TrainConfig",
     "EvalConfig",
     "ModelArchitecture",
-    "DatasetFeatures",
     "TrainFoldType",
 ]
 
@@ -35,13 +36,14 @@ class ModelConfig(TypedDict, total=True):
     max_chunk_size: int
 
 
-DatasetFeatures: TypeAlias = Literal["max", "min", "mean", "std", "median"]
+TrainDatasetType: TypeAlias = Literal["base", "with_part_id"]
 
 
 class DatasetConfig(TypedDict):
     sigma: int
     agg_interval: int
-    features: DatasetFeatures
+    features: FeatureNames
+    train_dataset_type: TrainDatasetType
 
 
 TrainFoldType: TypeAlias = Literal["group", "stratified_group"]
@@ -58,6 +60,8 @@ class TrainConfig(TypedDict, total=False):
     n_folds: Required[int]
 
     early_stopping_patience: int
+    early_stopping_max_epoch: int
+
     save_top_k_models: int
 
     optimizer: Required["TrainOptimizerConfig"]

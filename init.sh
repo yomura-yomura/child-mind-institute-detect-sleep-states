@@ -29,8 +29,7 @@ download_dataset () {
 }
 
 download_dataset "train dataset with part_id " "jumtras1/train-series-with-partid"
-#download_dataset "train k-fold datasets" "ranchantan/cmi-dss-train-k-fold-datasets"
-
+download_dataset "train train datasets" "ranchantan/cmi-dss-train-datasets"
 download_dataset "train k-fold indices" "ranchantan/cmi-dss-train-k-fold-indices"
 
 #

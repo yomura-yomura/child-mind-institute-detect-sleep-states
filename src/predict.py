@@ -40,28 +40,10 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
                 ckpt_dir_path / "best.ckpt", config=config
             )
 
-            # fold_dir_path = (
-            #     data_dir_path
-            #     / "base"
-            #     / config["train"]["fold_type"]
-            #     / f"sigma{config['dataset']['sigma']}"
-            #     / f"fold{i_fold}"
-            # )
-            # p = fold_dir_path / "valid.parquet"
-            # valid_dataset = child_mind_institute_detect_sleep_states.model.dataset.UserWiseDataset(
-            #     pl.scan_parquet(p),
-            #     agg_interval=config["dataset"]["agg_interval"],
-            #     feature_names=config["dataset"]["features"],
-            #     use_labels=False,
-            # )
-            # valid_loader = torch.utils.data.DataLoader(
-            #     dataset=valid_dataset, batch_size=1, shuffle=False, num_workers=3
-            # )
             data_module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.DataModule(df, config, i_fold)
             data_module.setup("validate")
 
             preds_list = trainer.predict(module, data_module.val_dataloader())
-            # preds = torch.concat(preds).numpy()
 
             submission_df_list = []
             prob_df_list = []
@@ -120,10 +102,10 @@ if __name__ == "__main__":
     # args = parser.parse_args(
     #     ["config/multi_res_bi_gru.toml"]
     # )
-
-    # main(model_path / "multi_res_bi_gru" / "remove-0.8-nan-interval-6", recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "group" / "remove-0.8-nan", recreate=True)
     # main(model_path / "multi_res_bi_gru" / "0.8-nan-3-interval", recreate=True)
-    main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval-with-fft", recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval-with-fft", recreate=True)
+    main(model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval-patient-10")
     # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval", recreate=True)
 
     # for p in (model_path / "multi_res_bi_gru").glob("*"):

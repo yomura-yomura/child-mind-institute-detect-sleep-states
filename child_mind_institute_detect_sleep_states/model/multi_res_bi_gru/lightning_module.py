@@ -33,6 +33,12 @@ class Module(L.LightningModule):
         )
         self.eval_time_window = config["eval"]["window"]
         self.step_interval = config["dataset"]["agg_interval"]
+        self.train_dataset_type = config["dataset"]["train_dataset_type"]
+
+        self.early_stopping_epoch_ratio = (
+            config["train"].get("early_stopping_max_epoch", config["train"]["num_epochs"])
+            / config["train"]["num_epochs"]
+        )
 
         self.preds_list: list = []
         self.ids_list: list = []
@@ -76,7 +82,7 @@ class Module(L.LightningModule):
         pred = self.forward(batch)
 
         self.preds_list.append(pred.detach().cpu().numpy())
-        self.ids_list.append(ids)
+        self.ids_list.append([id_.split("_")[0] for id_ in ids])
         self.steps_list.append(steps.detach().cpu().numpy())
         loss = nn.MSELoss()(pred.float(), y_batch.float())
         self.log(
@@ -127,7 +133,7 @@ class Module(L.LightningModule):
         optimizer_params = copy.deepcopy(self.optimizer_params)
 
         scheduler_params = optimizer_params.pop("scheduler")
-        scheduler_params["T_max"] = self.trainer.estimated_stepping_batches
+        scheduler_params["T_max"] = self.trainer.estimated_stepping_batches * self.early_stopping_epoch_ratio
 
         optimizer = torch.optim.Adam(self.model.parameters(), **optimizer_params)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, **scheduler_params)

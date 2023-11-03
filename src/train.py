@@ -59,8 +59,13 @@ with open(config_path, "w") as f:
 fold_dir_path = project_root_path / "data" / "cmi-dss-train-k-fold-indices" / "base"
 
 
-data_dir_path = this_dir_path / "data" / config["dataset"]["train_dataset_type"]
-df = pl.scan_parquet(data_dir_path / f"all-corrected-sigma{config['dataset']['sigma']}.parquet")
+df = pl.scan_parquet(
+    project_root_path
+    / "data"
+    / "cmi-dss-train-datasets"
+    / config["dataset"]["train_dataset_type"]
+    / f"all-corrected-sigma{config['dataset']['sigma']}.parquet"
+)
 
 
 for i_fold in range(config["train"]["n_folds"]):
@@ -93,13 +98,10 @@ for i_fold in range(config["train"]["n_folds"]):
 
     match config["model_architecture"]:
         case "multi_res_bi_gru":
-            # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(data_module.train_dataset)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module(config)
-
         case "multi_res_bi_lstm":
             import child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm
 
-            # config["train"]["optimizer"]["scheduler"]["T_max"] = 20 * len(train_loader)
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm.Module(config)
         # case "sleep_stage_classification":
         #     module = child_mind_institute_detect_sleep_states.model.sleep_stage_classification.Module(

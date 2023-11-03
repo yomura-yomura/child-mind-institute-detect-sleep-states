@@ -24,9 +24,9 @@ class ResidualBiLSTM(nn.Module):
         self.fc2 = nn.Linear(hidden_size * dir_factor * 2, hidden_size)
         self.ln2 = nn.LayerNorm(hidden_size)
 
-    def forward(self, x, h=None,c=None):
-        H = (h,c)
-        res, (new_h,new_c) = self.lstm(x, H)
+    def forward(self, x, h=None, c=None):
+        H = (h, c)
+        res, (new_h, new_c) = self.lstm(x, H)
         # res.shape = (batch_size, sequence_size, 2*hidden_size)
 
         res = self.fc1(res)
@@ -40,7 +40,7 @@ class ResidualBiLSTM(nn.Module):
         # skip connection
         res = res + x
 
-        return res, (new_h,new_c)
+        return res, (new_h, new_c)
 
 
 class MultiResidualBiLSTM(nn.Module):
@@ -57,17 +57,16 @@ class MultiResidualBiLSTM(nn.Module):
         self.res_bilstm = nn.ModuleList([ResidualBiLSTM(hidden_size, n_layers=1, bidir=bidir) for _ in range(n_layers)])
         self.fc_out = nn.Linear(hidden_size, out_size)
 
-    def forward(self, x, h = None,c =None):
+    def forward(self, x, h=None, c=None):
         # if we are at the beginning of a sequence (no hidden state)
         num_directions = 2 if self.bidir else 1
         if h is None:
             # (re)initialize the hidden state
-            h = [torch.zeros(num_directions, 1, self.hidden_size,device = "cuda") for _ in range(self.n_layers)]
+            h = [torch.zeros(num_directions, 1, self.hidden_size, device="cuda") for _ in range(self.n_layers)]
 
         if c is None:
             # (re)initialize the hidden state
-            c = [torch.zeros(num_directions, 1, self.hidden_size,device = "cuda") for _ in range(self.n_layers)]
-        
+            c = [torch.zeros(num_directions, 1, self.hidden_size, device="cuda") for _ in range(self.n_layers)]
 
         x = self.fc_in(x)
         x = self.ln(x)
@@ -76,10 +75,10 @@ class MultiResidualBiLSTM(nn.Module):
         new_h = []
         new_c = []
         for i, res_bilstm in enumerate(self.res_bilstm):
-            x, (new_hi,new_ci) = res_bilstm(x, h[i],c[i])
+            x, (new_hi, new_ci) = res_bilstm(x, h[i], c[i])
             new_h.append(new_hi)
             new_c.append(new_ci)
 
         x = self.fc_out(x)
         #         x = F.normalize(x,dim=0)
-        return x, (new_h,new_c)  # log probabilities + hidden states
+        return x, (new_h, new_c)  # log probabilities + hidden states

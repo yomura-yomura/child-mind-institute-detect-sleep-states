@@ -1,13 +1,24 @@
 import argparse
-import json
 import pathlib
 
 import numpy as np
+import pandas as pd
 import polars as pl
 import sklearn.model_selection
 import toml
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
+
+project_root_path = pathlib.Path(__file__).parent
+train_dataset_dir_path = project_root_path / "data" / "cmi-dss-train-datasets"
+
+
+train_dataset_type = "base"
+# train_dataset_type = "with_part_id"
+
+# fold_type = "group"
+fold_type = "stratified_group"
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
@@ -21,28 +32,18 @@ args = parser.parse_args(
 with open(args.config_path) as f:
     config = toml.load(f)
 
-data_dir_path = pathlib.Path("data")
-data_dir_path /= "base"
-# data_dir_path /= "with_part_id"
-# fold_type = "group"
-fold_type = "stratified_group"
 
-df = pl.scan_parquet(data_dir_path / f"all.parquet")
-
-# n_total_records = df.select(pl.count()).collect()[0, 0]
-# df = df.with_columns(index=pl.Series(np.arange(n_total_records, dtype=np.uint32)))
+df = pl.scan_parquet(train_dataset_dir_path / train_dataset_type / f"all.parquet")
 
 event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
-import pandas as pd
 
-
-def get_cat_per_id(df: pd.DataFrame, target_cols: str = "series_id", nan_cols: str = "step") -> dict[str, float]:
-    """get nanrate per user_id"""
+def get_cat_per_id(df_: pd.DataFrame, target_cols: str = "series_id", nan_cols: str = "step") -> dict[str, float]:
+    """get nan-rate per user_id"""
     dict_result = {}
-    for user_id, df in df.groupby(target_cols):
-        nans = df[nan_cols].isna().sum()
-        lens = df.shape[0]
+    for user_id, df_ in df_.groupby(target_cols):
+        nans = df_[nan_cols].isna().sum()
+        lens = df_.shape[0]
         nan_rate = nans / lens
         dict_result[str(user_id)] = pd.cut(
             [nan_rate], bins=[-1] + [i / 10 for i in range(11)], labels=[i for i in range(11)]
@@ -64,11 +65,11 @@ else:
     raise ValueError(f"unexpected {fold_type=}")
 
 
-dst_data_dir_path = pathlib.Path("cmi-dss-train-k-fold-indices") / data_dir_path.relative_to("data")
+dst_fold_dir_path = project_root_path / "data" / "cmi-dss-train-k-fold-indices" / train_dataset_type / fold_type
 
 
 for i_fold, (train_indices, valid_indices) in enumerate(kf_iter):
-    p = dst_data_dir_path / fold_type / f"fold{i_fold}.npz"
+    p = dst_fold_dir_path / f"fold{i_fold}.npz"
     p.parent.mkdir(exist_ok=True, parents=True)
     print(p)
 

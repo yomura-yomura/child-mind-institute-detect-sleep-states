@@ -6,13 +6,14 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 import child_mind_institute_detect_sleep_states.pj_struct_paths
 from child_mind_institute_detect_sleep_states.data.comp_dataset import event_mapping
 
+project_root_path = pathlib.Path(__file__).parent
+train_dataset_dir_path = project_root_path / "data" / "cmi-dss-train-datasets"
 
-data_dir_path = pathlib.Path("data")
 
 # train_dataset_type = "base"
 train_dataset_type = "with_part_id"
 
-data_dir_path /= train_dataset_type
+data_dir_path = train_dataset_dir_path / train_dataset_type
 data_dir_path.mkdir(exist_ok=True, parents=True)
 
 child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(

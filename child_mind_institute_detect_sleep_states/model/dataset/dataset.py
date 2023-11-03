@@ -1,5 +1,5 @@
 import os
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 import numpy as np
 import numpy.lib.recfunctions
@@ -12,12 +12,15 @@ from tqdm.auto import tqdm, trange
 from ...data.comp_dataset import event_mapping
 from . import features as _features
 
-__all__ = ["Batch", "UserWiseDataset", "TimeWindowDataset"]
+__all__ = ["Batch", "UserWiseDataset", "TimeWindowDataset", "FeatureNames"]
 
 
 Batch: TypeAlias = tuple[torch.Tensor, np.str_, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, np.str_, torch.Tensor]
 
 target_columns = [f"event_{k}" for k in event_mapping]
+
+
+FeatureNames: TypeAlias = Literal["max", "min", "mean", "std", "median"]
 
 
 def reshape(a, new_shape, drop=True) -> NDArray:
@@ -57,7 +60,7 @@ class UserWiseDataset(Dataset):
         df: pl.LazyFrame | pl.DataFrame,
         *,
         agg_interval: int,
-        feature_names: list[str],
+        feature_names: FeatureNames,
         use_labels: bool = True,
         in_memory: bool = True,
     ):
@@ -109,6 +112,12 @@ class UserWiseDataset(Dataset):
             features_list.append(np.max(features, axis=1))
         if "min" in self.feature_names:
             features_list.append(np.min(features, axis=1))
+
+        if "q25" in self.feature_names:
+            features_list.append(np.quantile(features, 0.25, axis=1))
+        if "q75" in self.feature_names:
+            features_list.append(np.quantile(features, 0.75, axis=1))
+
         if "fft" in self.feature_names:
             features_list.append(
                 _features.fft_signal_clean(
