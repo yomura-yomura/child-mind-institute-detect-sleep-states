@@ -1,4 +1,5 @@
 import argparse
+import os
 import pathlib
 
 import lightning as L
@@ -14,17 +15,20 @@ this_dir_path = pathlib.Path(__file__).parent
 project_root_path = this_dir_path.parent
 
 
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = [
+        # "config/sleep_stage_classification.toml"
+        "config/multi_res_bi_gru.toml",
+        "-f",
+    ]
+else:
+    args = None
+
 parser = argparse.ArgumentParser()
 parser.add_argument("config_path", type=pathlib.Path)
 parser.add_argument("--n-devices", "-n", type=int, default=1)
 parser.add_argument("-f", default=False, action="store_true")
-args = parser.parse_args(
-    # [
-    #     # "config/sleep_stage_classification.toml"
-    #     "config/multi_res_bi_gru.toml",
-    #     "-f",
-    # ]
-)
+args = parser.parse_args(args)
 
 with open(args.config_path) as f:
     config = toml.load(f)
@@ -33,7 +37,10 @@ with open(args.config_path) as f:
 
 exp_name = config["exp_name"]
 
-wandb_group_name = f"{config['model_architecture']}-{exp_name}"
+wandb_group_name = "-".join(
+    [config["model_architecture"], config["dataset"]["train_dataset_type"], config["train"]["fold_type"], exp_name]
+)
+f"{config['model_architecture']}-{exp_name}"
 wandb_group_name = get_versioning_wandb_group_name(wandb_group_name)
 # wandb_group_name = f"{wandb_group_name}_v6"
 
@@ -63,9 +70,22 @@ df = pl.scan_parquet(
     project_root_path
     / "data"
     / "cmi-dss-train-datasets"
-    / config["dataset"]["train_dataset_type"]
+    # / config["dataset"]["train_dataset_type"]
+    / "base"
     / f"all-corrected-sigma{config['dataset']['sigma']}.parquet"
 )
+
+if config["dataset"]["train_dataset_type"] == "with_part_id":
+    import child_mind_institute_detect_sleep_states.pj_struct_paths
+
+    part_id_df = pl.scan_parquet(
+        child_mind_institute_detect_sleep_states.pj_struct_paths.get_data_dir_path()
+        / "train-series-with-partid"
+        / "train_series.parquet"
+    ).select(pl.col(["series_id", "step", "part_id"]))
+    df = df.join(part_id_df, on=["series_id", "step"], how="left")
+
+df = df.collect()
 
 
 for i_fold in range(config["train"]["n_folds"]):

@@ -23,10 +23,13 @@ child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
 
 df_dict = child_mind_institute_detect_sleep_states.data.comp_dataset.get_df_dict("train", as_polars=True)
 
-if train_dataset_type == "with_part_id":
-    df_dict["series"] = (
-        df_dict["series"].drop(columns=["series_id"]).drop_nulls("part_id").rename({"part_id": "series_id"})
-    )
+# if train_dataset_type == "with_part_id":
+#     target_unique_column = "part_id"
+# else:
+#     target_unique_column = "part_id"
+#     df_dict["series"] = (
+#         df_dict["series"].rename({"part_id": "series_id"})
+#     )
 
 
 all_dataset_path = data_dir_path / "all.parquet"

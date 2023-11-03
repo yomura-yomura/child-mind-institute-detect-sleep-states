@@ -41,7 +41,11 @@ def get_series_df(dataset_type: DatasetType, as_polars: bool = False) -> pd.Data
         return pd.read_parquet(path)
 
 
-def rolling(a, window, axis, writable: bool = False):
+def rolling(a, window, axis: int, writable: bool = False):
+    if axis < 0:
+        axis = a.ndim + axis
+    assert axis >= 0
+
     shape = a.shape[:axis] + (a.shape[axis] - window + 1, window) + a.shape[axis + 1 :]
     strides = a.strides[:axis] + (a.strides[axis],) + a.strides[axis:]
     rolling = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides, writeable=writable)
@@ -115,34 +119,34 @@ def get_submission_df(
         interest = slice((window - 1) // 2, -(window - 1) // 2)
         corrected_preds_list = []
         for i in range(2):
-            max_preds = np.max(rolling(preds[..., -i], window=window, axis=1), axis=2)
-            max_preds[preds[:, interest, -i] != max_preds] = 0
+            max_preds = np.max(rolling(preds[..., -i], window=window, axis=-1), axis=-1)
+            max_preds[preds[..., interest, -i] != max_preds] = 0
             corrected_preds = np.zeros(preds.shape[:-1], dtype=preds.dtype)
-            corrected_preds[:, interest] = max_preds
+            corrected_preds[..., interest] = max_preds
             corrected_preds_list.append(corrected_preds)
 
-        onset_indices = np.argsort(corrected_preds_list[0], axis=1)[:, -n_days:]
-        wakeup_indices = np.argsort(corrected_preds_list[1], axis=1)[:, -n_days:]
+        onset_indices = np.argsort(corrected_preds_list[0], axis=-1)[..., -n_days:]
+        wakeup_indices = np.argsort(corrected_preds_list[1], axis=-1)[..., -n_days:]
         # print(corrected_preds_list[0][0][wakeup_indices[0]])
 
-        series_id = np.repeat(np.expand_dims(series_id, axis=1), preds.shape[1], axis=1)
+        series_id = np.repeat(np.expand_dims(series_id, axis=-1), preds.shape[-2], axis=-1)
 
         submission_df = pd.concat(
             [
                 pd.DataFrame(
                     {
-                        "series_id": np.take_along_axis(series_id, onset_indices, axis=1).flatten(),
-                        "step": np.take_along_axis(steps, onset_indices, axis=1).flatten(),
+                        "series_id": np.take_along_axis(series_id, onset_indices, axis=-1).flatten(),
+                        "step": np.take_along_axis(steps, onset_indices, axis=-1).flatten(),
                         "event": "onset",
-                        "score": np.take_along_axis(preds[..., -2], onset_indices, axis=1).flatten(),
+                        "score": np.take_along_axis(preds[..., -2], onset_indices, axis=-1).flatten(),
                     }
                 ),
                 pd.DataFrame(
                     {
-                        "series_id": np.take_along_axis(series_id, wakeup_indices, axis=1).flatten(),
-                        "step": np.take_along_axis(steps, wakeup_indices, axis=1).flatten(),
+                        "series_id": np.take_along_axis(series_id, wakeup_indices, axis=-1).flatten(),
+                        "step": np.take_along_axis(steps, wakeup_indices, axis=-1).flatten(),
                         "event": "wakeup",
-                        "score": np.take_along_axis(preds[..., -1], wakeup_indices, axis=1).flatten(),
+                        "score": np.take_along_axis(preds[..., -1], wakeup_indices, axis=-1).flatten(),
                     }
                 ),
             ]

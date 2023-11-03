@@ -13,8 +13,11 @@ import child_mind_institute_detect_sleep_states.model.multi_res_bi_gru
 import child_mind_institute_detect_sleep_states.model.sleep_stage_classification
 import child_mind_institute_detect_sleep_states.score.event_detection_ap
 
-data_dir_path = pathlib.Path("data")
-model_path = pathlib.Path("models")
+this_dir_path = pathlib.Path(__file__).parent
+project_root_path = this_dir_path.parent
+
+data_dir_path = project_root_path / "data" / "cmi-dss-train-datasets"
+model_path = this_dir_path / "models"
 
 
 def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
@@ -102,10 +105,12 @@ if __name__ == "__main__":
     # args = parser.parse_args(
     #     ["config/multi_res_bi_gru.toml"]
     # )
-    # main(model_path / "multi_res_bi_gru" / "group" / "remove-0.8-nan", recreate=True)
+    # main(model_path / "multi_res_bi_gru" / "base" / "group" / "remove-0.8-nan", recreate=True)
+    main(model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval_retry", recreate=True)
+
     # main(model_path / "multi_res_bi_gru" / "0.8-nan-3-interval", recreate=True)
     # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval-with-fft", recreate=True)
-    main(model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval-patient-10")
+    # main(model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval-patient-10")
     # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval", recreate=True)
 
     # for p in (model_path / "multi_res_bi_gru").glob("*"):
