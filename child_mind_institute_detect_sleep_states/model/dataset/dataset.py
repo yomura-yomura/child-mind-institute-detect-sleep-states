@@ -60,7 +60,7 @@ class UserWiseDataset(Dataset):
         df: pl.LazyFrame | pl.DataFrame,
         *,
         agg_interval: int,
-        feature_names: FeatureNames,
+        feature_names: list[FeatureNames],
         use_labels: bool = True,
         in_memory: bool = True,
     ):

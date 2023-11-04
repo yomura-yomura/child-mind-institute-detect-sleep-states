@@ -19,7 +19,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "config/sleep_stage_classification.toml"
         "config/multi_res_bi_gru.toml",
-        "-f",
+        # "-f",
     ]
 else:
     args = None
@@ -66,25 +66,11 @@ with open(config_path, "w") as f:
 fold_dir_path = project_root_path / "data" / "cmi-dss-train-k-fold-indices" / "base"
 
 
-df = pl.scan_parquet(
-    project_root_path
-    / "data"
-    / "cmi-dss-train-datasets"
-    # / config["dataset"]["train_dataset_type"]
-    / "base"
-    / f"all-corrected-sigma{config['dataset']['sigma']}.parquet"
+import child_mind_institute_detect_sleep_states.data.train
+
+df = child_mind_institute_detect_sleep_states.data.train.get_train_df(
+    config["dataset"]["sigma"], config["dataset"]["train_dataset_type"]
 )
-
-if config["dataset"]["train_dataset_type"] == "with_part_id":
-    import child_mind_institute_detect_sleep_states.pj_struct_paths
-
-    part_id_df = pl.scan_parquet(
-        child_mind_institute_detect_sleep_states.pj_struct_paths.get_data_dir_path()
-        / "train-series-with-partid"
-        / "train_series.parquet"
-    ).select(pl.col(["series_id", "step", "part_id"]))
-    df = df.join(part_id_df, on=["series_id", "step"], how="left")
-
 df = df.collect()
 
 
@@ -164,3 +150,7 @@ for i_fold in range(config["train"]["n_folds"]):
     trainer.fit(module, data_module)
 
     wandb.finish()
+
+from predict import main
+
+main(exp_name_dir_path)

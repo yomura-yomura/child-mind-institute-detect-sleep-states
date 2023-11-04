@@ -220,6 +220,7 @@ class DataModule(L.LightningDataModule):
                 train_df,
                 agg_interval=self.config["dataset"]["agg_interval"],
                 feature_names=self.config["dataset"]["features"],
+                in_memory=self.config["dataset"].get("in_memory", True),
             )
 
         if stage in ("fit", "validate"):
@@ -230,6 +231,7 @@ class DataModule(L.LightningDataModule):
                 valid_df,
                 agg_interval=self.config["dataset"]["agg_interval"],
                 feature_names=self.config["dataset"]["features"],
+                in_memory=self.config["dataset"].get("in_memory", True),
             )
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:

@@ -1,18 +1,18 @@
 model_architecture = "multi_res_bi_gru"
-#exp_name = "0.8-nan-12-interval"
-exp_name = "0.8-nan-12-interval-patient-10"
-#exp_name = "0.8-nan-12-interval-patient-10_4"
+exp_name = "0.8-nan-12-interval-2-gru-layers"
+#exp_name = "0.8-nan-12-interval-3-gru-layers_2"
 
 [model]
 hidden_size = 64
 out_size = 2
-n_layers = 5
+n_layers = 2
 
 max_chunk_size = 500_000
 
 [dataset]
 sigma = 108
 agg_interval = 12  # 5sec/pt
+#agg_interval = 6  # 5sec/pt
 #agg_interval = 3  # 5sec/pt
 features = [
     "max",
@@ -24,18 +24,19 @@ features = [
 #    "q75"
 #    "fft",
 ]
-#train_dataset_type = "base"
-train_dataset_type = "with_part_id"
+train_dataset_type = "base"
+#train_dataset_type = "with_part_id"
 
 [train]
 #num_epochs = 20
-num_epochs = 30
+#num_epochs = 30
+num_epochs = 40
 train_batch_size = 1
 valid_batch_size = 1
 learning_rate = 0.001
 
-#lower_nan_fraction_to_exclude = 0.8
-lower_nan_fraction_to_exclude = -1
+lower_nan_fraction_to_exclude = 0.8
+#lower_nan_fraction_to_exclude = -1
 
 fold_type = "group"
 #fold_type = "stratified_group"

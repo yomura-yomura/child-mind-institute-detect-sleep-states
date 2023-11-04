@@ -25,7 +25,10 @@ class ResidualBiLSTM(nn.Module):
         self.ln2 = nn.LayerNorm(hidden_size)
 
     def forward(self, x, h=None, c=None):
-        H = (h, c)
+        if h is None and c is None:
+            H = None
+        else:
+            H = (h, c)
         res, (new_h, new_c) = self.lstm(x, H)
         # res.shape = (batch_size, sequence_size, 2*hidden_size)
 

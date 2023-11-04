@@ -1,4 +1,5 @@
 import argparse
+import os
 import pathlib
 
 import lightning.pytorch as lp
@@ -20,6 +21,15 @@ data_dir_path = project_root_path / "data" / "cmi-dss-train-datasets"
 model_path = this_dir_path / "models"
 
 
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = [
+        model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval_retry",
+        "-f",
+    ]
+else:
+    args = None
+
+
 def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
     score_list = []
 
@@ -36,7 +46,7 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
         if not recreate and submission_path.exists():
             submission_df = pd.read_csv(submission_path)
         else:
-            trainer = lp.Trainer()
+            trainer = lp.Trainer(devices=1)
 
             print(f"load from {ckpt_dir_path}")
             module = child_mind_institute_detect_sleep_states.model.multi_res_bi_gru.Module.load_from_checkpoint(
@@ -100,13 +110,12 @@ def main(exp_name_dir_path: pathlib.Path, recreate: bool = False):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("config_path", type=pathlib.Path)
-    # args = parser.parse_args(
-    #     ["config/multi_res_bi_gru.toml"]
-    # )
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model_path", type=pathlib.Path)
+    parser.add_argument("-f", default=False, action="store_true")
+    args = parser.parse_args(args)
     # main(model_path / "multi_res_bi_gru" / "base" / "group" / "remove-0.8-nan", recreate=True)
-    main(model_path / "multi_res_bi_gru" / "base" / "group" / "0.8-nan-12-interval_retry", recreate=True)
+    main(args.model_path, recreate=args.f)
 
     # main(model_path / "multi_res_bi_gru" / "0.8-nan-3-interval", recreate=True)
     # main(model_path / "multi_res_bi_gru" / "stratified_group" / "0.8-nan-12-interval-with-fft", recreate=True)

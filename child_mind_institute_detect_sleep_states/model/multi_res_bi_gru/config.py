@@ -42,8 +42,9 @@ TrainDatasetType: TypeAlias = Literal["base", "with_part_id"]
 class DatasetConfig(TypedDict):
     sigma: int
     agg_interval: int
-    features: FeatureNames
+    features: list[FeatureNames]
     train_dataset_type: TrainDatasetType
+    in_memory: bool
 
 
 TrainFoldType: TypeAlias = Literal["group", "stratified_group"]
