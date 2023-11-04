@@ -17,17 +17,22 @@ from tqdm import tqdm
 
 
 def load_model(cfg: DictConfig) -> nn.Module:
-    num_timesteps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
+    num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
     model = get_model(
         cfg,
         feature_dim=len(cfg.features),
         n_classes=len(cfg.labels),
-        num_timesteps=num_timesteps // cfg.downsample_rate,
+        num_timesteps=num_time_steps // cfg.downsample_rate,
     )
 
     # load weights
     if cfg.weight is not None:
-        weight_path = Path(cfg.dir.model_dir) / cfg.weight["exp_name"] / cfg.weight["run_name"] / "best_model.pth"
+        weight_path = (
+            Path(cfg.dir.model_dir)
+            / cfg.weight["exp_name"]
+            / cfg.weight["run_name"]
+            / "best_model.pth"
+        )
         model.load_state_dict(torch.load(weight_path))
         print('load weight from "{}"'.format(weight_path))
     return model
@@ -90,7 +95,9 @@ def inference(
     return keys, preds  # type: ignore
 
 
-def make_submission(keys: list[str], preds: np.ndarray, downsample_rate, score_th, distance) -> pl.DataFrame:
+def make_submission(
+    keys: list[str], preds: np.ndarray, downsample_rate, score_th, distance
+) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds[:, :, [1, 2]],  # type: ignore

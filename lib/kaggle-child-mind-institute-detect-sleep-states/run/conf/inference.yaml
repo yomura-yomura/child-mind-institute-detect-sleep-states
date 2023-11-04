@@ -2,7 +2,7 @@
 hydra:
   job:
     name: inference
-    chdir: true
+    chdir: false
   run:
     dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}/single
   sweep:
