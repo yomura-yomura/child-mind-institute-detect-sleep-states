@@ -5,16 +5,15 @@ import numpy as np
 import polars as pl
 import torch
 import torch.nn as nn
-from omegaconf import DictConfig
-from lightning import seed_everything
-from torch.utils.data import DataLoader
-from torchvision.transforms.functional import resize
-from tqdm import tqdm
-
 from cmi_dss_lib.datamodule.seg import TestDataset, load_chunk_features, nearest_valid_size
 from cmi_dss_lib.models.common import get_model
 from cmi_dss_lib.utils.common import trace
 from cmi_dss_lib.utils.post_process import post_process_for_seg
+from lightning import seed_everything
+from omegaconf import DictConfig
+from torch.utils.data import DataLoader
+from torchvision.transforms.functional import resize
+from tqdm import tqdm
 
 
 def load_model(cfg: DictConfig) -> nn.Module:
@@ -28,12 +27,7 @@ def load_model(cfg: DictConfig) -> nn.Module:
 
     # load weights
     if cfg.weight is not None:
-        weight_path = (
-            Path(cfg.dir.model_dir)
-            / cfg.weight["exp_name"]
-            / cfg.weight["run_name"]
-            / "best_model.pth"
-        )
+        weight_path = Path(cfg.dir.model_dir) / cfg.weight["exp_name"] / cfg.weight["run_name"] / "best_model.pth"
         model.load_state_dict(torch.load(weight_path))
         print('load weight from "{}"'.format(weight_path))
     return model
@@ -96,9 +90,7 @@ def inference(
     return keys, preds  # type: ignore
 
 
-def make_submission(
-    keys: list[str], preds: np.ndarray, downsample_rate, score_th, distance
-) -> pl.DataFrame:
+def make_submission(keys: list[str], preds: np.ndarray, downsample_rate, score_th, distance) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds[:, :, [1, 2]],  # type: ignore

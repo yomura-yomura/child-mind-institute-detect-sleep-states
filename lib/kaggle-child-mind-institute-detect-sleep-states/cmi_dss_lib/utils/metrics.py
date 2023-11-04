@@ -40,11 +40,8 @@ def score(
 ) -> float:
     # Validate metric parameters
     assert len(tolerances) > 0, "Events must have defined tolerances."
-    assert set(tolerances.keys()) == set(solution[event_column_name]).difference(
-        {"start", "end"}
-    ), (
-        f"Solution column {event_column_name} must contain the same events "
-        "as defined in tolerances."
+    assert set(tolerances.keys()) == set(solution[event_column_name]).difference({"start", "end"}), (
+        f"Solution column {event_column_name} must contain the same events " "as defined in tolerances."
     )
     assert pd.api.types.is_numeric_dtype(
         solution[time_column_name]
@@ -61,13 +58,9 @@ def score(
             raise ParticipantVisibleError(f"Submission must have column '{column_name}'.")
 
     if not pd.api.types.is_numeric_dtype(submission[time_column_name]):
-        raise ParticipantVisibleError(
-            f"Submission column '{time_column_name}' must be of numeric type."
-        )
+        raise ParticipantVisibleError(f"Submission column '{time_column_name}' must be of numeric type.")
     if not pd.api.types.is_numeric_dtype(submission[score_column_name]):
-        raise ParticipantVisibleError(
-            f"Submission column '{score_column_name}' must be of numeric type."
-        )
+        raise ParticipantVisibleError(f"Submission column '{score_column_name}' must be of numeric type.")
 
     # Set these globally to avoid passing around a bunch of arguments
     globals()["series_id_column_name"] = series_id_column_name
@@ -196,9 +189,7 @@ def find_nearest_time_idx(times, target_time, excluded_indices, tolerance):
     return best_idx, best_error
 
 
-def match_detections(
-    tolerance: float, ground_truths: pd.DataFrame, detections: pd.DataFrame
-) -> pd.DataFrame:
+def match_detections(tolerance: float, ground_truths: pd.DataFrame, detections: pd.DataFrame) -> pd.DataFrame:
     detections_sorted = detections.sort_values(score_column_name, ascending=False).dropna()
     is_matched = np.full_like(detections_sorted[event_column_name], False, dtype=bool)
     ground_truths_times = ground_truths.sort_values(time_column_name)[time_column_name].tolist()
@@ -207,9 +198,7 @@ def match_detections(
     for i, det in enumerate(detections_sorted.itertuples(index=False)):
         det_time = getattr(det, time_column_name)
 
-        best_idx, best_error = find_nearest_time_idx(
-            ground_truths_times, det_time, matched_gt_indices, tolerance
-        )
+        best_idx, best_error = find_nearest_time_idx(ground_truths_times, det_time, matched_gt_indices, tolerance)
 
         if best_idx is not None and best_error < tolerance:
             is_matched[i] = True
@@ -240,9 +229,7 @@ def precision_recall_curve(
 
     precision = tps / (tps + fps)
     precision[np.isnan(precision)] = 0
-    recall = (
-        tps / p
-    )  # total number of ground truths might be different than total number of matches
+    recall = tps / p  # total number of ground truths might be different than total number of matches
 
     # Stop when full recall attained and reverse the outputs so recall is non-increasing.
     last_ind = tps.searchsorted(tps[-1])

@@ -25,9 +25,7 @@ class Cutmix:
     def __init__(self, alpha: float = 0.4):
         self.alpha = alpha
 
-    def __call__(
-        self, imgs: torch.Tensor, labels: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, imgs: torch.Tensor, labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Cutmix augmentation.
 
         Args:
@@ -47,9 +45,7 @@ class Cutmix:
         lam = np.random.beta(self.alpha, self.alpha)
         start, end = get_rand_1dbbox(imgs.size(2), lam)
 
-        mixed_imgs = torch.concatenate(
-            [imgs[:, :, :start], shuffled_imgs[:, :, start:end], imgs[:, :, end:]], dim=2
-        )
+        mixed_imgs = torch.concatenate([imgs[:, :, :start], shuffled_imgs[:, :, start:end], imgs[:, :, end:]], dim=2)
         mixed_labels = torch.concatenate(
             [labels[:, :start, :], shuffled_labels[:, start:end, :], labels[:, end:, :]], dim=1
         )

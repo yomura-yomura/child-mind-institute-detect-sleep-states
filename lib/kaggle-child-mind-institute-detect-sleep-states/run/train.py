@@ -6,18 +6,11 @@ import torch
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import (
-    LearningRateMonitor,
-    ModelCheckpoint,
-    RichModelSummary,
-    RichProgressBar,
-)
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, RichModelSummary, RichProgressBar
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
 LOGGER = logging.getLogger(Path(__file__).name)
 
 import pathlib
@@ -32,9 +25,7 @@ def main(cfg: DictConfig):  # type: ignore
     # init lightning model
     datamodule = SegDataModule(cfg)
     LOGGER.info("Set Up DataModule")
-    model = SegModel(
-        cfg, datamodule.valid_event_df, len(cfg.features), len(cfg.labels), cfg.duration
-    )
+    model = SegModel(cfg, datamodule.valid_event_df, len(cfg.features), len(cfg.labels), cfg.duration)
 
     # set callbacks
     checkpoint_cb = ModelCheckpoint(

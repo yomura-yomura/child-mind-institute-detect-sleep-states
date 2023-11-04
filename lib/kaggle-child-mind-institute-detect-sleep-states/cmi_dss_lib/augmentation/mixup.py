@@ -6,9 +6,7 @@ class Mixup:
     def __init__(self, alpha: float = 0.4):
         self.alpha = alpha
 
-    def __call__(
-        self, imgs: torch.Tensor, labels: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, imgs: torch.Tensor, labels: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Mixup augmentation.
 
         Args:

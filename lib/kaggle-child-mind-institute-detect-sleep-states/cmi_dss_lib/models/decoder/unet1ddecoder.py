@@ -68,9 +68,7 @@ class DoubleConv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(
-        self, in_channels, out_channels, scale_factor, norm=nn.BatchNorm1d, se=False, res=False
-    ):
+    def __init__(self, in_channels, out_channels, scale_factor, norm=nn.BatchNorm1d, se=False, res=False):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool1d(scale_factor),
@@ -84,9 +82,7 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(
-        self, in_channels, out_channels, bilinear=True, scale_factor=2, norm=nn.BatchNorm1d
-    ):
+    def __init__(self, in_channels, out_channels, bilinear=True, scale_factor=2, norm=nn.BatchNorm1d):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
@@ -94,9 +90,7 @@ class Up(nn.Module):
             self.up = nn.Upsample(scale_factor=scale_factor, mode="bilinear", align_corners=True)
             self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, norm=norm)
         else:
-            self.up = nn.ConvTranspose1d(
-                in_channels, in_channels // 2, kernel_size=scale_factor, stride=scale_factor
-            )
+            self.up = nn.ConvTranspose1d(in_channels, in_channels // 2, kernel_size=scale_factor, stride=scale_factor)
             self.conv = DoubleConv(in_channels, out_channels, norm=norm)
 
     def forward(self, x1, x2):
@@ -134,18 +128,10 @@ class UNet1DDecoder(nn.Module):
         self.scale_factor = scale_factor
 
         factor = 2 if bilinear else 1
-        self.inc = DoubleConv(
-            self.n_channels, 64, norm=partial(create_layer_norm, length=self.duration)
-        )
-        self.down1 = Down(
-            64, 128, scale_factor, norm=partial(create_layer_norm, length=self.duration // 2)
-        )
-        self.down2 = Down(
-            128, 256, scale_factor, norm=partial(create_layer_norm, length=self.duration // 4)
-        )
-        self.down3 = Down(
-            256, 512, scale_factor, norm=partial(create_layer_norm, length=self.duration // 8)
-        )
+        self.inc = DoubleConv(self.n_channels, 64, norm=partial(create_layer_norm, length=self.duration))
+        self.down1 = Down(64, 128, scale_factor, norm=partial(create_layer_norm, length=self.duration // 2))
+        self.down2 = Down(128, 256, scale_factor, norm=partial(create_layer_norm, length=self.duration // 4))
+        self.down3 = Down(256, 512, scale_factor, norm=partial(create_layer_norm, length=self.duration // 8))
         self.down4 = Down(
             512,
             1024 // factor,
@@ -173,9 +159,7 @@ class UNet1DDecoder(nn.Module):
             scale_factor,
             norm=partial(create_layer_norm, length=self.duration // 2),
         )
-        self.up4 = Up(
-            128, 64, bilinear, scale_factor, norm=partial(create_layer_norm, length=self.duration)
-        )
+        self.up4 = Up(128, 64, bilinear, scale_factor, norm=partial(create_layer_norm, length=self.duration))
 
         self.cls = nn.Sequential(
             nn.Conv1d(64, 64, kernel_size=3, padding=1),
@@ -185,9 +169,7 @@ class UNet1DDecoder(nn.Module):
         )
         self.loss_fn = nn.BCEWithLogitsLoss()
 
-    def forward(
-        self, x: torch.Tensor, labels: Optional[torch.Tensor] = None
-    ) -> dict[str, Optional[torch.Tensor]]:
+    def forward(self, x: torch.Tensor, labels: Optional[torch.Tensor] = None) -> dict[str, Optional[torch.Tensor]]:
         """Forward
 
         Args:

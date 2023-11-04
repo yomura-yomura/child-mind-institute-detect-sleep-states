@@ -3,7 +3,6 @@ from typing import Optional
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
-
 from cmi_dss_lib.augmentation.cutmix import Cutmix
 from cmi_dss_lib.augmentation.mixup import Mixup
 

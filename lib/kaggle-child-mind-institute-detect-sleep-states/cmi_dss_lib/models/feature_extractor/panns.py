@@ -2,7 +2,6 @@ from typing import Callable, Optional
 
 import torch
 import torch.nn as nn
-
 from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
 

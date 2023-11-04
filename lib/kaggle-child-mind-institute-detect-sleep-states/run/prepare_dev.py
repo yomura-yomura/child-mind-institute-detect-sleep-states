@@ -11,11 +11,7 @@ def main(cfg: DictConfig):
     series_df = pl.scan_parquet(data_dir / "train_series.parquet")
     event_df = pl.scan_csv(data_dir / "train_events.csv")
     sample_200_series_ids = (
-        series_df.select("series_id")
-        .unique()
-        .collect(streaming=True)
-        .sample(200)
-        .get_column("series_id")
+        series_df.select("series_id").unique().collect(streaming=True).sample(200).get_column("series_id")
     )
     dev_series_df = series_df.filter(pl.col("series_id").is_in(sample_200_series_ids))
     dev_event_df = event_df.filter(pl.col("series_id").is_in(sample_200_series_ids))

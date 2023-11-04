@@ -1,8 +1,6 @@
 from typing import Union
 
 import torch.nn as nn
-from omegaconf import DictConfig
-
 from cmi_dss_lib.models.decoder.lstmdecoder import LSTMDecoder
 from cmi_dss_lib.models.decoder.mlpdecoder import MLPDecoder
 from cmi_dss_lib.models.decoder.transformerdecoder import TransformerDecoder
@@ -13,17 +11,14 @@ from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
+from omegaconf import DictConfig
 
-FEATURE_EXTRACTORS = Union[
-    CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor
-]
+FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
 
-def get_feature_extractor(
-    cfg: DictConfig, feature_dim: int, num_timesteps: int
-) -> FEATURE_EXTRACTORS:
+def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int) -> FEATURE_EXTRACTORS:
     feature_extractor: FEATURE_EXTRACTORS
     if cfg.feature_extractor.name == "CNNSpectrogram":
         feature_extractor = CNNSpectrogram(

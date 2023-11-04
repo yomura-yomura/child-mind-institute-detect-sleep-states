@@ -4,15 +4,14 @@ import numpy as np
 import polars as pl
 import torch
 import torch.optim as optim
-from omegaconf import DictConfig
-from lightning import LightningModule
-from torchvision.transforms.functional import resize
-from transformers import get_cosine_schedule_with_warmup
-
 from cmi_dss_lib.datamodule.seg import nearest_valid_size
 from cmi_dss_lib.models.common import get_model
 from cmi_dss_lib.utils.metrics import event_detection_ap
 from cmi_dss_lib.utils.post_process import post_process_for_seg
+from lightning import LightningModule
+from omegaconf import DictConfig
+from torchvision.transforms.functional import resize
+from transformers import get_cosine_schedule_with_warmup
 
 
 class SegModel(LightningModule):
@@ -38,9 +37,7 @@ class SegModel(LightningModule):
         self.validation_step_outputs: list = []
         self.__best_loss = np.inf
 
-    def forward(
-        self, x: torch.Tensor, labels: Optional[torch.Tensor] = None
-    ) -> dict[str, Optional[torch.Tensor]]:
+    def forward(self, x: torch.Tensor, labels: Optional[torch.Tensor] = None) -> dict[str, Optional[torch.Tensor]]:
         return self.model(x, labels)
 
     def training_step(self, batch, batch_idx):
