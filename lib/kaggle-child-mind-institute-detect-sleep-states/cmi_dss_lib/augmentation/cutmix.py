@@ -2,20 +2,20 @@ import numpy as np
 import torch
 
 
-def get_rand_1dbbox(n_timesteps: int, lam: float) -> tuple[int, int]:
+def get_rand_1dbbox(n_time_steps: int, lam: float) -> tuple[int, int]:
     """Get random 1D bounding box.
 
     Args:
-        n_timesteps (int): Number of timesteps.
+        n_time_steps (int): Number of timesteps.
         lam (float): Lambda value.
 
     Returns:
         tuple[int, int]: (start, end) of the bounding box.
     """
     cut_rat = np.sqrt(1.0 - lam)
-    cut_len = int(n_timesteps * cut_rat)
+    cut_len = int(n_time_steps * cut_rat)
 
-    start = np.random.randint(0, n_timesteps - cut_len)
+    start = np.random.randint(0, n_time_steps - cut_len)
     end = start + cut_len
 
     return start, end
@@ -29,12 +29,12 @@ class Cutmix:
         """Cutmix augmentation.
 
         Args:
-            imgs (torch.Tensor): (batch_size, n_channels, n_timesteps)
-            labels (torch.Tensor): (batch_size, n_timesteps, n_classes)
+            imgs (torch.Tensor): (batch_size, n_channels, n_time_steps)
+            labels (torch.Tensor): (batch_size, n_time_steps, n_classes)
 
         Returns:
-            tuple[torch.Tensor]: mixed_imgs (batch_size, n_channels, n_timesteps)
-                                 mixed_labels (batch_size, n_timesteps, n_classes)
+            tuple[torch.Tensor]: mixed_imgs (batch_size, n_channels, n_time_steps)
+                                 mixed_labels (batch_size, n_time_steps, n_classes)
         """
         batch_size = imgs.size(0)
         idx = torch.randperm(batch_size)

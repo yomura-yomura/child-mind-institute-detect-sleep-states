@@ -106,9 +106,9 @@ def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_timesteps:
 
 def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_timesteps: int) -> MODELS:
     model: MODELS
+    feature_extractor = get_feature_extractor(cfg, feature_dim, num_timesteps)
+    decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_timesteps)
     if cfg.model.name == "Spec2DCNN":
-        feature_extractor = get_feature_extractor(cfg, feature_dim, num_timesteps)
-        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_timesteps)
         model = Spec2DCNN(
             feature_extractor=feature_extractor,
             decoder=decoder,
@@ -119,8 +119,6 @@ def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_timesteps: 
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
     elif cfg.model.name == "Spec1D":
-        feature_extractor = get_feature_extractor(cfg, feature_dim, num_timesteps)
-        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_timesteps)
         model = Spec1D(
             feature_extractor=feature_extractor,
             decoder=decoder,

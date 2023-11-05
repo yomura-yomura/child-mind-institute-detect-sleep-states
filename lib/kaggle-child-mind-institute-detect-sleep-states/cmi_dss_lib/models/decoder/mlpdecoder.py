@@ -14,10 +14,10 @@ class MLPDecoder(nn.Module):
         """Forward pass of the model.
 
         Args:
-            x (torch.Tensor): (batch_size, n_channels, n_timesteps)
+            x (torch.Tensor): (batch_size, n_channels, n_time_steps)
 
         Returns:
-            torch.Tensor: (batch_size, n_timesteps, n_classes)
+            torch.Tensor: (batch_size, n_time_steps, n_classes)
         """
         x = x.transpose(1, 2)
         x = F.relu(self.fc1(x))

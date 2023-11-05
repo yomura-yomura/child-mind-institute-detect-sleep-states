@@ -32,12 +32,12 @@ class Spec1D(nn.Module):
         """Forward pass of the model.
 
         Args:
-            x (torch.Tensor): (batch_size, n_channels, n_timesteps)
-            labels (Optional[torch.Tensor], optional): (batch_size, n_timesteps, n_classes)
+            x (torch.Tensor): (batch_size, n_channels, n_time_steps)
+            labels (Optional[torch.Tensor], optional): (batch_size, n_time_steps, n_classes)
         Returns:
-            dict[str, torch.Tensor]: logits (batch_size, n_timesteps, n_classes)
+            dict[str, torch.Tensor]: logits (batch_size, n_time_steps, n_classes)
         """
-        x = self.feature_extractor(x)  # (batch_size, n_channels, height, n_timesteps)
+        x = self.feature_extractor(x)  # (batch_size, n_channels, height, n_time_steps)
 
         if do_mixup and labels is not None:
             x, labels = self.mixup(x, labels)
@@ -45,10 +45,10 @@ class Spec1D(nn.Module):
             x, labels = self.cutmix(x, labels)
 
         # pool over n_channels dimension
-        x = x.transpose(1, 3)  # (batch_size, n_timesteps, height, n_channels)
-        x = self.channels_fc(x)  # (batch_size, n_timesteps, height, 1)
-        x = x.squeeze(-1).transpose(1, 2)  # (batch_size, height, n_timesteps)
-        logits = self.decoder(x)  # (batch_size, n_classes, n_timesteps)
+        x = x.transpose(1, 3)  # (batch_size, n_time_steps, height, n_channels)
+        x = self.channels_fc(x)  # (batch_size, n_time_steps, height, 1)
+        x = x.squeeze(-1).transpose(1, 2)  # (batch_size, height, n_time_steps)
+        logits = self.decoder(x)  # (batch_size, n_classes, n_time_steps)
 
         output = {"logits": logits}
         if labels is not None:

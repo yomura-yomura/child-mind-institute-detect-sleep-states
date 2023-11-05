@@ -41,20 +41,22 @@ class Spec2DCNN(nn.Module):
         """Forward pass of the model.
 
         Args:
-            x (torch.Tensor): (batch_size, n_channels, n_timesteps)
-            labels (Optional[torch.Tensor], optional): (batch_size, n_timesteps, n_classes)
+            x (torch.Tensor): (batch_size, n_channels, n_time_steps)
+            labels (Optional[torch.Tensor], optional): (batch_size, n_time_steps, n_classes)
+            do_mixup: do mixup augmentation
+            do_cutmix: do cutmix augmentation
         Returns:
-            dict[str, torch.Tensor]: logits (batch_size, n_timesteps, n_classes)
+            dict[str, torch.Tensor]: logits (batch_size, n_time_steps, n_classes)
         """
-        x = self.feature_extractor(x)  # (batch_size, n_channels, height, n_timesteps)
+        x = self.feature_extractor(x)  # (batch_size, n_channels, height, n_time_steps)
 
         if do_mixup and labels is not None:
             x, labels = self.mixup(x, labels)
         if do_cutmix and labels is not None:
             x, labels = self.cutmix(x, labels)
 
-        x = self.encoder(x).squeeze(1)  # (batch_size, height, n_timesteps)
-        logits = self.decoder(x)  # (batch_size, n_classes, n_timesteps)
+        x = self.encoder(x).squeeze(1)  # (batch_size, height, n_time_steps)
+        logits = self.decoder(x)  # (batch_size, n_classes, n_time_steps)
 
         output = {"logits": logits}
         if labels is not None:

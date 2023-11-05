@@ -1,4 +1,7 @@
+import json
 import pathlib
+import subprocess
+import sys
 
 import hydra
 import torch
@@ -15,7 +18,7 @@ def main(cfg: DictConfig):
     dataset_output_dir_path = project_root_path / "output_dataset"
     print(train_output_dir_path.resolve())
 
-    for p in tqdm.tqdm(sorted(train_output_dir_path.glob("train/exp003-fold*/single/best.ckpt"))):
+    for p in tqdm.tqdm(sorted(train_output_dir_path.glob("train/exp004-fold*/single/best.ckpt"))):
         module = SegModel.load_from_checkpoint(
             f"{p}",
             cfg=cfg,
@@ -31,6 +34,35 @@ def main(cfg: DictConfig):
             module.model.state_dict(),
             output_dir_path / "best_model.pth",
         )
+
+    dataset_metadata_json = {
+        "title": "CMI-DSS Segmentation Model",
+        "id": "ranchantan/cmi-dss-seg-model",
+        "licenses": [{"name": "CC0-1.0"}],
+    }
+
+    dataset_dir_path = project_root_path / "output_dataset" / "train"
+    with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
+        json.dump(dataset_metadata_json, f, indent=2)
+
+    subprocess.run(
+        " ".join(
+            [
+                str(pathlib.Path.home() / ".local" / "bin" / "kaggle"),
+                "datasets",
+                "version",
+                "-p",
+                f"{dataset_dir_path}",
+                "-m",
+                "''",
+                "--dir-mode",
+                "tar",
+            ]
+        ),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+        shell=True,
+    )
 
 
 if __name__ == "__main__":
