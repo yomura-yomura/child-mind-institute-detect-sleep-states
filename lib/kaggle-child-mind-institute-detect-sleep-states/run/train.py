@@ -25,7 +25,7 @@ cwd_path = pathlib.Path.cwd()
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
-def main(cfg: DictConfig):  # type: ignore
+def main(cfg: DictConfig):
     print(cfg)
 
     seed_everything(cfg.seed)

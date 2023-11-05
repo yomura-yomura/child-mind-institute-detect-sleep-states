@@ -54,8 +54,10 @@ augmentation:
   
 # post_process
 post_process:
-  score_th: 0.02
-  distance: 10
+#  score_th: 0.02
+  score_th: 0.005
+#  distance: 10
+  distance: 96
 
 # label
 labels:

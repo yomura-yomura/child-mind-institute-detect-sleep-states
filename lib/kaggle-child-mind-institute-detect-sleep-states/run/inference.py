@@ -121,6 +121,8 @@ def main(cfg: DictConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, test_dataloader, model, device, use_amp=cfg.use_amp)
 
+    np.savez("predicted.npz", key=keys, pred=preds)
+
     with trace("make submission"):
         sub_df = make_submission(
             keys,
