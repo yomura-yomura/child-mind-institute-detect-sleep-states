@@ -164,3 +164,5 @@ processed_data/
 output/
 wandb/
 *.out
+wandb
+*.out
