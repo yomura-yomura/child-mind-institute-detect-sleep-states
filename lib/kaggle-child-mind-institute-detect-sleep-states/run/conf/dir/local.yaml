@@ -1,5 +1,5 @@
-data_dir: ~/develop/child-mind-institute-detect-sleep-states/data/child-mind-institute-detect-sleep-states/
-processed_dir: ~/develop/child-mind-institute-detect-sleep-states/output/prepare_data/processed_data
+data_dir: /home/jumpei.uchida/child-mind-institute-detect-sleep-states/data/train-series-with-partid
+processed_dir: ./processed_data
 output_dir: ./output
 model_dir: ./train
 sub_dir: ./

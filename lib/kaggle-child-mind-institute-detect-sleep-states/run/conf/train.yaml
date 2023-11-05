@@ -27,7 +27,7 @@ upsample_rate: 1
 epoch: 50
 #batch_size: 64
 batch_size: 32
-num_workers: 12
+num_workers: 8
 accelerator: auto
 #use_amp: true
 use_amp: false
