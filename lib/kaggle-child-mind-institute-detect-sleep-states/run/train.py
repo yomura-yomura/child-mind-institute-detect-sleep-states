@@ -5,12 +5,7 @@ import hydra
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-    RichModelSummary,
-    RichProgressBar,
-)
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, RichModelSummary, RichProgressBar
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import DictConfig
 
@@ -56,14 +51,12 @@ def main(cfg: DictConfig):
     # probs = [batch["logits"].sigmoid().detach().cpu() for batch in preds]
     # torch.save(module.model.state_dict(), "best_model.pth")
 
-    from child_mind_institute_detect_sleep_states.model.callbacks import (
-        ModelCheckpointWithSymlinkToBest,
-    )
+    from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
 
     # init experiment logger
     pl_logger = WandbLogger(
         name=cfg.exp_name,
-        project="child-mind-institute-detect-sleep-states",
+        project="child-mind-institute-detect-sleep-states-Unet",
     )
 
     cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, "single")
