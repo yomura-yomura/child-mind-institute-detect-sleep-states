@@ -24,7 +24,7 @@ downsample_rate: 2
 upsample_rate: 1
 
 # training
-epoch: 70
+epoch: 50
 #batch_size: 64
 batch_size: 32  # 0.0005
 #batch_size: 16
@@ -79,8 +79,8 @@ features:
 
 # optimizer
 optimizer:
-#  lr: 0.0005
-  lr: 0.00025
+  lr: 0.0005
+#  lr: 0.00025
 
 # scheduler
 scheduler:
