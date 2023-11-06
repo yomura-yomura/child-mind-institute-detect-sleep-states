@@ -8,11 +8,11 @@ from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
-    RichModelSummary,
-    RichProgressBar,
+    # RichModelSummary,
+    # RichProgressBar,
 )
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig
+from cmi_dss_lib.config import TrainConfig
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
@@ -24,11 +24,8 @@ import pathlib
 cwd_path = pathlib.Path.cwd()
 
 
-import dataclasses
-
-
 @hydra.main(config_path=None, config_name="train", version_base="1.2")
-def main(cfg: DictConfig):
+def main(cfg: TrainConfig):
     print(cfg)
 
     seed_everything(cfg.seed)
@@ -112,21 +109,6 @@ def main(cfg: DictConfig):
     )
 
     trainer.fit(model, datamodule=datamodule)
-
-    # # load best weights
-    # model = SegModel.load_from_checkpoint(
-    #     checkpoint_cb.best_model_path,
-    #     cfg=cfg,
-    #     val_event_df=datamodule.valid_event_df,
-    #     feature_dim=len(cfg.features),
-    #     num_classes=len(cfg.labels),
-    #     duration=cfg.duration,
-    # )
-    # weights_path = "model_weights.pth"
-    # LOGGER.info(f"Extracting and saving best weights: {weights_path}")
-    # torch.save(model.model.state_dict(), weights_path)
-
-    return
 
 
 if __name__ == "__main__":

@@ -6,11 +6,12 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import torch
-from cmi_dss_lib.utils.common import pad_if_needed
 from lightning import LightningDataModule
-from omegaconf import DictConfig
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
+
+from ..config import TrainConfig
+from ..utils.common import pad_if_needed
 
 
 ###################
@@ -157,7 +158,7 @@ def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
 class TrainDataset(Dataset):
     def __init__(
         self,
-        cfg: DictConfig,
+        cfg: TrainConfig,
         event_df: pl.DataFrame,
         features: dict[str, np.ndarray],
     ):
@@ -218,7 +219,7 @@ class TrainDataset(Dataset):
 class ValidDataset(Dataset):
     def __init__(
         self,
-        cfg: DictConfig,
+        cfg: TrainConfig,
         chunk_features: dict[str, np.ndarray],
         event_df: pl.DataFrame,
     ):
@@ -270,7 +271,7 @@ class ValidDataset(Dataset):
 class TestDataset(Dataset):
     def __init__(
         self,
-        cfg: DictConfig,
+        cfg: TrainConfig,
         chunk_features: dict[str, np.ndarray],
     ):
         self.cfg = cfg
@@ -304,7 +305,7 @@ class TestDataset(Dataset):
 # DataModule
 ###################
 class SegDataModule(LightningDataModule):
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: TrainConfig):
         super().__init__()
         self.cfg = cfg
         self.data_dir = Path(cfg.dir.data_dir)

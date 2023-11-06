@@ -11,7 +11,8 @@ from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
-from omegaconf import DictConfig
+
+from ..config import TrainConfig
 
 FEATURE_EXTRACTORS = Union[
     CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor
@@ -21,10 +22,11 @@ MODELS = Union[Spec1D, Spec2DCNN]
 
 
 def get_feature_extractor(
-    cfg: DictConfig, feature_dim: int, num_time_steps: int
+    cfg: TrainConfig, feature_dim: int, num_time_steps: int
 ) -> FEATURE_EXTRACTORS:
     feature_extractor: FEATURE_EXTRACTORS
     if cfg.feature_extractor.name == "CNNSpectrogram":
+        assert cfg.model_dim == 2
         feature_extractor = CNNSpectrogram(
             in_channels=feature_dim,
             base_filters=cfg.feature_extractor.base_filters,
@@ -36,6 +38,7 @@ def get_feature_extractor(
             reinit=cfg.feature_extractor.reinit,
         )
     elif cfg.feature_extractor.name == "PANNsFeatureExtractor":
+        assert cfg.model_dim == 2
         feature_extractor = PANNsFeatureExtractor(
             in_channels=feature_dim,
             base_filters=cfg.feature_extractor.base_filters,
@@ -53,9 +56,11 @@ def get_feature_extractor(
             hidden_size=cfg.feature_extractor.hidden_size,
             num_layers=cfg.feature_extractor.num_layers,
             bidirectional=cfg.feature_extractor.bidirectional,
+            model_dim=cfg.model_dim,
             out_size=num_time_steps,
         )
     elif cfg.feature_extractor.name == "SpecFeatureExtractor":
+        assert cfg.model_dim == 2
         feature_extractor = SpecFeatureExtractor(
             in_channels=feature_dim,
             height=cfg.feature_extractor.height,
@@ -69,7 +74,9 @@ def get_feature_extractor(
     return feature_extractor
 
 
-def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_time_steps: int) -> DECODERS:
+def get_decoder(
+    cfg: TrainConfig, n_channels: int, n_classes: int, num_time_steps: int
+) -> DECODERS:
     decoder: DECODERS
     if cfg.decoder.name == "UNet1DDecoder":
         decoder = UNet1DDecoder(
@@ -108,11 +115,13 @@ def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_time_steps
     return decoder
 
 
-def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_time_steps: int) -> MODELS:
+def get_model(cfg: TrainConfig, feature_dim: int, n_classes: int, num_time_steps: int) -> MODELS:
     model: MODELS
     feature_extractor = get_feature_extractor(cfg, feature_dim, num_time_steps)
+    decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_time_steps)
     if cfg.model.name == "Spec2DCNN":
-        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_time_steps)
+        assert cfg.model_dim == 2
+
         model = Spec2DCNN(
             feature_extractor=feature_extractor,
             decoder=decoder,
@@ -123,11 +132,13 @@ def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_time_steps:
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
     elif cfg.model.name == "Spec1D":
-        decoder = get_decoder(cfg, 1, n_classes, num_time_steps)
+        # decoder = get_decoder(cfg, 1, n_classes, num_time_steps)
+
         model = Spec1D(
             feature_extractor=feature_extractor,
             decoder=decoder,
             num_time_steps=num_time_steps,
+            model_dim=cfg.model_dim,
             mixup_alpha=cfg.augmentation.mixup_alpha,
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )

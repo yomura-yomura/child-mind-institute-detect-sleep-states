@@ -2,13 +2,15 @@
 
 #EXP_NAME=exp004
 #EXP_NAME=exp005-lstm-feature-2
-EXP_NAME=exp005-lstm-feature-3
+#EXP_NAME=exp005-lstm-feature-3
 #EXP_NAME=exp006-lstm-feature-fp16
-#EXP_NAME=exp007-lstm-feature-1d-fp16
 #EXP_NAME=exp009-lstm-feature-half-lr
 #EXP_NAME=exp010-lstm-feature-mlp-decoder
 
-ARGS="--config-dir $1"
+EXP_NAME=exp011-lstm-feature-1d-fp16
+CONFIG_DIR=config/omura/v100/1d/
+
+ARGS="batch_size=64 --config-dir $CONFIG_DIR"
 
 echo $ARGS
 

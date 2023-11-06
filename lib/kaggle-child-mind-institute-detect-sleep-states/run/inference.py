@@ -1,22 +1,25 @@
+import argparse
 from pathlib import Path
+from typing import cast
 
 import hydra
 import numpy as np
 import polars as pl
 import torch
 import torch.nn as nn
+from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule, nearest_valid_size
 from cmi_dss_lib.models.common import get_model
 from cmi_dss_lib.utils.common import trace
 from cmi_dss_lib.utils.post_process import post_process_for_seg
 from lightning import seed_everything
-from omegaconf import DictConfig
+from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
 
-def load_model(cfg: DictConfig) -> nn.Module:
+def load_model(cfg: TrainConfig) -> nn.Module:
     num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
     model = get_model(
         cfg,
@@ -107,17 +110,19 @@ def make_submission(keys: list[str], preds: np.ndarray, score_th, distance) -> p
 
 
 @hydra.main(config_path=None, config_name="train", version_base="1.2")
-def main(cfg: DictConfig):
+def main(cfg: TrainConfig):
     seed_everything(cfg.seed)
 
     with trace("load test dataloader"):
         # test_dataloader = get_test_dataloader(cfg)
         data_module = SegDataModule(cfg)
-        data_module.setup("valid")
-        dataloader = data_module.val_dataloader()
 
-        # data_module.setup("test")
-        # dataloader = data_module.test_dataloader()
+        if cfg.phase == "train":
+            data_module.setup("valid")
+            dataloader = data_module.val_dataloader()
+        elif cfg.phase == "test":
+            data_module.setup("test")
+            dataloader = data_module.test_dataloader()
 
     with trace("load model"):
         model = load_model(cfg)
@@ -143,4 +148,13 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("config_path", type=str)
+    # parser.add_argument("overrides", type=str)
+    # args = parser.parse_args()
+    #
+    # with hydra.initialize(config_path=args.config_path):
+    #     cfg = hydra.compose(config_name="config.yaml", overrides=OmegaConf.load(args.overrides))
+    # print(cfg)
+    # main(cfg)
     main()
