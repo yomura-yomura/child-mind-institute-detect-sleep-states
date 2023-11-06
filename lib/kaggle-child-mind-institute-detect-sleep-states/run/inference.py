@@ -22,7 +22,7 @@ def load_model(cfg: DictConfig) -> nn.Module:
         cfg,
         feature_dim=len(cfg.features),
         n_classes=len(cfg.labels),
-        num_timesteps=num_time_steps // cfg.downsample_rate,
+        num_time_steps=num_time_steps // cfg.downsample_rate,
     )
 
     # load weights

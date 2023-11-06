@@ -33,7 +33,7 @@ class SegModel(LightningModule):
             cfg,
             feature_dim=feature_dim,
             n_classes=num_classes,
-            num_timesteps=num_time_steps // cfg.downsample_rate,
+            num_time_steps=num_time_steps // cfg.downsample_rate,
         )
         self.duration = duration
         self.validation_step_outputs: list = []
@@ -44,7 +44,7 @@ class SegModel(LightningModule):
     ) -> dict[str, Optional[torch.Tensor]]:
         return self.model(batch["feature"], batch["label"], do_mixup, do_cutmix)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch):
         do_mixup = np.random.rand() < self.cfg.augmentation.mixup_prob
         do_cutmix = np.random.rand() < self.cfg.augmentation.cutmix_prob
 
@@ -61,7 +61,7 @@ class SegModel(LightningModule):
         )
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch):
         output = self.forward(batch)
         loss: torch.Tensor = output["loss"]
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
