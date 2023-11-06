@@ -10,12 +10,12 @@ class Mixup:
         """Mixup augmentation.
 
         Args:
-            imgs (torch.Tensor): (batch_size, n_channels, n_timesteps)
-            labels (torch.Tensor): (batch_size, n_timesteps, n_classes)
+            imgs (torch.Tensor): (batch_size, n_channels, n_time_steps)
+            labels (torch.Tensor): (batch_size, n_time_steps, n_classes)
 
         Returns:
-            tuple[torch.Tensor]: mixed_imgs (batch_size, n_channels, n_timesteps)
-                                 mixed_labels (batch_size, n_timesteps, n_classes)
+            tuple[torch.Tensor]: mixed_imgs (batch_size, n_channels, n_time_steps)
+                                 mixed_labels (batch_size, n_time_steps, n_classes)
         """
         batch_size = imgs.size(0)
         idx = torch.randperm(batch_size)

@@ -1,13 +1,13 @@
 from typing import Optional
 
+import cmi_dss_lib.datamodule.seg
+import cmi_dss_lib.models.common
+import cmi_dss_lib.utils.metrics
+import cmi_dss_lib.utils.post_process
 import numpy as np
 import polars as pl
 import torch
 import torch.optim as optim
-from cmi_dss_lib.datamodule.seg import nearest_valid_size
-from cmi_dss_lib.models.common import get_model
-from cmi_dss_lib.utils.metrics import event_detection_ap
-from cmi_dss_lib.utils.post_process import post_process_for_seg
 from lightning import LightningModule
 from omegaconf import DictConfig
 from torchvision.transforms.functional import resize
@@ -26,12 +26,14 @@ class SegModel(LightningModule):
         super().__init__()
         self.cfg = cfg
         self.val_event_df = val_event_df
-        num_time_steps = nearest_valid_size(int(duration * cfg.upsample_rate), cfg.downsample_rate)
-        self.model = get_model(
+        num_time_steps = cmi_dss_lib.datamodule.seg.nearest_valid_size(
+            int(duration * cfg.upsample_rate), cfg.downsample_rate
+        )
+        self.model = cmi_dss_lib.models.common.get_model(
             cfg,
             feature_dim=feature_dim,
             n_classes=num_classes,
-            num_timesteps=num_time_steps // cfg.downsample_rate,
+            num_time_steps=num_time_steps // cfg.downsample_rate,
         )
         self.duration = duration
         self.validation_step_outputs: list = []
@@ -42,13 +44,13 @@ class SegModel(LightningModule):
     ) -> dict[str, Optional[torch.Tensor]]:
         return self.model(batch["feature"], batch["label"], do_mixup, do_cutmix)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch):
         do_mixup = np.random.rand() < self.cfg.augmentation.mixup_prob
         do_cutmix = np.random.rand() < self.cfg.augmentation.cutmix_prob
 
         output = self.forward(batch, do_mixup=do_mixup, do_cutmix=do_cutmix)
         loss: torch.Tensor = output["loss"]
-        # logits = output["logits"]  # (batch_size, n_timesteps, n_classes)
+        # logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
         self.log(
             f"train_loss",
             loss.detach().item(),
@@ -59,10 +61,10 @@ class SegModel(LightningModule):
         )
         return loss
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch):
         output = self.forward(batch)
         loss: torch.Tensor = output["loss"]
-        logits = output["logits"]  # (batch_size, n_timesteps, n_classes)
+        logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
 
         resized_logits = resize(
             logits.sigmoid().detach().cpu(),
@@ -102,13 +104,15 @@ class SegModel(LightningModule):
         # losses = np.array([x[3] for x in self.validation_step_outputs])
         # loss = losses.mean()
 
-        val_pred_df = post_process_for_seg(
+        val_pred_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             keys=keys,
             preds=preds[:, :, [1, 2]],
             score_th=self.cfg.post_process.score_th,
             distance=self.cfg.post_process.distance,
         )
-        score = event_detection_ap(self.val_event_df.to_pandas(), val_pred_df.to_pandas())
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(
+            self.val_event_df.to_pandas(), val_pred_df.to_pandas()
+        )
         self.log(
             "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
         )

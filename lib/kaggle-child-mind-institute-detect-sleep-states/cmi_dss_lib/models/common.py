@@ -19,7 +19,9 @@ DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
 
-def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int) -> FEATURE_EXTRACTORS:
+def get_feature_extractor(
+    cfg: DictConfig, feature_dim: int, num_time_steps: int
+) -> FEATURE_EXTRACTORS:
     feature_extractor: FEATURE_EXTRACTORS
     if cfg.feature_extractor.name == "CNNSpectrogram":
         feature_extractor = CNNSpectrogram(
@@ -28,7 +30,7 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
             kernel_sizes=cfg.feature_extractor.kernel_sizes,
             stride=cfg.feature_extractor.stride,
             sigmoid=cfg.feature_extractor.sigmoid,
-            output_size=num_timesteps,
+            output_size=num_time_steps,
             conv=nn.Conv1d,
             reinit=cfg.feature_extractor.reinit,
         )
@@ -39,7 +41,7 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
             kernel_sizes=cfg.feature_extractor.kernel_sizes,
             stride=cfg.feature_extractor.stride,
             sigmoid=cfg.feature_extractor.sigmoid,
-            output_size=num_timesteps,
+            output_size=num_time_steps,
             conv=nn.Conv1d,
             reinit=cfg.feature_extractor.reinit,
             win_length=cfg.feature_extractor.win_length,
@@ -50,7 +52,7 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
             hidden_size=cfg.feature_extractor.hidden_size,
             num_layers=cfg.feature_extractor.num_layers,
             bidirectional=cfg.feature_extractor.bidirectional,
-            out_size=num_timesteps,
+            out_size=num_time_steps,
         )
     elif cfg.feature_extractor.name == "SpecFeatureExtractor":
         feature_extractor = SpecFeatureExtractor(
@@ -58,6 +60,15 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
             height=cfg.feature_extractor.height,
             hop_length=cfg.feature_extractor.hop_length,
             win_length=cfg.feature_extractor.win_length,
+            out_size=num_time_steps,
+        )
+
+    elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
+        feature_extractor = StackedGRUFeatureExtractor(
+            in_channels=feature_dim,
+            hidden_size=cfg.feature_extractor.hidden_size,
+            num_layers=cfg.feature_extractor.num_layers,
+            bidirectional=cfg.feature_extractor.bidirectional,
             out_size=num_timesteps,
         )
     elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
@@ -74,13 +85,13 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
     return feature_extractor
 
 
-def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_timesteps: int) -> DECODERS:
+def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_time_steps: int) -> DECODERS:
     decoder: DECODERS
     if cfg.decoder.name == "UNet1DDecoder":
         decoder = UNet1DDecoder(
             n_channels=n_channels,
             n_classes=n_classes,
-            duration=num_timesteps,
+            duration=num_time_steps,
             bilinear=cfg.decoder.bilinear,
             se=cfg.decoder.se,
             res=cfg.decoder.res,
@@ -113,11 +124,11 @@ def get_decoder(cfg: DictConfig, n_channels: int, n_classes: int, num_timesteps:
     return decoder
 
 
-def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_timesteps: int) -> MODELS:
+def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_time_steps: int) -> MODELS:
     model: MODELS
+    feature_extractor = get_feature_extractor(cfg, feature_dim, num_time_steps)
     if cfg.model.name == "Spec2DCNN":
-        feature_extractor = get_feature_extractor(cfg, feature_dim, num_timesteps)
-        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_timesteps)
+        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_time_steps)
         model = Spec2DCNN(
             feature_extractor=feature_extractor,
             decoder=decoder,
@@ -128,11 +139,11 @@ def get_model(cfg: DictConfig, feature_dim: int, n_classes: int, num_timesteps: 
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
     elif cfg.model.name == "Spec1D":
-        feature_extractor = get_feature_extractor(cfg, feature_dim, num_timesteps)
-        decoder = get_decoder(cfg, feature_extractor.height, n_classes, num_timesteps)
+        decoder = get_decoder(cfg, 1, n_classes, num_time_steps)
         model = Spec1D(
             feature_extractor=feature_extractor,
             decoder=decoder,
+            num_time_steps=num_time_steps,
             mixup_alpha=cfg.augmentation.mixup_alpha,
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
