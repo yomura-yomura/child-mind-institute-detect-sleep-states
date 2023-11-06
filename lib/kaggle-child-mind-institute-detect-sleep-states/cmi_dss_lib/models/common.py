@@ -69,15 +69,7 @@ def get_feature_extractor(
             hidden_size=cfg.feature_extractor.hidden_size,
             num_layers=cfg.feature_extractor.num_layers,
             bidirectional=cfg.feature_extractor.bidirectional,
-            out_size=num_timesteps,
-        )
-    elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
-        feature_extractor = StackedGRUFeatureExtractor(
-            in_channels=feature_dim,
-            hidden_size=cfg.feature_extractor.hidden_size,
-            num_layers=cfg.feature_extractor.num_layers,
-            bidirectional=cfg.feature_extractor.bidirectional,
-            out_size=num_timesteps,
+            out_size=num_time_steps,
         )
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
