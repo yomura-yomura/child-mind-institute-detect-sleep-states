@@ -24,7 +24,10 @@ import pathlib
 cwd_path = pathlib.Path.cwd()
 
 
-@hydra.main(config_path="conf", config_name="train", version_base="1.2")
+import dataclasses
+
+
+@hydra.main(config_path=None, config_name="train", version_base="1.2")
 def main(cfg: DictConfig):
     print(cfg)
 
@@ -97,8 +100,8 @@ def main(cfg: DictConfig):
                 patience=20,
             ),
             LearningRateMonitor("epoch"),
-            RichProgressBar(),
-            RichModelSummary(max_depth=2),
+            # RichProgressBar(),
+            # RichModelSummary(max_depth=2),
         ],
         logger=pl_logger,
         # resume_from_checkpoint=resume_from,

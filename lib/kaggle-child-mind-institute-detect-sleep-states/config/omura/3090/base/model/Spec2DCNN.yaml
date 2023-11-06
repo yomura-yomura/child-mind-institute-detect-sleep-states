@@ -1,0 +1,3 @@
+name: Spec2DCNN
+encoder_name: resnet18
+encoder_weights: imagenet

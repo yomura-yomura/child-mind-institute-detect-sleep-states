@@ -13,12 +13,17 @@ defaults:
   - _self_
   - dir: local
   - model: Spec2DCNN
-  - feature_extractor: CNNSpectrogram
+  - feature_extractor: LSTMFeatureExtractor
   - decoder: UNet1DDecoder
   - split: fold_0
 
 seed: 42
 exp_name: dummy
+phase: train
+weight:
+  exp_name: ${exp_name}
+  run_name: single
+
 duration: 5760 # duration * 5 = 秒数
 downsample_rate: 2
 upsample_rate: 1
@@ -26,12 +31,12 @@ upsample_rate: 1
 # training
 epoch: 70
 #batch_size: 64
-batch_size: 32  # 0.0005
-#batch_size: 16
+#batch_size: 32  # 0.0005
+batch_size: 16
 num_workers: 8
 accelerator: auto
-#use_amp: true
-use_amp: false
+use_amp: true
+#use_amp: false
 debug: false
 gradient_clip_val: 1.0
 accumulate_grad_batches: 1

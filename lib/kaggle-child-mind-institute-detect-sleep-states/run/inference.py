@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 import torch
 import torch.nn as nn
-from cmi_dss_lib.datamodule.seg import TestDataset, load_chunk_features, nearest_valid_size
+from cmi_dss_lib.datamodule.seg import SegDataModule, nearest_valid_size
 from cmi_dss_lib.models.common import get_model
 from cmi_dss_lib.utils.common import trace
 from cmi_dss_lib.utils.post_process import post_process_for_seg
@@ -38,34 +38,34 @@ def load_model(cfg: DictConfig) -> nn.Module:
     return model
 
 
-def get_test_dataloader(cfg: DictConfig) -> DataLoader:
-    """get test dataloader
-
-    Args:
-        cfg (DictConfig): config
-
-    Returns:
-        DataLoader: test dataloader
-    """
-    feature_dir = Path(cfg.dir.processed_dir) / cfg.phase
-    series_ids = [x.name for x in feature_dir.glob("*")]
-    chunk_features = load_chunk_features(
-        duration=cfg.duration,
-        feature_names=cfg.features,
-        series_ids=series_ids,
-        processed_dir=Path(cfg.dir.processed_dir),
-        phase=cfg.phase,
-    )
-    test_dataset = TestDataset(cfg, chunk_features=chunk_features)
-    test_dataloader = DataLoader(
-        test_dataset,
-        batch_size=cfg.batch_size,
-        shuffle=False,
-        num_workers=cfg.num_workers,
-        pin_memory=True,
-        drop_last=False,
-    )
-    return test_dataloader
+# def get_test_dataloader(cfg: DictConfig) -> DataLoader:
+#     """get test dataloader
+#
+#     Args:
+#         cfg (DictConfig): config
+#
+#     Returns:
+#         DataLoader: test dataloader
+#     """
+#     feature_dir = Path(cfg.dir.processed_dir) / cfg.phase
+#     series_ids = [x.name for x in feature_dir.glob("*")]
+#     chunk_features = load_chunk_features(
+#         duration=cfg.duration,
+#         feature_names=cfg.features,
+#         series_ids=series_ids,
+#         processed_dir=Path(cfg.dir.processed_dir),
+#         phase=cfg.phase,
+#     )
+#     test_dataset = TestDataset(cfg, chunk_features=chunk_features)
+#     test_dataloader = DataLoader(
+#         test_dataset,
+#         batch_size=cfg.batch_size,
+#         shuffle=False,
+#         num_workers=cfg.num_workers,
+#         pin_memory=True,
+#         drop_last=False,
+#     )
+#     return test_dataloader
 
 
 def inference(
@@ -95,9 +95,7 @@ def inference(
     return keys, preds  # type: ignore
 
 
-def make_submission(
-    keys: list[str], preds: np.ndarray, downsample_rate, score_th, distance
-) -> pl.DataFrame:
+def make_submission(keys: list[str], preds: np.ndarray, score_th, distance) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds[:, :, [1, 2]],  # type: ignore
@@ -108,26 +106,36 @@ def make_submission(
     return sub_df
 
 
-@hydra.main(config_path="conf", config_name="inference", version_base="1.2")
+@hydra.main(config_path=None, config_name="train", version_base="1.2")
 def main(cfg: DictConfig):
     seed_everything(cfg.seed)
 
     with trace("load test dataloader"):
-        test_dataloader = get_test_dataloader(cfg)
+        # test_dataloader = get_test_dataloader(cfg)
+        data_module = SegDataModule(cfg)
+        data_module.setup("valid")
+        dataloader = data_module.val_dataloader()
+
+        # data_module.setup("test")
+        # dataloader = data_module.test_dataloader()
+
     with trace("load model"):
         model = load_model(cfg)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     with trace("inference"):
-        keys, preds = inference(cfg.duration, test_dataloader, model, device, use_amp=cfg.use_amp)
+        keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
-    np.savez("predicted.npz", key=keys, pred=preds)
+    if cfg.phase == "train":
+        labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
+        np.savez("predicted.npz", key=keys, pred=preds, label=labels)
+    else:
+        np.savez("predicted.npz", key=keys, pred=preds)
 
     with trace("make submission"):
         sub_df = make_submission(
             keys,
             preds,
-            downsample_rate=cfg.downsample_rate,
             score_th=cfg.post_process.score_th,
             distance=cfg.post_process.distance,
         )

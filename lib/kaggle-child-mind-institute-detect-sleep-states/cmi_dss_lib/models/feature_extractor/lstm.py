@@ -26,7 +26,8 @@ class LSTMFeatureExtractor(nn.Module):
         self.out_chans = 1
         self.out_size = out_size
         if self.out_size is not None:
-            self.pool = nn.AdaptiveAvgPool2d((None, self.out_size))
+            self.pool = nn.AdaptiveAvgPool1d(self.out_size)
+            # self.pool = nn.AdaptiveAvgPool2d((None, self.out_size))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass
@@ -39,9 +40,10 @@ class LSTMFeatureExtractor(nn.Module):
         """
         # x: (batch_size, in_channels, time_steps)
         if self.out_size is not None:
-            x = x.unsqueeze(1)  # x: (batch_size, 1, in_channels, time_steps)
+            # x = x.unsqueeze(1)  # x: (batch_size, 1, in_channels, time_steps)
             x = self.pool(x)  # x: (batch_size, 1, in_channels, output_size)
-            x = x.squeeze(1)  # x: (batch_size, in_channels, output_size)
+            # x = x.squeeze(1)  # x: (batch_size, in_channels, output_size)
+
         x = x.transpose(1, 2)  # x: (batch_size, output_size, in_channels)
         x = self.fc(x)  # x: (batch_size, output_size, hidden_size)
         x, _ = self.lstm(x)  # x: (batch_size, output_size, hidden_size * num_directions)

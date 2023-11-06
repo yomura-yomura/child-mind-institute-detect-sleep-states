@@ -1,13 +1,14 @@
 #!/bin/sh
 
 #EXP_NAME=exp004
-#EXP_NAME=exp005-lstm-feature
+#EXP_NAME=exp005-lstm-feature-2
+EXP_NAME=exp005-lstm-feature-3
 #EXP_NAME=exp006-lstm-feature-fp16
 #EXP_NAME=exp007-lstm-feature-1d-fp16
-EXP_NAME=exp009-lstm-feature-half-lr
+#EXP_NAME=exp009-lstm-feature-half-lr
+#EXP_NAME=exp010-lstm-feature-mlp-decoder
 
-ARGS="feature_extractor=LSTMFeatureExtractor"
-#ARGS="feature_extractor=LSTMFeatureExtractor use_amp=true model=Spec1D"
+ARGS="--config-dir $1"
 
 echo $ARGS
 

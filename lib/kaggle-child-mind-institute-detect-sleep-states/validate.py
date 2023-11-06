@@ -8,9 +8,9 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 import child_mind_institute_detect_sleep_states.score
 
 submission_df = pd.read_csv(
-    # "submission.csv"
+    "submission.csv"
     # "new_submission2.csv"
-    "new_submission3.csv"
+    # "new_submission3.csv"
 )
 
 ids_dict = OmegaConf.load(pathlib.Path("run") / "conf" / "split" / "fold_0.yaml")
@@ -28,9 +28,10 @@ event_df = event_df[event_df["series_id"].isin(ids_dict["valid_series_ids"])]
 # score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
 #     event_df, submission_df
 # )
+
 score = event_detection_ap(
     event_df,
-    # submission_df
-    submission_df[submission_df["score"] > 0.1],
+    submission_df
+    # submission_df[submission_df["score"] > 0.1],
 )
 print(f"{score = :.3f}")

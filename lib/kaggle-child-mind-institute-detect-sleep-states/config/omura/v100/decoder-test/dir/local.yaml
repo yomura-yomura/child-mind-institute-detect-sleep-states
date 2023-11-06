@@ -1,0 +1,5 @@
+data_dir: ~/child-mind-institute-detect-sleep-states/data/child-mind-institute-detect-sleep-states/
+processed_dir: ./processed_data
+output_dir: ./output
+model_dir: ./train
+sub_dir: ./
