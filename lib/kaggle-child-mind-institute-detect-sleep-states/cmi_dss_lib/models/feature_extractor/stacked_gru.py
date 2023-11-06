@@ -18,8 +18,8 @@ class StackedGRUFeatureExtractor(nn.Module):
         self.stacked_gru = MultiResidualBiGRU(
             input_size = hidden_size,
             hidden_size=hidden_size,
-            output_size=out_size,
-            num_layers=num_layers,
+            out_size=out_size,
+            n_layers=num_layers,
             bidir=bidirectional,
                     )
         self.out_chans = 1
@@ -102,7 +102,7 @@ class MultiResidualBiGRU(nn.Module):
         self.fc_in = nn.Linear(input_size, hidden_size)
         self.ln = nn.LayerNorm(hidden_size)
         self.res_bigrus = nn.ModuleList([ResidualBiGRU(hidden_size, n_layers=1, bidir=bidir) for _ in range(n_layers)])
-        self.fc_out = nn.Linear(hidden_size, out_size)
+        self.fc_out = nn.Linear(hidden_size, hidden_size*2)
 
     def forward(self, x, h=None):
         # if we are at the beginning of a sequence (no hidden state)

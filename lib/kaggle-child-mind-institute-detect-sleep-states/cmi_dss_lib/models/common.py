@@ -14,7 +14,7 @@ from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 from omegaconf import DictConfig
 
-FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor]
+FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor,StackedGRUFeatureExtractor]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
@@ -60,7 +60,7 @@ def get_feature_extractor(cfg: DictConfig, feature_dim: int, num_timesteps: int)
             win_length=cfg.feature_extractor.win_length,
             out_size=num_timesteps,
         )
-    elif cfg.feature_extractor.name == "GRUFeatureExtractor":
+    elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
         feature_extractor = StackedGRUFeatureExtractor(
             in_channels=feature_dim,
             hidden_size=cfg.feature_extractor.hidden_size,
