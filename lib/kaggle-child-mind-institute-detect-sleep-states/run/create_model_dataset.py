@@ -13,7 +13,7 @@ from omegaconf import DictConfig
 project_root_path = pathlib.Path(__file__).parent.parent
 
 
-exp_name = "exp005-lstm-feature"
+exp_name = "exp005-lstm-feature-2"
 # exp_name = "exp008-lstm-feature-half-lr"
 sys.argv += ["feature_extractor=LSTMFeatureExtractor"]
 
@@ -52,6 +52,7 @@ def main(cfg: DictConfig):
             feature_dim=len(cfg.features),
             num_classes=len(cfg.labels),
             duration=cfg.duration,
+            map_location="cpu",
         )
 
         output_dir_path = dataset_output_dir_path / p.relative_to(train_output_dir_path).parent

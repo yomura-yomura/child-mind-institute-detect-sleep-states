@@ -10,7 +10,7 @@
 EXP_NAME=exp011-lstm-feature-1d-fp16
 CONFIG_DIR=config/omura/v100/1d/
 
-ARGS="batch_size=64 --config-dir $CONFIG_DIR"
+ARGS="batch_size=8 optimizer.lr=0.0001 --config-dir $CONFIG_DIR"
 
 echo $ARGS
 
