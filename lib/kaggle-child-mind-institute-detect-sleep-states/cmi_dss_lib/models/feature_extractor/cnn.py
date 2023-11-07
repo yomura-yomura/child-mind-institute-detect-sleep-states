@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import torch
 import torch.nn as nn
@@ -9,8 +9,8 @@ class CNNSpectrogram(nn.Module):
     def __init__(
         self,
         in_channels: int = 3,
-        base_filters: int | tuple = 128,
-        kernel_sizes: tuple = (32, 16, 4, 2),
+        base_filters: int | Sequence[int] = 128,
+        kernel_sizes: Sequence[int] = (32, 16, 4, 2),
         stride: int = 4,
         sigmoid: bool = False,
         output_size: Optional[int] = None,

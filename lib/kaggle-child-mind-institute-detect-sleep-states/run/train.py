@@ -2,12 +2,12 @@ import logging
 from pathlib import Path
 
 import hydra
+from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, RichModelSummary, RichProgressBar
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor  # RichModelSummary,; RichProgressBar,
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
@@ -20,7 +20,7 @@ cwd_path = pathlib.Path.cwd()
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
-def main(cfg: DictConfig):
+def main(cfg: TrainConfig):
     print(cfg)
 
     seed_everything(cfg.seed)
@@ -59,7 +59,7 @@ def main(cfg: DictConfig):
         project="child-mind-institute-detect-sleep-states-Unet",
     )
 
-    cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, "single")
+    cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, cfg.split.name)
 
     trainer = Trainer(
         devices=1,
@@ -90,8 +90,8 @@ def main(cfg: DictConfig):
                 patience=10,
             ),
             LearningRateMonitor("epoch"),
-            RichProgressBar(),
-            RichModelSummary(max_depth=2),
+            # RichProgressBar(),
+            # RichModelSummary(max_depth=2),
         ],
         logger=pl_logger,
         # resume_from_checkpoint=resume_from,
@@ -102,21 +102,6 @@ def main(cfg: DictConfig):
     )
 
     trainer.fit(model, datamodule=datamodule)
-
-    # # load best weights
-    # model = SegModel.load_from_checkpoint(
-    #     checkpoint_cb.best_model_path,
-    #     cfg=cfg,
-    #     val_event_df=datamodule.valid_event_df,
-    #     feature_dim=len(cfg.features),
-    #     num_classes=len(cfg.labels),
-    #     duration=cfg.duration,
-    # )
-    # weights_path = "model_weights.pth"
-    # LOGGER.info(f"Extracting and saving best weights: {weights_path}")
-    # torch.save(model.model.state_dict(), weights_path)
-
-    return
 
 
 if __name__ == "__main__":

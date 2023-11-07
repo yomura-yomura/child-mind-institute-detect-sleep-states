@@ -9,15 +9,16 @@ import polars as pl
 import torch
 import torch.optim as optim
 from lightning import LightningModule
-from omegaconf import DictConfig
 from torchvision.transforms.functional import resize
 from transformers import get_cosine_schedule_with_warmup
+
+from ..config import TrainConfig
 
 
 class SegModel(LightningModule):
     def __init__(
         self,
-        cfg: DictConfig,
+        cfg: TrainConfig,
         val_event_df: pl.DataFrame,
         feature_dim: int,
         num_classes: int,
@@ -66,7 +67,7 @@ class SegModel(LightningModule):
         loss: torch.Tensor = output["loss"]
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
 
-        resized_logits = resize(
+        resized_probs = resize(
             logits.sigmoid().detach().cpu(),
             size=[self.duration, logits.shape[2]],
             antialias=False,
@@ -80,7 +81,7 @@ class SegModel(LightningModule):
             (
                 batch["key"],
                 resized_labels.numpy(),
-                resized_logits.numpy(),
+                resized_probs.numpy(),
                 loss.detach().item(),
             )
         )

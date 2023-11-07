@@ -4,7 +4,7 @@ hydra:
     name: train
     chdir: false
   run:
-    dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}/single
+    dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}/${split.name}
   sweep:
     dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}
     subdir: run${hydra.job.num}
@@ -13,12 +13,19 @@ defaults:
   - _self_
   - dir: local
   - model: Spec2DCNN
-  - feature_extractor: CNNSpectrogram
+  - feature_extractor: LSTMFeatureExtractor
   - decoder: UNet1DDecoder
   - split: fold_0
 
+model_dim: 2
+
 seed: 42
 exp_name: dummy
+phase: train
+weight:
+  exp_name: ${exp_name}
+  run_name: single
+
 duration: 5760 # duration * 5 = 秒数
 downsample_rate: 2
 upsample_rate: 1
