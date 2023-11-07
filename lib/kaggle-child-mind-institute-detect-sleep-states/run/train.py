@@ -2,17 +2,12 @@ import logging
 from pathlib import Path
 
 import hydra
+from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-    # RichModelSummary,
-    # RichProgressBar,
-)
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor  # RichModelSummary,; RichProgressBar,
 from lightning.pytorch.loggers import WandbLogger
-from cmi_dss_lib.config import TrainConfig
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
@@ -24,7 +19,7 @@ import pathlib
 cwd_path = pathlib.Path.cwd()
 
 
-@hydra.main(config_path=None, config_name="train", version_base="1.2")
+@hydra.main(config_path="conf", config_name="train", version_base="1.2")
 def main(cfg: TrainConfig):
     print(cfg)
 
@@ -56,9 +51,7 @@ def main(cfg: TrainConfig):
     # probs = [batch["logits"].sigmoid().detach().cpu() for batch in preds]
     # torch.save(module.model.state_dict(), "best_model.pth")
 
-    from child_mind_institute_detect_sleep_states.model.callbacks import (
-        ModelCheckpointWithSymlinkToBest,
-    )
+    from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
 
     # init experiment logger
     pl_logger = WandbLogger(
@@ -66,7 +59,7 @@ def main(cfg: TrainConfig):
         project="child-mind-institute-detect-sleep-states",
     )
 
-    cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, "single")
+    cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, cfg.split.name)
 
     trainer = Trainer(
         devices=1,
