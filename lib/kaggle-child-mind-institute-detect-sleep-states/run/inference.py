@@ -41,6 +41,7 @@ def load_model(cfg: TrainConfig) -> nn.Module:
         / cfg.split.name
         / "best_model.pth"
     )
+    print(weight_path)
     model.load_state_dict(torch.load(weight_path))
     print('load weight from "{}"'.format(weight_path))
 
@@ -104,12 +105,15 @@ def inference(
     return keys, preds  # type: ignore
 
 
-def make_submission(keys: list[str], preds: np.ndarray, score_th, distance) -> pl.DataFrame:
+def make_submission(
+    keys: list[str], preds: np.ndarray, score_th, distance, post_process_modes=None
+) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
-        preds[:, :, [1, 2]],  # type: ignore
+        preds,
         score_th=score_th,
         distance=distance,  # type: ignore
+        post_process_modes=post_process_modes,
     )
 
     return sub_df
@@ -161,7 +165,11 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["config/omura/3090/lstm-feature-extractor.yaml"]
+    args = [
+        # "config/omura/3090/lstm-feature-extractor.yaml"
+        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
+        "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
+    ]
 else:
     args = None
 
