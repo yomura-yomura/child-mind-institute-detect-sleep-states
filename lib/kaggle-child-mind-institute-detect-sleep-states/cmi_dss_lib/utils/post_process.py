@@ -1,23 +1,49 @@
 import numpy as np
+import numpy_utility as npu
 import polars as pl
+from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
 
 def post_process_for_seg(
-    keys: list[str], preds: np.ndarray, score_th: float = 0.01, distance: int = 5000
+    keys: list[str],
+    preds: np.ndarray,
+    score_th: float = 0.01,
+    distance: int = 5000,
+    post_process_modes: list[str] | None = None,
 ) -> pl.DataFrame:
     """make submission dataframe for segmentation task
 
     Args:
         keys (list[str]): list of keys. key is "{series_id}_{chunk_id}"
-        preds (np.ndarray): (num_series * num_chunks, duration, 2)
+        preds (np.ndarray): (num_series * num_chunks, duration, 3)
         score_th (float, optional): threshold for score. Defaults to 0.5.
-
+        distance: minimum interval between detectable peaks
+        post_process_modes: extra post process names can be given
     Returns:
         pl.DataFrame: submission dataframe
     """
     series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
     unique_series_ids = np.unique(series_ids)
+
+    if post_process_modes is not None:
+        if "adapt_sleep_prob" in post_process_modes:
+            data = adapt_sleep_prob(
+                npu.from_dict(
+                    {
+                        "key": keys,
+                        "pred": preds,
+                        "series_id": series_ids,
+                    }
+                )
+            )
+            keys = data["key"]
+            preds = data["pred"]
+            series_id = data["series_id"]
+
+            series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
+
+    preds = preds[:, :, [1, 2]]
 
     records = []
     for series_id in unique_series_ids:
@@ -54,69 +80,45 @@ def post_process_for_seg(
     sub_df = sub_df.with_columns(row_ids).select(["row_id", "series_id", "step", "event", "score"])
     return sub_df
 
-def post_process_for_seg_v1(
-    keys: list[str], preds: np.ndarray, score_th: float = 0.01, distance: int = 5000,th_hour:int = 6
-) -> pl.DataFrame:
-    """make submission dataframe for segmentation task
 
-    Args:
-        keys (list[str]): list of keys. key is "{series_id}_{chunk_id}"
-        preds (np.ndarray): (num_series * num_chunks, duration, 3)
-        score_th (float, optional): threshold for score. Defaults to 0.5.
+def adapt_sleep_prob(data: NDArray) -> NDArray:
+    duration = data["pred"].shape[1]
 
-    Returns:
-        pl.DataFrame: submission dataframe
-    """
-    th_step = 12*60*th_hour # th_hour h
-    series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-    unique_series_ids = np.unique(series_ids)
+    corrected_data_list = []
+    for series_id, grouped_data in npu.groupby(data, "series_id"):
+        grouped_data = grouped_data[np.argsort(grouped_data["key"])]
+        n = len(grouped_data)
+        concat_pred = grouped_data["pred"].reshape(-1, 3)
+        # partial_preds = concat_pred[..., 0][:20_000]
+        _, props = find_peaks(concat_pred[..., 0], width=6 * 12 / 2 * 60, height=0.2)
 
-    records = []
-    for series_id in unique_series_ids:
-        series_idx = np.where(series_ids == series_id)[0]
-        this_series_preds = preds[series_idx].reshape(-1, 3)
+        # fig = px.line(y=concat_pred[..., 0])
+        # for l_i, r_i in zip(props["left_ips"], props["right_ips"]):
+        #     fig.add_vrect(x0=l_i, x1=r_i, line_width=0, fillcolor="red", opacity=0.2)
+        # fig.show()
 
-        for i, event_name in enumerate(["onset", "wakeup"]):
-            this_event_preds = this_series_preds[:, i+1]
-            steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
-            scores = this_event_preds[steps]
-            sleep_scores = this_series_preds[:,0][steps]
-            sleep_scores = []
-            for step in steps:
-                min_step = step-th_step if (step -th_step) >=0 else 0
-                max_step = step+th_step if (step +th_step) <=len(this_event_preds) else len(this_event_preds)
-
-                if event_name == "onset":
-                    sleep_scores.append(np.median(this_series_preds[:,0][step:max_step]))
-
-                if event_name == "wakeup":
-                    sleep_scores.append(np.median(this_series_preds[:,0][min_step:step]))
-            sleep_scores = np.array(sleep_scores)
-                
-
-            for step, score,sleep_score in zip(steps, scores,sleep_scores):
-                records.append(
-                    {
-                        "series_id": series_id,
-                        "step": step,
-                        "event": event_name,
-                        "score": score,
-                        "sleep_score": sleep_score,
-                    }
+        for l_i, r_i in zip(props["left_ips"], props["right_ips"]):
+            # interval = 12 // 2 * 60
+            # interval = 12 // 2 * 10
+            for i, pos in enumerate([l_i, r_i]):
+                # interest = slice(
+                #     round(pos) - interval,
+                #     round(pos) + interval,
+                # )
+                concat_pred[
+                    int(np.floor(pos)),
+                    # interest,
+                    1 + i,
+                ] *= (
+                    1
+                    + concat_pred[
+                        int(np.floor(pos)),
+                        # interest,
+                        0,
+                    ]
                 )
+        corrected_data = grouped_data.copy()
+        corrected_data["pred"] = concat_pred.reshape(n, duration, 3)
+        corrected_data_list.append(corrected_data)
 
-    if len(records) == 0:  # 一つも予測がない場合はdummyを入れる
-        records.append(
-            {
-                "series_id": series_id,
-                "step": 0,
-                "event": "onset",
-                "score": 0,
-                "sleep_score": 0,
-            }
-        )
-
-    sub_df = pl.DataFrame(records).sort(by=["series_id", "step"])
-    row_ids = pl.Series(name="row_id", values=np.arange(len(sub_df)))
-    sub_df = sub_df.with_columns(row_ids).select(["row_id", "series_id", "step", "event", "score", "sleep_score"])
-    return sub_df
+    return np.concatenate(corrected_data_list)

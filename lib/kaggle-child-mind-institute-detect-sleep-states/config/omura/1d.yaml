@@ -1,0 +1,5 @@
+- exp_name=exp014-lstm-feature-fp32
+- model_dim=1
+- model=Spec1D
+- model.encoder_name=resnet18
+- feature_extractor=LSTMFeatureExtractor

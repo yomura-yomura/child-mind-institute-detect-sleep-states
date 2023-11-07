@@ -14,12 +14,16 @@ from omegaconf import DictConfig, OmegaConf
 project_root_path = pathlib.Path(__file__).parent.parent
 
 
-exp_name = "exp005-lstm-feature"
+# exp_name = "exp005-lstm-feature"
+exp_name = "exp005-lstm-feature-2"
+# exp_name = "exp014-lstm-feature"
+
 # exp_name = "exp008-lstm-feature-half-lr"
 # exp_name = "exp012-lstm-feature"
 # exp_name = "exp011-lstm-feature-1d-fp16"
 
-upload = False
+# upload = False
+upload = True
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
@@ -93,6 +97,8 @@ if __name__ == "__main__":
         dataset_dir_path.mkdir(exist_ok=True, parents=True)
         with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
             json.dump(dataset_metadata_json, f, indent=2)
+
+        (dataset_dir_path / ".keep").touch(exist_ok=True)
 
         subprocess.run(
             " ".join(

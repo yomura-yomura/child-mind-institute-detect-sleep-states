@@ -1,0 +1,4 @@
+- exp_name=exp015-lstm-feature-sigma
+- model.encoder_name=resnet18
+- feature_extractor.name=LSTMFeatureExtractor
+- sigma=108

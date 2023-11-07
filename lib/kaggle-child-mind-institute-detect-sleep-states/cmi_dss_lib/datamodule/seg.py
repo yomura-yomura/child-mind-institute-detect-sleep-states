@@ -342,10 +342,12 @@ class SegDataModule(LightningDataModule):
                 phase="train",
             )
         if stage == "test":
+            feature_dir = Path(self.cfg.dir.processed_dir) / self.cfg.phase
+            series_ids = [x.name for x in feature_dir.glob("*")]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
-                series_ids=self.cfg.split.valid_series_ids,
+                series_ids=series_ids,
                 processed_dir=self.processed_dir,
                 phase="test",
             )
