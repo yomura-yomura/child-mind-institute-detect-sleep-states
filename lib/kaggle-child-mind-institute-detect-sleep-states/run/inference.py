@@ -167,8 +167,8 @@ project_root_path = pathlib.Path(__file__).parent.parent
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "config/omura/3090/lstm-feature-extractor.yaml"
-        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
-        "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
+        "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
+        # "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
     ]
 else:
     args = None
