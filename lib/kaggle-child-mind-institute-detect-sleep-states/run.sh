@@ -22,4 +22,6 @@ ARGS="feature_extractor=LSTMFeatureExtractor model.encoder_name=resnet18"
 
 echo $ARGS
 
-python3 run/train.py --multirun exp_name=${EXP_NAME} split=fold_0,fold_1,fold_2,fold_3,fold_4 $ARGS
+#python3 run/train.py --multirun exp_name=${EXP_NAME} split=fold_0,fold_1,fold_2,fold_3,fold_4 $ARGS
+python3 run/train.py exp_name=${EXP_NAME} split=fold_0
+
