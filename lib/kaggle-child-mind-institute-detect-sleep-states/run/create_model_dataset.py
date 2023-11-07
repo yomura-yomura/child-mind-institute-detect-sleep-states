@@ -98,6 +98,8 @@ if __name__ == "__main__":
         with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
             json.dump(dataset_metadata_json, f, indent=2)
 
+        (dataset_dir_path / ".keep").touch(exist_ok=True)
+
         subprocess.run(
             " ".join(
                 [

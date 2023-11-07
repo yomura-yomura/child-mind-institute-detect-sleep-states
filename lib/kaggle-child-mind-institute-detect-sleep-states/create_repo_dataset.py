@@ -3,6 +3,8 @@ import pathlib
 import subprocess
 import sys
 
+subprocess.run(["rm", "-rf", "child-mind-institute-detect-sleep-states"])
+
 subprocess.run(
     ["git", "clone", "git@github.com:yomura-yomura/child-mind-institute-detect-sleep-states.git"]
 )
