@@ -1,4 +1,4 @@
 name: StackedGRUFeatureExtractor
 hidden_size: 64
-num_layers: 2
+num_layers: 4
 bidirectional: true

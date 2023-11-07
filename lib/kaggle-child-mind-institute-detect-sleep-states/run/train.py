@@ -87,7 +87,7 @@ def main(cfg: DictConfig):
             EarlyStopping(
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
-                patience=20,
+                patience=10,
             ),
             LearningRateMonitor("epoch"),
             RichProgressBar(),
