@@ -14,13 +14,12 @@
 #EXP_NAME=exp013-stacked-gru-feature
 #ARGS="batch_size=8 optimizer.lr=0.0001 feature_extractor=StackedGRUFeatureExtractor feature_extractor.num_layers=3 model.encoder_name=resnet18 epoch=100"
 
-EXP_NAME=exp011-lstm-feature-1d-fp16-2
-ARGS="model_dim=1 model=Spec1D batch_size=8 optimizer.lr=0.0001 feature_extractor=LSTMFeatureExtractor model.encoder_name=resnet34 epoch=100"
+#EXP_NAME=exp011-lstm-feature-1d-fp16-2
+#ARGS="model_dim=1 model=Spec1D batch_size=8 optimizer.lr=0.0001 feature_extractor=LSTMFeatureExtractor model.encoder_name=resnet34 epoch=100"
+
+EXP_NAME=exp014-lstm-feature
+ARGS="feature_extractor=LSTMFeatureExtractor model.encoder_name=resnet18"
 
 echo $ARGS
 
-python3 run/train.py exp_name=${EXP_NAME} split=fold_0 $ARGS
-python3 run/train.py exp_name=${EXP_NAME} split=fold_1 $ARGS
-python3 run/train.py exp_name=${EXP_NAME} split=fold_2 $ARGS
-python3 run/train.py exp_name=${EXP_NAME} split=fold_3 $ARGS
-python3 run/train.py exp_name=${EXP_NAME} split=fold_4 $ARGS
+python3 run/train.py --multirun exp_name=${EXP_NAME} split=fold_0,fold_1,fold_2,fold_3,fold_4 $ARGS
