@@ -1,4 +1,0 @@
-decoder: MLPDecoder
-
-model: Spec2DCNN
-model.encoder_name: resnet18

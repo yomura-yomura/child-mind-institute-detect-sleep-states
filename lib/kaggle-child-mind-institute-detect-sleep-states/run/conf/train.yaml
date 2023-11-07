@@ -22,9 +22,6 @@ model_dim: 2
 seed: 42
 exp_name: dummy
 phase: train
-weight:
-  exp_name: ${exp_name}
-  run_name: single
 
 duration: 5760 # duration * 5 = 秒数
 downsample_rate: 2

@@ -1,4 +1,8 @@
+import argparse
 import logging
+import os
+import pathlib
+import sys
 from pathlib import Path
 
 import hydra
@@ -8,15 +12,15 @@ from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor  # RichModelSummary,; RichProgressBar,
 from lightning.pytorch.loggers import WandbLogger
+from omegaconf import OmegaConf
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
 )
 LOGGER = logging.getLogger(Path(__file__).name)
 
-import pathlib
 
-cwd_path = pathlib.Path.cwd()
+project_root_path = pathlib.Path(__file__).parent.parent
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
@@ -59,12 +63,14 @@ def main(cfg: TrainConfig):
         project="child-mind-institute-detect-sleep-states",
     )
 
-    cwd = pathlib.Path(cfg.dir.output_dir, "train", cfg.exp_name, cfg.split.name)
+    model_save_dir_path = (
+        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    )
 
     trainer = Trainer(
         devices=1,
         # env
-        default_root_dir=cwd,
+        default_root_dir=model_save_dir_path,
         # num_nodes=cfg.training.num_gpus,
         accelerator=cfg.accelerator,
         precision=16 if cfg.use_amp else 32,
@@ -76,7 +82,7 @@ def main(cfg: TrainConfig):
         accumulate_grad_batches=cfg.accumulate_grad_batches,
         callbacks=[
             ModelCheckpointWithSymlinkToBest(
-                dirpath=cwd,
+                dirpath=model_save_dir_path,
                 filename="{epoch}-{EventDetectionAP:.3f}",
                 verbose=True,
                 monitor=cfg.monitor,
@@ -104,5 +110,28 @@ def main(cfg: TrainConfig):
     trainer.fit(model, datamodule=datamodule)
 
 
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = ["config/omura/v100/1d.yaml"]
+else:
+    args = None
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config_path", nargs="+")
+    parser.add_argument("--folds", type=str, default=None)
+    args = parser.parse_args(args)
+
+    if args.folds is None:
+        folds = range(5)
+    else:
+        folds = map(int, args.folds.split(","))
+
+    for i_fold in folds:
+        overrides_args = []
+        for p in args.config_path:
+            overrides_args += OmegaConf.load(project_root_path / p)
+        overrides_args.append(f"split=fold_{i_fold}")
+        print(f"{overrides_args = }")
+        sys.argv = sys.argv[:1] + overrides_args
+        main()

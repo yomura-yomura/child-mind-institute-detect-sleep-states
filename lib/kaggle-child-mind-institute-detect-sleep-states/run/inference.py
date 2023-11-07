@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import cast
@@ -159,10 +160,16 @@ import pandas as pd
 project_root_path = pathlib.Path(__file__).parent.parent
 
 
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = ["config/omura/3090/lstm-feature-extractor.yaml"]
+else:
+    args = None
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config_path")
-    args = parser.parse_args(["config/omura/3090/lstm-feature-extractor.yaml"])
+    args = parser.parse_args(args)
 
     for i_fold in range(5):
         overrides_args = OmegaConf.load(project_root_path / args.config_path)
