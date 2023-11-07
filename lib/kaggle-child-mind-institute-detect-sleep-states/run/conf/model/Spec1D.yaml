@@ -1,1 +1,2 @@
 name: Spec1D
+encoder_name: resnet18

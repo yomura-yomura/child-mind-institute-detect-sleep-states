@@ -7,6 +7,8 @@ from cmi_dss_lib.models.decoder.transformerdecoder import TransformerDecoder
 from cmi_dss_lib.models.decoder.unet1ddecoder import UNet1DDecoder
 from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
@@ -68,6 +70,27 @@ def get_feature_extractor(
             win_length=cfg.feature_extractor.win_length,
             out_size=num_time_steps,
         )
+
+    elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
+        assert cfg.model_dim == 2
+        feature_extractor = StackedGRUFeatureExtractor(
+            in_channels=feature_dim,
+            hidden_size=cfg.feature_extractor.hidden_size,
+            num_layers=cfg.feature_extractor.num_layers,
+            bidirectional=cfg.feature_extractor.bidirectional,
+            out_size=num_time_steps,
+        )
+
+    elif cfg.feature_extractor.name == "StackedLSTMFeatureExtractor":
+        assert cfg.model_dim == 2
+        feature_extractor = StackedLSTMFeatureExtractor(
+            in_channels=feature_dim,
+            hidden_size=cfg.feature_extractor.hidden_size,
+            num_layers=cfg.feature_extractor.num_layers,
+            bidirectional=cfg.feature_extractor.bidirectional,
+            out_size=num_time_steps,
+        )
+
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
 
@@ -132,11 +155,10 @@ def get_model(cfg: TrainConfig, feature_dim: int, n_classes: int, num_time_steps
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
     elif cfg.model.name == "Spec1D":
-        # decoder = get_decoder(cfg, 1, n_classes, num_time_steps)
-
         model = Spec1D(
             feature_extractor=feature_extractor,
             decoder=decoder,
+            encoder_name=cfg.model.encoder_name,
             num_time_steps=num_time_steps,
             model_dim=cfg.model_dim,
             mixup_alpha=cfg.augmentation.mixup_alpha,

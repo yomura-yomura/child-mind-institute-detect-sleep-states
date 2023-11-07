@@ -14,9 +14,12 @@ from omegaconf import DictConfig, OmegaConf
 project_root_path = pathlib.Path(__file__).parent.parent
 
 
-# exp_name = "exp005-lstm-feature-2"
+exp_name = "exp005-lstm-feature"
 # exp_name = "exp008-lstm-feature-half-lr"
-exp_name = "exp012-lstm-feature"
+# exp_name = "exp012-lstm-feature"
+# exp_name = "exp011-lstm-feature-1d-fp16"
+
+upload = False
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
@@ -36,7 +39,10 @@ def main(cfg: DictConfig):
     output_dir_path = dataset_output_dir_path / p.relative_to(train_output_dir_path).parent
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
-    shutil.copytree(p.parent / ".hydra", output_dir_path / ".hydra")
+    (output_dir_path / ".hydra").mkdir(exist_ok=True)
+    shutil.copy(
+        p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml"
+    )
 
     torch.save(
         module.model.state_dict(),
@@ -45,8 +51,6 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    argv = sys.argv.copy()
-
     train_output_dir_path = project_root_path / "output"
     print(f"{train_output_dir_path.resolve()=}")
 
@@ -71,38 +75,40 @@ if __name__ == "__main__":
     for p, i_fold, version in tqdm.tqdm(path_df.itertuples(index=False)):
         print(p.readlink().name)
         scores.append(float(p.readlink().stem.split("EventDetectionAP=", maxsplit=1)[1]))
+        p = p.parent / p.readlink().name
         overrides_args = OmegaConf.load(p.parent / ".hydra" / "overrides.yaml")
-        sys.argv = argv + overrides_args
+        sys.argv = overrides_args
         main()
 
     print(f"CV = {sum(scores) / len(scores):.3f} ({', '.join(map('{:.3f}'.format, scores))})")
 
-    dataset_metadata_json = {
-        "title": "CMI-DSS Segmentation Model",
-        "id": "ranchantan/cmi-dss-seg-model",
-        "licenses": [{"name": "CC0-1.0"}],
-    }
+    if upload:
+        dataset_metadata_json = {
+            "title": "CMI-DSS Segmentation Model",
+            "id": "ranchantan/cmi-dss-seg-model",
+            "licenses": [{"name": "CC0-1.0"}],
+        }
 
-    dataset_dir_path = project_root_path / "output_dataset" / "train"
-    dataset_dir_path.mkdir(exist_ok=True, parents=True)
-    with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
-        json.dump(dataset_metadata_json, f, indent=2)
+        dataset_dir_path = project_root_path / "output_dataset" / "train"
+        dataset_dir_path.mkdir(exist_ok=True, parents=True)
+        with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
+            json.dump(dataset_metadata_json, f, indent=2)
 
-    subprocess.run(
-        " ".join(
-            [
-                str(pathlib.Path.home() / ".local" / "bin" / "kaggle"),
-                "datasets",
-                "version",
-                "-p",
-                f"{dataset_dir_path}",
-                "-m",
-                "''",
-                "--dir-mode",
-                "tar",
-            ]
-        ),
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-        shell=True,
-    )
+        subprocess.run(
+            " ".join(
+                [
+                    str(pathlib.Path.home() / ".local" / "bin" / "kaggle"),
+                    "datasets",
+                    "version",
+                    "-p",
+                    f"{dataset_dir_path}",
+                    "-m",
+                    "''",
+                    "--dir-mode",
+                    "tar",
+                ]
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            shell=True,
+        )

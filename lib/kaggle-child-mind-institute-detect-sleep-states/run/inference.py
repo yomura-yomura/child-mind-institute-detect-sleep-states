@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -29,15 +30,19 @@ def load_model(cfg: TrainConfig) -> nn.Module:
     )
 
     # load weights
-    if cfg.weight is not None:
-        weight_path = (
-            Path(cfg.dir.model_dir)
-            / cfg.weight["exp_name"]
-            / cfg.weight["run_name"]
-            / "best_model.pth"
-        )
-        model.load_state_dict(torch.load(weight_path))
-        print('load weight from "{}"'.format(weight_path))
+    weight_path = (
+        project_root_path
+        / "output_dataset"
+        / cfg.dir.model_dir
+        # / cfg.weight["exp_name"]
+        # / cfg.weight["run_name"]
+        / cfg.exp_name
+        / cfg.split.name
+        / "best_model.pth"
+    )
+    model.load_state_dict(torch.load(weight_path))
+    print('load weight from "{}"'.format(weight_path))
+
     return model
 
 
@@ -109,7 +114,7 @@ def make_submission(keys: list[str], preds: np.ndarray, score_th, distance) -> p
     return sub_df
 
 
-@hydra.main(config_path=None, config_name="train", version_base="1.2")
+@hydra.main(config_path="conf", config_name="train", version_base="1.2")
 def main(cfg: TrainConfig):
     seed_everything(cfg.seed)
 
@@ -133,9 +138,9 @@ def main(cfg: TrainConfig):
 
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
-        np.savez("predicted.npz", key=keys, pred=preds, label=labels)
+        np.savez(f"predicted-{cfg.split.name}.npz", key=keys, pred=preds, label=labels)
     else:
-        np.savez("predicted.npz", key=keys, pred=preds)
+        np.savez(f"predicted-{cfg.split.name}.npz", key=keys, pred=preds)
 
     with trace("make submission"):
         sub_df = make_submission(
@@ -147,14 +152,20 @@ def main(cfg: TrainConfig):
     sub_df.write_csv(Path(cfg.dir.sub_dir) / "submission.csv")
 
 
+import pathlib
+
+import pandas as pd
+
+project_root_path = pathlib.Path(__file__).parent.parent
+
+
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("config_path", type=str)
-    # parser.add_argument("overrides", type=str)
-    # args = parser.parse_args()
-    #
-    # with hydra.initialize(config_path=args.config_path):
-    #     cfg = hydra.compose(config_name="config.yaml", overrides=OmegaConf.load(args.overrides))
-    # print(cfg)
-    # main(cfg)
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("config_path")
+    args = parser.parse_args(["config/omura/3090/lstm-feature-extractor.yaml"])
+
+    for i_fold in range(5):
+        overrides_args = OmegaConf.load(project_root_path / args.config_path)
+        overrides_args.append(f"split=fold_{i_fold}")
+        sys.argv = sys.argv[:1] + overrides_args
+        main()

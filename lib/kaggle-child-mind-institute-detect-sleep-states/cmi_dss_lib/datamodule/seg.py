@@ -1,3 +1,4 @@
+import pathlib
 import random
 from pathlib import Path
 from typing import Optional
@@ -12,6 +13,8 @@ from torchvision.transforms.functional import resize
 
 from ..config import TrainConfig
 from ..utils.common import pad_if_needed
+
+project_root_path = pathlib.Path(__file__).parent.parent.parent
 
 
 ###################
@@ -309,7 +312,7 @@ class SegDataModule(LightningDataModule):
         super().__init__()
         self.cfg = cfg
         self.data_dir = Path(cfg.dir.data_dir)
-        self.processed_dir = Path(cfg.dir.processed_dir)
+        self.processed_dir = project_root_path / cfg.dir.processed_dir
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
         self.train_event_df = self.event_df.filter(
             pl.col("series_id").is_in(self.cfg.split.train_series_ids)

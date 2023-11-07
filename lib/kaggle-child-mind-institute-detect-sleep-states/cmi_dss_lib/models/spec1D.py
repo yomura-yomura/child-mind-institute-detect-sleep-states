@@ -13,6 +13,7 @@ class Spec1D(nn.Module):
         self,
         feature_extractor: nn.Module,
         decoder: nn.Module,
+        encoder_name: str,
         num_time_steps: int,
         model_dim: int,
         mixup_alpha: float = 0.5,
@@ -28,21 +29,42 @@ class Spec1D(nn.Module):
         #     duration=num_time_steps,
         #     bilinear=False,
         # )
-        block_dim = list(
-            zip(
-                [64, 64, 128, 128, 256, 256, 512, 512],
-                [
-                    num_time_steps,
-                    num_time_steps,
-                    num_time_steps // 2,
-                    num_time_steps // 2,
-                    num_time_steps // 4,
-                    num_time_steps // 4,
-                    num_time_steps // 8,
-                    num_time_steps // 8,
-                ],
+
+        block_type_dict = {
+            "3x3, 64": [
+                (64, num_time_steps),
+                (64, num_time_steps),
+            ],
+            "3x3, 128": [
+                (128, num_time_steps // 2),
+                (128, num_time_steps // 2),
+            ],
+            "3x3, 256": [
+                (256, num_time_steps // 4),
+                (256, num_time_steps // 4),
+            ],
+            "3x3, 512": [
+                (512, num_time_steps // 8),
+                (512, num_time_steps // 8),
+            ],
+        }
+
+        if encoder_name == "resnet18":
+            block_dim = (
+                block_type_dict["3x3, 64"] * 2
+                + block_type_dict["3x3, 128"] * 2
+                + block_type_dict["3x3, 256"] * 2
+                + block_type_dict["3x3, 512"] * 2
             )
-        )
+        elif encoder_name == "resnet34":
+            block_dim = (
+                block_type_dict["3x3, 64"] * 3
+                + block_type_dict["3x3, 128"] * 4
+                + block_type_dict["3x3, 256"] * 6
+                + block_type_dict["3x3, 512"] * 3
+            )
+        else:
+            raise ValueError(f"unexpected {encoder_name=}")
         self.channels_fc = nn.Linear(block_dim[-1][1], num_time_steps)
         self.encoder = cmi_dss_lib.models.encoder.resnet_1d.ResNet1d(
             input_dim=(feature_extractor.height, num_time_steps),
