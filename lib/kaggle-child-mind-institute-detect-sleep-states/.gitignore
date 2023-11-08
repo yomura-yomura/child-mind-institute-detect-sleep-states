@@ -166,3 +166,6 @@ wandb/
 *.out
 wandb
 *.out
+*.npz
+*.csv
+output_dataset/
