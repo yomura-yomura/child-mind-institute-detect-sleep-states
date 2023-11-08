@@ -1,8 +1,8 @@
-
 from typing import Optional
 
 import torch
 import torch.nn as nn
+
 
 class StackedLSTMFeatureExtractor(nn.Module):
     def __init__(
@@ -17,12 +17,12 @@ class StackedLSTMFeatureExtractor(nn.Module):
         self.fc = nn.Linear(in_channels, hidden_size)
         self.height = hidden_size * (2 if bidirectional else 1)
         self.stacked_gru = MultiResidualBiLSTM(
-            input_size = hidden_size,
+            input_size=hidden_size,
             hidden_size=hidden_size,
             out_size=out_size,
             n_layers=num_layers,
             bidir=bidirectional,
-                    )
+        )
         self.out_chans = 1
         self.out_size = out_size
         if self.out_size is not None:
@@ -53,6 +53,7 @@ class StackedLSTMFeatureExtractor(nn.Module):
 #####
 # child_mind_institute_detect_sleep_states/model/multi_res_bi_gru/model.py
 #####
+
 
 class ResidualBiLSTM(nn.Module):
     def __init__(self, hidden_size, n_layers=1, bidir=True):
@@ -107,7 +108,7 @@ class MultiResidualBiLSTM(nn.Module):
         self.fc_in = nn.Linear(input_size, hidden_size)
         self.ln = nn.LayerNorm(hidden_size)
         self.res_bilstm = nn.ModuleList([ResidualBiLSTM(hidden_size, n_layers=1, bidir=bidir) for _ in range(n_layers)])
-        self.fc_out = nn.Linear(hidden_size, hidden_size*2)
+        self.fc_out = nn.Linear(hidden_size, hidden_size * 2)
 
     def forward(self, x, h=None, c=None):
         # if we are at the beginning of a sequence (no hidden state)

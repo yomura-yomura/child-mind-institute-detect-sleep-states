@@ -103,9 +103,7 @@ class MultiResidualBiGRU(nn.Module):
 
         self.fc_in = nn.Linear(input_size, hidden_size)
         self.ln = nn.LayerNorm(hidden_size)
-        self.res_bigrus = nn.ModuleList(
-            [ResidualBiGRU(hidden_size, n_layers=1, bidir=bidir) for _ in range(n_layers)]
-        )
+        self.res_bigrus = nn.ModuleList([ResidualBiGRU(hidden_size, n_layers=1, bidir=bidir) for _ in range(n_layers)])
         self.fc_out = nn.Linear(hidden_size, hidden_size * 2)
 
     def forward(self, x, h=None):

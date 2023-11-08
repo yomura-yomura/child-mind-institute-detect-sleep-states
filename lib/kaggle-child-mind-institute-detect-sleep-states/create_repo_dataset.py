@@ -5,9 +5,7 @@ import sys
 
 subprocess.run(["rm", "-rf", "child-mind-institute-detect-sleep-states"])
 
-subprocess.run(
-    ["git", "clone", "git@github.com:yomura-yomura/child-mind-institute-detect-sleep-states.git"]
-)
+subprocess.run(["git", "clone", "git@github.com:yomura-yomura/child-mind-institute-detect-sleep-states.git"])
 
 
 dataset_metadata_json = {
@@ -17,9 +15,7 @@ dataset_metadata_json = {
 }
 
 dataset_dir_path = (
-    pathlib.Path("child-mind-institute-detect-sleep-states")
-    / "lib"
-    / "kaggle-child-mind-institute-detect-sleep-states"
+    pathlib.Path("child-mind-institute-detect-sleep-states") / "lib" / "kaggle-child-mind-institute-detect-sleep-states"
 )
 with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
     json.dump(dataset_metadata_json, f, indent=2)

@@ -6,8 +6,5 @@ from .panns_feature_extractor import PANNsFeatureExtractorConfig
 from .spec_feature_extractor import SpecFeatureExtractorConfig
 
 FeatureExtractor: TypeAlias = (
-    CNNSpectrogramConfig
-    | LSTMFeatureExtractorConfig
-    | PANNsFeatureExtractorConfig
-    | SpecFeatureExtractorConfig
+    CNNSpectrogramConfig | LSTMFeatureExtractorConfig | PANNsFeatureExtractorConfig | SpecFeatureExtractorConfig
 )

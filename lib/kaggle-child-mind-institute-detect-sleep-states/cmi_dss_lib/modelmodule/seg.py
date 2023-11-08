@@ -40,9 +40,7 @@ class SegModel(LightningModule):
         self.validation_step_outputs: list = []
         self.__best_loss = np.inf
 
-    def forward(
-        self, batch: dict, *, do_mixup=False, do_cutmix=False
-    ) -> dict[str, Optional[torch.Tensor]]:
+    def forward(self, batch: dict, *, do_mixup=False, do_cutmix=False) -> dict[str, Optional[torch.Tensor]]:
         return self.model(batch["feature"], batch["label"], do_mixup, do_cutmix)
 
     def training_step(self, batch):
@@ -112,12 +110,8 @@ class SegModel(LightningModule):
             score_th=self.cfg.post_process.score_th,
             distance=self.cfg.post_process.distance,
         )
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(
-            self.val_event_df.to_pandas(), val_pred_df.to_pandas()
-        )
-        self.log(
-            "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
-        )
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), val_pred_df.to_pandas())
+        self.log("EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
         # if loss < self.__best_loss:
         #     np.save("keys.npy", np.array(keys))

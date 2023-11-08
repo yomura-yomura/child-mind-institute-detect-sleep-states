@@ -1,5 +1,5 @@
-from typing import Literal
 import dataclasses
+from typing import Literal
 
 
 @dataclasses.dataclass

@@ -19,10 +19,7 @@ def _downsample(n_samples_in, n_samples_out):
     if downsample < 1:
         raise ValueError("Number of samples should always decrease")
     if n_samples_in % n_samples_out != 0:
-        raise ValueError(
-            "Number of samples for two consecutive blocks "
-            "should always decrease by an integer factor."
-        )
+        raise ValueError("Number of samples for two consecutive blocks " "should always decrease by an integer factor.")
     return downsample
 
 
@@ -38,9 +35,7 @@ class ResBlock1d(nn.Module):
 
         # Forward path
         padding = _padding(1, kernel_size)
-        self.conv1 = nn.Conv1d(
-            n_filters_in, n_filters_out, kernel_size, padding=padding, bias=False
-        )
+        self.conv1 = nn.Conv1d(n_filters_in, n_filters_out, kernel_size, padding=padding, bias=False)
         self.bn1 = nn.BatchNorm1d(n_filters_out)
         self.relu = nn.LeakyReLU()
         self.dropout1 = nn.Dropout(dropout_rate)
@@ -154,9 +149,7 @@ class ResNet1d(nn.Module):
             n_filters_in, n_filters_out = n_filters_out, n_filters
             n_samples_in, n_samples_out = n_samples_out, n_samples
             downsample = _downsample(n_samples_in, n_samples_out)
-            res_block_1d = ResBlock1d(
-                n_filters_in, n_filters_out, downsample, kernel_size, dropout_rate
-            )
+            res_block_1d = ResBlock1d(n_filters_in, n_filters_out, downsample, kernel_size, dropout_rate)
             self.add_module("res_block_1d_{0}".format(i), res_block_1d)
             self.res_blocks += [res_block_1d]
 

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import hydra
+import wandb
 from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
@@ -13,9 +14,7 @@ from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import (
-    ModelCheckpointWithSymlinkToBest,
-)
+from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -24,9 +23,7 @@ else:
     args = None
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
 LOGGER = logging.getLogger(Path(__file__).name)
 
 
@@ -51,9 +48,7 @@ def main(cfg: TrainConfig):
         duration=cfg.duration,
     )
 
-    model_save_dir_path = (
-        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
-    )
+    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
 
     trainer = Trainer(
         devices=1,
@@ -100,6 +95,7 @@ def main(cfg: TrainConfig):
     )
 
     trainer.fit(model, datamodule=datamodule)
+    wandb.finish()
 
 
 if __name__ == "__main__":

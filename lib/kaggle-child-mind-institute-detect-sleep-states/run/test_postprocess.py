@@ -74,9 +74,7 @@ for i_fold in range(5):
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
-    all_data = npu.from_dict(
-        {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
-    )
+    all_data = npu.from_dict({"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids})
 
     unique_series_ids = np.unique(all_series_ids)
 
@@ -156,9 +154,7 @@ class Plotter:
         series_idx = np.where(self.series_ids == series_id)[0]
         this_series_preds = self.preds[series_idx].reshape(-1, 3)
         this_series_labels = self.labels[series_idx].reshape(-1, 3)
-        this_series_df = self.df_submit[self.df_submit["series_id"] == series_id].reset_index(
-            drop=True
-        )
+        this_series_df = self.df_submit[self.df_submit["series_id"] == series_id].reset_index(drop=True)
         val_wakeup = this_series_df[this_series_df["event"] == "wakeup"]["step"].values
         val_onset = this_series_df[this_series_df["event"] == "onset"]["step"].values
         val_step = np.arange(1, self.preds[series_idx].reshape(-1, 3).shape[0] + 1)
@@ -189,9 +185,7 @@ class Plotter:
                 axs[j].plot(this_series_preds_chunk[:, 0], label="pred_sleep")
             if mode == "all" or mode == "onset":
                 axs[j].plot(this_series_preds_chunk[:, 1], label="pred_onset")
-                axs[j].vlines(
-                    pred_onset_idx, 0, 1, label="pred_label_onset", linestyles="dotted", color="C1"
-                )
+                axs[j].vlines(pred_onset_idx, 0, 1, label="pred_label_onset", linestyles="dotted", color="C1")
                 axs[j].vlines(
                     onset_idx,
                     0,

@@ -44,9 +44,7 @@ for i_fold in range(5):
         assert np.all(first["key"] == other["key"])
         assert np.all(first["label"] == other["label"])
     keys_dict[i_fold] = first["key"]
-    preds_dict[i_fold] = np.stack(
-        [data["pred"] for data in predicted_dict[i_fold].values()], axis=0
-    )
+    preds_dict[i_fold] = np.stack([data["pred"] for data in predicted_dict[i_fold].values()], axis=0)
 
 
 all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
