@@ -85,11 +85,18 @@ def calc_all_scores(weights: list[int]):
     return scores
 
 
-scores = calc_all_scores(weights=[1, 1])
+calc_all_scores(weights=[1, 1])
 
 
-# weight_list = np.linspace(0, 1, 20)
-# scores = [calc_all_scores(weights=[w, 1 - w]) for w in tqdm.tqdm(weight_list, desc="grid search")]
+weight_list = np.linspace(0, 1, 20)
+scores = [calc_all_scores(weights=[w, 1 - w]) for w in tqdm.tqdm(weight_list, desc="grid search")]
+
+mean_scores = np.mean(scores, axis=1)
+order = np.argsort(mean_scores)[::-1]
+mean_scores[order]
+weight_list[order]
+
+# #
 #
 # scores = np.array(
 #     [

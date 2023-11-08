@@ -14,7 +14,7 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule, nearest_valid_size
 from cmi_dss_lib.models.common import get_model
 from cmi_dss_lib.utils.common import trace
-from cmi_dss_lib.utils.post_process import post_process_for_seg
+from cmi_dss_lib.utils.post_process import PostProcessModes, post_process_for_seg
 from lightning import seed_everything
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
@@ -90,12 +90,17 @@ def inference(
 
 
 def make_submission(
-    keys: list[str], preds: np.ndarray, score_th, distance: int, post_process_modes=None
+    keys: list[str],
+    preds: np.ndarray,
+    downsample_rate: int,
+    score_th: float,
+    distance: int,
+    post_process_modes: PostProcessModes = None,
 ) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds,
-        downsample_rate=2,
+        downsample_rate=downsample_rate,
         score_th=score_th,
         distance=distance,
         post_process_modes=post_process_modes,
@@ -148,6 +153,7 @@ def main(cfg: TrainConfig):
         sub_df = make_submission(
             keys,
             preds,
+            downsample_rate=cfg.downsample_rate,
             score_th=cfg.post_process.score_th,
             distance=cfg.post_process.distance,
         )

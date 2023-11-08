@@ -1,4 +1,6 @@
-- exp_name=exp014-lstm-feature-resnet18
-- model.encoder_name=resnet18
-#- model.encoder_name=efficientnet-b0
+- exp_name=exp014-lstm-feature-effnet-b3
+#- model.encoder_name=resnet18
+- model.encoder_name=efficientnet-b3
 - feature_extractor.name=LSTMFeatureExtractor
+- batch_size=8
+- optimizer.lr=0.0001
