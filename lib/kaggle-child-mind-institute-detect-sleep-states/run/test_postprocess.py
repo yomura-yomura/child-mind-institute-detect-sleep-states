@@ -8,11 +8,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy_utility as npu
 import tqdm
+from cmi_dss_lib.utils.post_process import PostProcessModes
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 from child_mind_institute_detect_sleep_states.data.comp_dataset import rolling
 
 project_root_path = pathlib.Path(__file__).parent.parent
+
+
+post_process_modes = {
+    "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
+        sleep_prob_th=0.2, min_sleeping_hours=6
+    ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=6, sleep_occupancy_th=0.3
+    ),
+}
 
 
 def get_corrected_pred(all_data, time_window=15, step_interval=1):
@@ -41,11 +52,9 @@ def get_corrected_pred(all_data, time_window=15, step_interval=1):
     return corrected_preds
 
 
-def get_submit_df(all_data, modes=None):
+def get_submit_df(all_data, modes: PostProcessModes = None):
     return cmi_dss_lib.utils.post_process.post_process_for_seg(
-        #
         preds=all_data["pred"],
-        # preds=corrected_preds[:, :, [1, 2]],
         keys=all_data["key"],
         score_th=0.005,
         distance=96,
@@ -84,21 +93,26 @@ for i_fold in range(5):
     print(f"{prev_score:.4f} -> ", end="", flush=True)
     scores.append(prev_score)
 
-    df_submit = get_submit_df(all_data, modes=["sleeping_edges_as_probs"])
+    df_submit = get_submit_df(
+        all_data, modes={"sleeping_edges_as_probs": post_process_modes["sleeping_edges_as_probs"]}
+    )
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"sleeping_edges_as_probs: {score:.4f}")
     scores.append(score)
 
-    df_submit = get_submit_df(all_data, modes=["cutting_probs_by_sleep_prob"])
+    df_submit = get_submit_df(
+        all_data,
+        modes={"cutting_probs_by_sleep_prob": post_process_modes["cutting_probs_by_sleep_prob"]},
+    )
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"cutting_probs_by_sleep_prob: {score:.4f}")
     scores.append(score)
 
-    df_submit = get_submit_df(all_data, modes=["sleeping_edges_as_probs", "cutting_probs_by_sleep_prob"])
+    df_submit = get_submit_df(all_data, modes=post_process_modes)
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
