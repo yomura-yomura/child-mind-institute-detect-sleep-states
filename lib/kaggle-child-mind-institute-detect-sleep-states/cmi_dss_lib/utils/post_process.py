@@ -23,6 +23,9 @@ def post_process_for_seg(
     Returns:
         pl.DataFrame: submission dataframe
     """
+    around_hour = 6
+    th_hour_step = around_hour*60*5
+    cut_prob_th = 0.5
     series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
     unique_series_ids = np.unique(series_ids)
 
@@ -42,20 +45,38 @@ def post_process_for_seg(
             series_id = data["series_id"]
 
             series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-
-    preds = preds[:, :, [1, 2]]
+     
+    preds = preds if "cut_sleep_prob" in post_process_modes else  preds[:, :, [1, 2]]
 
     records = []
     for series_id in unique_series_ids:
         series_idx = np.where(series_ids == series_id)[0]
-        this_series_preds = preds[series_idx].reshape(-1, 2)
+        this_series_preds = preds[series_idx].reshape(-1, 3) if "cut_sleep_prob" in post_process_modes else preds[series_idx].reshape(-1, 2)
+
+        if "cut_sleep_prob" in post_process_modes:
+            max_len_step = this_series_preds.shape[0]
+            sleep_preds = this_series_preds[:, 0]
 
         for i, event_name in enumerate(["onset", "wakeup"]):
-            this_event_preds = this_series_preds[:, i]
+            this_event_preds = this_series_preds[:, i+1] if "cut_sleep_prob" in post_process_modes else this_series_preds[:, i]
             steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
             scores = this_event_preds[steps]
 
             for step, score in zip(steps, scores):
+                if "cut_sleep_prob" in post_process_modes:
+                    if event_name == "onset":
+                        max_step = step+th_hour_step if step+th_hour_step <= max_len_step-1 else max_len_step-1
+                        sleep_score = np.median(sleep_preds[step:max_step] )
+
+                    if event_name == "wakeup":
+                        min_step = step-th_hour_step if step-th_hour_step >=0 else step
+                        sleep_score = np.median(sleep_preds[min_step:step] )
+
+                    # skip
+                    if sleep_score < cut_prob_th:
+                        continue
+                        
+
                 records.append(
                     {
                         "series_id": series_id,
