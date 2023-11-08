@@ -10,7 +10,10 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor  # RichModelSummary,; RichProgressBar,
+from lightning.pytorch.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+)  # RichModelSummary,; RichProgressBar,
 from lightning.pytorch.loggers import WandbLogger
 from omegaconf import OmegaConf
 
@@ -55,7 +58,9 @@ def main(cfg: TrainConfig):
     # probs = [batch["logits"].sigmoid().detach().cpu() for batch in preds]
     # torch.save(module.model.state_dict(), "best_model.pth")
 
-    from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
+    from child_mind_institute_detect_sleep_states.model.callbacks import (
+        ModelCheckpointWithSymlinkToBest,
+    )
 
     # init experiment logger
     pl_logger = WandbLogger(
@@ -93,7 +98,7 @@ def main(cfg: TrainConfig):
             EarlyStopping(
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
-                patience=20,
+                patience=cfg.early_stopping_patience,
             ),
             LearningRateMonitor("epoch"),
             # RichProgressBar(),

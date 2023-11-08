@@ -75,6 +75,8 @@ class TrainConfig:
 
     scheduler: "TrainSchedulerConfig"
 
+    early_stopping_patience: int
+
 
 @dataclasses.dataclass
 class TrainAugmentationConfig:

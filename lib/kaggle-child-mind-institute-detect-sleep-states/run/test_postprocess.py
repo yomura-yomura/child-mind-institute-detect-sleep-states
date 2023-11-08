@@ -56,9 +56,11 @@ def get_submit_df(all_data, modes=None):
 for i_fold in range(5):
     all_keys, all_preds, all_labels = np.load(
         project_root_path
-        / "output"
-        / "train"
-        / "exp005-lstm-feature-2"
+        # / "output"
+        # / "train"
+        # / "exp005-lstm-feature-2"
+        / "preds"
+        / "uchida-1"
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
@@ -82,6 +84,18 @@ for i_fold in range(5):
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"{score:.4f}")
+
+    df_submit = get_submit_df(all_data, modes=["cut_sleep_prob"])
+    score = cmi_dss_lib.utils.metrics.event_detection_ap(
+        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
+    )
+    print(f"cut_sleep_prob = {score:.4f}")
+
+    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob", "cut_sleep_prob"])
+    score = cmi_dss_lib.utils.metrics.event_detection_ap(
+        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
+    )
+    print(f"both = {score:.4f}")
     print()
 
 
