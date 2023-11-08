@@ -16,7 +16,8 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 # exp_name = "exp005-lstm-feature"
 # exp_name = "exp005-lstm-feature-2"
-exp_name = "exp014-lstm-feature"
+# exp_name = "exp014-lstm-feature"
+exp_name = "exp015-lstm-feature-sigma"
 
 # exp_name = "exp008-lstm-feature-half-lr"
 # exp_name = "exp012-lstm-feature"

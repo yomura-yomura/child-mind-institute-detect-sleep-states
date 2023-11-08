@@ -86,7 +86,6 @@ scores = calc_all_scores(weights=[1, 1])
 weight_list = np.linspace(0, 1, 20)
 scores = [calc_all_scores(weights=[w, 1 - w]) for w in tqdm.tqdm(weight_list, desc="grid search")]
 
-
 scores = np.array(
     [
         [
