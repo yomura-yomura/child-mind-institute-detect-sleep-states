@@ -136,7 +136,7 @@ def negative_sampling(this_event_df: pd.DataFrame, num_steps: int) -> int:
     Returns:
         int: negative sample position
     """
-    # onsetとwakupを除いた範囲からランダムにサンプリング
+    # onsetとwakeupを除いた範囲からランダムにサンプリング
     positive_positions = set(this_event_df[["onset", "wakeup"]].to_numpy().flatten().tolist())
     negative_positions = list(set(range(num_steps)) - positive_positions)
     return random.sample(negative_positions, 1)[0]

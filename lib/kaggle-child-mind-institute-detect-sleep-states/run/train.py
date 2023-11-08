@@ -10,12 +10,19 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import (
-    EarlyStopping,
-    LearningRateMonitor,
-)  # RichModelSummary,; RichProgressBar,
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from omegaconf import OmegaConf
+
+from child_mind_institute_detect_sleep_states.model.callbacks import (
+    ModelCheckpointWithSymlinkToBest,
+)
+from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
+
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = ["config/omura/v100/1d.yaml"]
+else:
+    args = None
+
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
@@ -35,37 +42,13 @@ def main(cfg: TrainConfig):
     # init lightning model
     datamodule = SegDataModule(cfg)
     LOGGER.info("Set Up DataModule")
+
     model = SegModel(
         cfg=cfg,
         val_event_df=datamodule.valid_event_df,
         feature_dim=len(cfg.features),
         num_classes=len(cfg.labels),
         duration=cfg.duration,
-    )
-
-    # import torch
-    #
-    # module = SegModel.load_from_checkpoint(
-    #     "/home/yugo.omura/child-mind-institute-detect-sleep-states/lib/kaggle-child-mind-institute-detect-sleep-states/output/train/exp002/single/best.ckpt",
-    #     cfg=cfg,
-    #     val_event_df=datamodule.valid_event_df,
-    #     feature_dim=len(cfg.features),
-    #     num_classes=len(cfg.labels),
-    #     duration=cfg.duration,
-    # )
-    # trainer = Trainer()
-    # preds = trainer.predict(module, datamodule.val_dataloader())
-    # probs = [batch["logits"].sigmoid().detach().cpu() for batch in preds]
-    # torch.save(module.model.state_dict(), "best_model.pth")
-
-    from child_mind_institute_detect_sleep_states.model.callbacks import (
-        ModelCheckpointWithSymlinkToBest,
-    )
-
-    # init experiment logger
-    pl_logger = WandbLogger(
-        name=cfg.exp_name,
-        project="child-mind-institute-detect-sleep-states",
     )
 
     model_save_dir_path = (
@@ -104,7 +87,11 @@ def main(cfg: TrainConfig):
             # RichProgressBar(),
             # RichModelSummary(max_depth=2),
         ],
-        logger=pl_logger,
+        logger=WandbLogger(
+            name=f"{cfg.exp_name}-{cfg.split.name}",
+            project="child-mind-institute-detect-sleep-states",
+            group=cfg.exp_name,
+        ),
         # resume_from_checkpoint=resume_from,
         num_sanity_val_steps=0,
         log_every_n_steps=int(len(datamodule.train_dataloader()) * 0.1),
@@ -113,12 +100,6 @@ def main(cfg: TrainConfig):
     )
 
     trainer.fit(model, datamodule=datamodule)
-
-
-if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["config/omura/v100/1d.yaml"]
-else:
-    args = None
 
 
 if __name__ == "__main__":

@@ -108,6 +108,7 @@ class SegModel(LightningModule):
         val_pred_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             keys=keys,
             preds=preds,
+            downsample_rate=self.cfg.downsample_rate,
             score_th=self.cfg.post_process.score_th,
             distance=self.cfg.post_process.distance,
         )

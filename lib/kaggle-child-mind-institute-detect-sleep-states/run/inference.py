@@ -1,7 +1,7 @@
 import argparse
 import os
+import pathlib
 import sys
-from pathlib import Path
 
 import cmi_dss_lib.utils.metrics
 import hydra
@@ -21,7 +21,19 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
-import child_mind_institute_detect_sleep_states.data.comp_dataset
+project_root_path = pathlib.Path(__file__).parent.parent
+
+
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = [
+        # "config/omura/3090/lstm-feature-extractor.yaml"
+        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+        "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
+        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
+        # "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
+    ]
+else:
+    args = None
 
 
 def load_model(cfg: TrainConfig) -> nn.Module:
@@ -44,41 +56,10 @@ def load_model(cfg: TrainConfig) -> nn.Module:
         # / cfg.split.name
         / "best_model.pth"
     )
-    print(weight_path)
     model.load_state_dict(torch.load(weight_path))
-    print('load weight from "{}"'.format(weight_path))
+    print(f'load weight from "{weight_path}"')
 
     return model
-
-
-# def get_test_dataloader(cfg: DictConfig) -> DataLoader:
-#     """get test dataloader
-#
-#     Args:
-#         cfg (DictConfig): config
-#
-#     Returns:
-#         DataLoader: test dataloader
-#     """
-#     feature_dir = Path(cfg.dir.processed_dir) / cfg.phase
-#     series_ids = [x.name for x in feature_dir.glob("*")]
-#     chunk_features = load_chunk_features(
-#         duration=cfg.duration,
-#         feature_names=cfg.features,
-#         series_ids=series_ids,
-#         processed_dir=Path(cfg.dir.processed_dir),
-#         phase=cfg.phase,
-#     )
-#     test_dataset = TestDataset(cfg, chunk_features=chunk_features)
-#     test_dataloader = DataLoader(
-#         test_dataset,
-#         batch_size=cfg.batch_size,
-#         shuffle=False,
-#         num_workers=cfg.num_workers,
-#         pin_memory=True,
-#         drop_last=False,
-#     )
-#     return test_dataloader
 
 
 def inference(
@@ -109,13 +90,14 @@ def inference(
 
 
 def make_submission(
-    keys: list[str], preds: np.ndarray, score_th, distance, post_process_modes=None
+    keys: list[str], preds: np.ndarray, score_th, distance: int, post_process_modes=None
 ) -> pl.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds,
+        downsample_rate=2,
         score_th=score_th,
-        distance=distance,  # type: ignore
+        distance=distance,
         post_process_modes=post_process_modes,
     )
 
@@ -127,7 +109,6 @@ def main(cfg: TrainConfig):
     seed_everything(cfg.seed)
 
     with trace("load test dataloader"):
-        # test_dataloader = get_test_dataloader(cfg)
         data_module = SegDataModule(cfg)
 
         if cfg.phase == "train":
@@ -144,17 +125,21 @@ def main(cfg: TrainConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
+    pred_dir_path = pathlib.Path(
+        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+    )
+    pred_dir_path.mkdir(parents=True, exist_ok=True)
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
         np.savez(
-            pathlib.Path(cfg.dir.sub_dir) / f"predicted-{cfg.split.name}.npz",
+            pred_dir_path / f"predicted-{cfg.split.name}.npz",
             key=keys,
             pred=preds,
             label=labels,
         )
     else:
         np.savez(
-            pathlib.Path(cfg.dir.sub_dir) / f"predicted-{cfg.split.name}.npz",
+            pred_dir_path / f"predicted-{cfg.split.name}.npz",
             key=keys,
             pred=preds,
         )
@@ -176,24 +161,7 @@ def main(cfg: TrainConfig):
         score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df.to_pandas())
         print(f"{cfg.split.name}: {score:.4f}")
 
-    sub_df.write_csv(Path(cfg.dir.sub_dir) / "submission.csv")
-
-
-import pathlib
-
-project_root_path = pathlib.Path(__file__).parent.parent
-
-
-if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = [
-        # "config/omura/3090/lstm-feature-extractor.yaml"
-        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
-        "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
-        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
-        # "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
-    ]
-else:
-    args = None
+    sub_df.write_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv")
 
 
 if __name__ == "__main__":

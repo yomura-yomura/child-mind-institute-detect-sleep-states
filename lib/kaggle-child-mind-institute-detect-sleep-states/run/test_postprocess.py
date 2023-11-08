@@ -53,14 +53,15 @@ def get_submit_df(all_data, modes=None):
     ).to_pandas()
 
 
+scores_list = []
 for i_fold in range(5):
     all_keys, all_preds, all_labels = np.load(
         project_root_path
-        # / "output"
-        # / "train"
-        # / "exp005-lstm-feature-2"
-        / "preds"
-        / "uchida-1"
+        / "output"
+        / "train"
+        / "exp005-lstm-feature-2"
+        # / "preds"
+        # / "uchida-1"
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
@@ -73,30 +74,47 @@ for i_fold in range(5):
     event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
     event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
 
+    scores = []
+
     print(f"{i_fold=}")
     df_submit = get_submit_df(all_data)
     prev_score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"{prev_score:.4f} -> ", end="", flush=True)
-    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob"])
-    score = cmi_dss_lib.utils.metrics.event_detection_ap(
-        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
-    )
-    print(f"{score:.4f}")
+    scores.append(prev_score)
 
-    df_submit = get_submit_df(all_data, modes=["cut_sleep_prob"])
+    df_submit = get_submit_df(all_data, modes=["sleeping_edges_as_probs"])
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
-    print(f"cut_sleep_prob = {score:.4f}")
+    print(f"sleeping_edges_as_probs: {score:.4f}")
+    scores.append(score)
 
-    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob", "cut_sleep_prob"])
+    df_submit = get_submit_df(all_data, modes=["cutting_probs_by_sleep_prob"])
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
-    print(f"both = {score:.4f}")
+    print(f"cutting_probs_by_sleep_prob: {score:.4f}")
+    scores.append(score)
+
+    df_submit = get_submit_df(all_data, modes=["sleeping_edges_as_probs", "cutting_probs_by_sleep_prob"])
+    score = cmi_dss_lib.utils.metrics.event_detection_ap(
+        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
+    )
+    print(f"both: {score:.4f}")
+    scores.append(score)
+
     print()
+
+    scores_list.append(scores)
+
+
+scores = np.array(scores_list)  # (fold, mode)
+
+print(f"mean score = {', '.join(map('{:.4f}'.format, np.mean(scores, axis=0)))}")
+
+fads
 
 
 class Plotter:
