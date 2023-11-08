@@ -6,4 +6,4 @@ from typing import Literal
 class Spec2DCNNConfig:
     name: Literal["Spec2DCNN"]
     encoder_name: Literal["resnet16", "resnet34"]
-    encoder_weights: Literal["imagenet"]
+    encoder_weights: Literal["imagenet", None]

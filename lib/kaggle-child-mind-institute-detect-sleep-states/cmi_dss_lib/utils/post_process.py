@@ -28,6 +28,7 @@ def post_process_for_seg(
 
     if post_process_modes is not None:
         if "adapt_sleep_prob" in post_process_modes:
+            print("enable 'adapt_sleep_prob'")
             data = adapt_sleep_prob(
                 npu.from_dict(
                     {
