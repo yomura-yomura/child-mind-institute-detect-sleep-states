@@ -10,6 +10,9 @@ requires-python = ">= 3.10"
 version = "0.0.1"
 dependencies = [
     "lightning~=2.1.0",
+    "numexpr==2.8.4",  # due to bug: https://github.com/pandas-dev/pandas/issues/54449
+    "hydra-core",
+    "segmentation_models_pytorch==0.3.3"
 #    "numpy_utility@git+https://github.com/yomura-yomura/numpy_utility#egg=88e5bea"
 ]
 
