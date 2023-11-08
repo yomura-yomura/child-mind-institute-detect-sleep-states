@@ -58,7 +58,7 @@ for i_fold in range(5):
         project_root_path
         / "output"
         / "train"
-        / "exp014-lstm-feature"
+        / "exp005-lstm-feature-2"
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
@@ -77,7 +77,7 @@ for i_fold in range(5):
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"{prev_score:.4f} -> ", end="", flush=True)
-    df_submit = get_submit_df(all_data, modes="adapt_sleep_prob")
+    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob"])
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )

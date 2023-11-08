@@ -2,10 +2,11 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import cast
 
+import cmi_dss_lib.utils.metrics
 import hydra
 import numpy as np
+import pandas as pd
 import polars as pl
 import torch
 import torch.nn as nn
@@ -20,6 +21,8 @@ from torch.utils.data import DataLoader
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
+import child_mind_institute_detect_sleep_states.data.comp_dataset
+
 
 def load_model(cfg: TrainConfig) -> nn.Module:
     num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
@@ -32,13 +35,13 @@ def load_model(cfg: TrainConfig) -> nn.Module:
 
     # load weights
     weight_path = (
-        project_root_path
-        / "output_dataset"
-        / cfg.dir.model_dir
+        # project_root_path
+        # / "output_dataset"
+        pathlib.Path(cfg.dir.model_dir)
         # / cfg.weight["exp_name"]
         # / cfg.weight["run_name"]
-        / cfg.exp_name
-        / cfg.split.name
+        # / cfg.exp_name
+        # / cfg.split.name
         / "best_model.pth"
     )
     print(weight_path)
@@ -143,9 +146,18 @@ def main(cfg: TrainConfig):
 
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
-        np.savez(f"predicted-{cfg.split.name}.npz", key=keys, pred=preds, label=labels)
+        np.savez(
+            pathlib.Path(cfg.dir.sub_dir) / f"predicted-{cfg.split.name}.npz",
+            key=keys,
+            pred=preds,
+            label=labels,
+        )
     else:
-        np.savez(f"predicted-{cfg.split.name}.npz", key=keys, pred=preds)
+        np.savez(
+            pathlib.Path(cfg.dir.sub_dir) / f"predicted-{cfg.split.name}.npz",
+            key=keys,
+            pred=preds,
+        )
 
     with trace("make submission"):
         sub_df = make_submission(
@@ -154,12 +166,20 @@ def main(cfg: TrainConfig):
             score_th=cfg.post_process.score_th,
             distance=cfg.post_process.distance,
         )
+
+    if cfg.phase == "train":
+        unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
+
+        event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
+        event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
+
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df.to_pandas())
+        print(f"{cfg.split.name}: {score:.4f}")
+
     sub_df.write_csv(Path(cfg.dir.sub_dir) / "submission.csv")
 
 
 import pathlib
-
-import pandas as pd
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
@@ -167,7 +187,9 @@ project_root_path = pathlib.Path(__file__).parent.parent
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "config/omura/3090/lstm-feature-extractor.yaml"
-        "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
+        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+        "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
+        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
         # "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
     ]
 else:
@@ -176,13 +198,19 @@ else:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_path", nargs="+")
+    parser.add_argument("model_path", type=pathlib.Path)
+    parser.add_argument("config_path", nargs="*")
     args = parser.parse_args(args)
 
     for i_fold in range(5):
         overrides_args = []
-        for p in args.config_path:
-            overrides_args += OmegaConf.load(project_root_path / p)
+        for p in (
+            args.model_path / f"fold_{i_fold}" / ".hydra" / "overrides.yaml",
+            *args.config_path,
+        ):
+            overrides_args += OmegaConf.load(p)
         overrides_args.append(f"split=fold_{i_fold}")
+        overrides_args.append(f"dir.model_dir={args.model_path / f'fold_{i_fold}'}")
+        # overrides_args.append(f"phase=test")
         sys.argv = sys.argv[:1] + overrides_args
         main()

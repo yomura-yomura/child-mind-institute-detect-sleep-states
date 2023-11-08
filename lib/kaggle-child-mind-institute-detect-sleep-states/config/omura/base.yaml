@@ -1,0 +1,4 @@
+- exp_name=exp014-lstm-feature-resnet18
+- model.encoder_name=resnet18
+#- model.encoder_name=efficientnet-b0
+- feature_extractor.name=LSTMFeatureExtractor

@@ -1,3 +1,0 @@
-- exp_name=exp014-lstm-feature
-#- model.encoder_name=resnet18
-- feature_extractor.name=LSTMFeatureExtractor
