@@ -1,8 +1,9 @@
-- exp_name=exp024-StackedGRU-feature-layer4-resnext50
+- exp_name=exp009-StackedGRU-feature-layer4-resnext50
 - feature_extractor=StackedGRUFeatureExtractor
 - model.encoder_name=resnext50_32x4d
 - use_amp=true
 - epoch=70
 - batch_size=16
 - feature_extractor.num_layers=4
+- early_stopping_patience=20
 - optimizer.lr=0.00025
