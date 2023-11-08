@@ -9,8 +9,6 @@ from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
