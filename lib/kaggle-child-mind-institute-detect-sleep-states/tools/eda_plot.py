@@ -42,17 +42,22 @@ def read_folds(path_data:Path,folds,distance = 96,th_score=0.005,mode = None) ->
 
 def score_folds(path_data:Path,folds,distance = 96,th_score=0.005,mode = None) -> pd.DataFrame:
 
-    df_event = pd.read_csv(path_data / "train-series-with-partid/train_events.csv")
+    df_event = pd.read_csv(path_data / "train_events.csv")
     dict_data = {}
     list_score = []
     for f in tqdm(range(folds),desc = "fold:"):
         file_name = f"eda/predicted-fold_{f}.npz"
         path_file = path_data /file_name
         dict_result =read_npz(path_file)
-        series_ids = dict_result["series_ids"]
+        series_ids = np.unique(dict_result["series_ids"])
 
         gt_df = df_event[df_event["series_id"].isin(series_ids)].dropna().reset_index(drop=True)
+
+
+        # same
         df_sub = post_process_for_seg(keys=dict_result["keys"],preds = dict_result["preds"],score_th = th_score,distance=distance,post_process_modes = mode).to_pandas()
+
+        # same
         score = event_detection_ap(solution=gt_df,submission=df_sub)
         list_score.append(score)
         dict_data[f"fold_{f}"] = [score]

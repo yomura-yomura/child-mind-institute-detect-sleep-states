@@ -23,9 +23,13 @@ def post_process_for_seg(
     Returns:
         pl.DataFrame: submission dataframe
     """
+    if post_process_modes is None:
+        post_process_modes = []
+    # add params
     around_hour = 6
     th_hour_step = around_hour*60*5
     cut_prob_th = 0.5
+
     series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
     unique_series_ids = np.unique(series_ids)
 
