@@ -5,11 +5,75 @@ from cmi_dss_lib.utils.post_process import post_process_for_seg
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Literal
-chunk = 4
+from tqdm import tqdm
 plt.style.use("ggplot")
 
-RESULT_DIR = "../../../data/eda/predicted-fold_0.npz"
-def plot_random_sample(keys,preds, labels,list_id:list[str] ,df_submit,mode:Literal["all","onset","wakeup"],use_sleep:bool = True,num_chunks:int=5):
+
+
+def read_npz(path_data:Path)->dict:
+
+    data = np.load(path_data)
+    keys = data["key"]
+    series_ids = list(set([str(k).split("_")[0] for k in keys]))
+    preds = data["pred"]
+    labels = data["label"]
+    return {"keys":keys,"labels":labels,"preds":preds,"series_ids":series_ids}
+
+def read_folds(path_data:Path,folds,distance = 96,th_score=0.005,mode = None) -> list[dict]:
+
+    df_event = pd.read_csv(path_data / "train-series-with-partid/train_events.csv")
+    dict_data = {}
+    for f in tqdm(range(folds),desc = "fold:"):
+        file_name = f"eda/predicted-fold_{f}.npz"
+        path_file = path_data /file_name
+        dict_result =read_npz(path_file)
+        series_ids = dict_result["series_ids"]
+
+        gt_df = df_event[df_event["series_id"].isin(series_ids)].dropna().reset_index(drop=True)
+        df_sub = post_process_for_seg(keys=dict_result["keys"],preds = dict_result["preds"],score_th = th_score,distance=distance,post_process_modes = mode).to_pandas()
+        dict_result[f"score"] = [event_detection_ap(solution=gt_df,submission=df_sub)]
+        df_score_per_id = score_per_id(sub_df = df_sub,event_df=gt_df).sort_values(by="score")
+        dict_result[f"score_per_id"] = df_score_per_id 
+        dict_result["submit"] = df_sub
+        dict_result["event"] = gt_df
+        dict_data[f"fold_{f}"] = dict_result 
+        
+    return dict_data
+
+def score_folds(path_data:Path,folds,distance = 96,th_score=0.005,mode = None) -> pd.DataFrame:
+
+    df_event = pd.read_csv(path_data / "train-series-with-partid/train_events.csv")
+    dict_data = {}
+    list_score = []
+    for f in tqdm(range(folds),desc = "fold:"):
+        file_name = f"eda/predicted-fold_{f}.npz"
+        path_file = path_data /file_name
+        dict_result =read_npz(path_file)
+        series_ids = dict_result["series_ids"]
+
+        gt_df = df_event[df_event["series_id"].isin(series_ids)].dropna().reset_index(drop=True)
+        df_sub = post_process_for_seg(keys=dict_result["keys"],preds = dict_result["preds"],score_th = th_score,distance=distance,post_process_modes = mode).to_pandas()
+        score = event_detection_ap(solution=gt_df,submission=df_sub)
+        list_score.append(score)
+        dict_data[f"fold_{f}"] = [score]
+    mean_score = np.mean(list_score)
+    dict_data["Avg"] = mean_score
+    return pd.DataFrame(dict_data)
+
+
+def score_per_id(sub_df:pd.DataFrame,event_df:pd.DataFrame) -> pd.DataFrame:
+    sub_id = event_df["series_id"].unique()
+    dict_result = {"series_id":[],"score":[]}
+    for s_id in tqdm(sub_id,desc="scoreing"):
+        dict_result["series_id"].append(s_id)
+        dict_result["score"].append(event_detection_ap(solution=event_df[event_df["series_id"] == s_id],submission=sub_df[sub_df["series_id"] == s_id]))
+    return pd.DataFrame(dict_result)
+
+def plot_pred(dict_result,list_id:list[str] ,mode:Literal["all","onset","wakeup"],use_sleep:bool = True,num_chunks:int=5):
+    keys = dict_result["keys"]
+    preds = dict_result["preds"]
+    labels = dict_result["labels"]
+    df_submit = dict_result["df_submit"]
     # get series ids",
     series_ids = np.array(list(map(lambda x: x.split("_")[0], keys))),
     #unique_series_ids = np.unique(series_ids)\n",
