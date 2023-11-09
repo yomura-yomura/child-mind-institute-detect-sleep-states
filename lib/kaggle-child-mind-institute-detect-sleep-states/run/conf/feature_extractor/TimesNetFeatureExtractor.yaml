@@ -1,0 +1,16 @@
+name: TimesNetFeatureExtractor
+height: 64
+is_fc: false
+
+# timesnet
+dim_model: 64
+encoder_layers: 2
+times_blocks: 2
+num_kernels: 6
+dropout: 0.1
+dim_fc: 2048
+
+embed_encoding: "timeF"
+freq: "s"
+task: "anomaly" #forecast
+

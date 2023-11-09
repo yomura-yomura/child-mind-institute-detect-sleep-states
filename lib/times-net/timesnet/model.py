@@ -1,9 +1,10 @@
 import torch
+import torch.fft
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.fft
-from layers.Embed import DataEmbedding
-from layers.Conv_Blocks import Inception_Block_V1
+
+from .layers.Conv_Blocks import Inception_Block_V1
+from .layers.Embed import DataEmbedding
 
 
 def FFT_for_Period(x, k=2):
@@ -73,18 +74,45 @@ class TimesNet(nn.Module):
     Paper link: https://openreview.net/pdf?id=ju_Uqw384Oq
     """
 
-    def __init__(self, configs):
-        super(Model, self).__init__(len_input,enc_in,d_model,embed,freq,dropout,e_layers)
-        self.seq_len = len_input
-        self.pred_len = 0
-        self.model = nn.ModuleList([TimesBlock()
+    def __init__(self, len_input:int,enc_in:int,d_model:int,embed:str,freq:str,dropout:float,e_layers:int,top_k,d_ff:int,num_kernels:int,task:str):
+        """Parameter for TimesNet
+
+        Parameters
+        ----------
+        
+        time_steps : int
+            input sequence length
+        enc_in : int
+            encoder input size
+        d_model : int
+            dimension of model
+        embed : str
+            time features encoding, options:[timeF, fixed, learned]
+        freq : str
+            freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h
+        dropout : float
+            dropout
+        e_layers : int
+            num of encoder layers
+        top_k : _type_
+            for TimesBlock
+        d_ff : int
+            dimension of fcn
+        num_kernels : int
+            for Inception
+        """
+        super(TimesNet, self).__init__()
+        self.task_name = task #"anomaly_detection" #'imputation' 'anomaly_detection':
+        self.seq_len = len_input # input sequence length
+        self.pred_len = 0 # predict sequence length
+        self.model = nn.ModuleList([TimesBlock(len_input,top_k,d_model,d_ff,num_kernels)
                                     for _ in range(e_layers)])
-        self.enc_embedding = DataEmbedding(enc_in, d_model, embed, freq,
+        self.enc_embedding = DataEmbedding(enc_in, d_model,len_input, embed, freq,
                                            dropout)
         self.layer = e_layers
         self.layer_norm = nn.LayerNorm(d_model)
 
-    def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
+    def forecast(self, x_enc, x_mark_enc):
         # Normalization from Non-stationary Transformer
         means = x_enc.mean(1, keepdim=True).detach()
         x_enc = x_enc - means
@@ -111,33 +139,6 @@ class TimesNet(nn.Module):
         #              1, self.pred_len + self.seq_len, 1))
         return enc_out
 
-    def imputation(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask):
-        # Normalization from Non-stationary Transformer
-        means = torch.sum(x_enc, dim=1) / torch.sum(mask == 1, dim=1)
-        means = means.unsqueeze(1).detach()
-        x_enc = x_enc - means
-        x_enc = x_enc.masked_fill(mask == 0, 0)
-        stdev = torch.sqrt(torch.sum(x_enc * x_enc, dim=1) /
-                           torch.sum(mask == 1, dim=1) + 1e-5)
-        stdev = stdev.unsqueeze(1).detach()
-        x_enc /= stdev
-
-        # embedding
-        enc_out = self.enc_embedding(x_enc, x_mark_enc)  # [B,T,C]
-        # TimesNet
-        for i in range(self.layer):
-            enc_out = self.layer_norm(self.model[i](enc_out))
-        ## porject back
-        #dec_out = self.projection(enc_out)
-
-        ## De-Normalization from Non-stationary Transformer
-        #dec_out = dec_out * \
-        #          (stdev[:, 0, :].unsqueeze(1).repeat(
-        #              1, self.pred_len + self.seq_len, 1))
-        #dec_out = dec_out + \
-        #          (means[:, 0, :].unsqueeze(1).repeat(
-        #              1, self.pred_len + self.seq_len, 1))
-        return enc_out
 
     def anomaly_detection(self, x_enc):
         # Normalization from Non-stationary Transformer
@@ -147,6 +148,7 @@ class TimesNet(nn.Module):
             torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
         x_enc /= stdev
 
+        x_enc =x_enc.transpose(1,2)
         # embedding
         enc_out = self.enc_embedding(x_enc, None)  # [B,T,C]
         # TimesNet
@@ -164,15 +166,11 @@ class TimesNet(nn.Module):
         #              1, self.pred_len + self.seq_len, 1))
         return enc_out
 
-    def forward(self, x_enc, x_mark_enc, x_dec, x_mark_dec, mask=None):
-        if self.task_name == 'long_term_forecast' or self.task_name == 'short_term_forecast':
-            dec_out = self.forecast(x_enc, x_mark_enc, x_dec, x_mark_dec)
-            return dec_out[:, -self.pred_len:, :]  # [B, L, D]
-        if self.task_name == 'imputation':
-            dec_out = self.imputation(
-                x_enc, x_mark_enc, x_dec, x_mark_dec, mask)
-            return dec_out  # [B, L, D]
-        if self.task_name == 'anomaly_detection':
+    def forward(self, x_enc, x_mark_enc=None, mask=None):
+        if self.task_name == 'forecast' :
+            dec_out = self.forecast(x_enc, x_mark_enc)
+            return dec_out # [B, L, D]
+        if self.task_name == 'anomaly':
             dec_out = self.anomaly_detection(x_enc)
             return dec_out  # [B, L, D]
         return None

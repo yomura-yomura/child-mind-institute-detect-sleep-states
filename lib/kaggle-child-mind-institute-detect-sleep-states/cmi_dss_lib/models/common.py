@@ -8,10 +8,11 @@ from cmi_dss_lib.models.decoder.unet1ddecoder import UNet1DDecoder
 from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.lstm_cnn import LSTMandCNNFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 
@@ -87,6 +88,23 @@ def get_feature_extractor(
             hidden_size=cfg.feature_extractor.hidden_size,
             num_layers=cfg.feature_extractor.num_layers,
             bidirectional=cfg.feature_extractor.bidirectional,
+            out_size=num_time_steps,
+        )
+    elif cfg.feature_extractor.name == "TimesNetFeatureExtractor":
+        assert cfg.model_dim == 2
+        feature_extractor = TimesNetFeatureExtractor(
+            in_channels=feature_dim,
+            height = cfg.feature_extractor.height,
+            dim_model = cfg.feature_extractor.dim_model,
+            encoder_layers = cfg.feature_extractor.encoder_layers,
+            times_blocks = cfg.feature_extractor.times_blocks,
+            num_kernels = cfg.feature_extractor.num_kernels,
+            dropout = cfg.feature_extractor.dropout,
+            dim_fc = cfg.feature_extractor.dim_fc,
+            embed_encoding = cfg.feature_extractor.embed_encoding,
+            freq = cfg.feature_extractor.freq,
+            task = cfg.feature_extractor.task,
+            is_fc = cfg.feature_extractor.is_fc,
             out_size=num_time_steps,
         )
 
