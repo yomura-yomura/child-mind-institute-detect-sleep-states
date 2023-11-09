@@ -1,0 +1,7 @@
+- exp_name=exp016-LSTMCNN-feature
+- feature_extractor=LSTMandCNNFeatureExtractor
+- use_amp=true
+- epoch=70
+- batch_size=32
+- early_stopping_patience=20
+- optimizer.lr=0.00025

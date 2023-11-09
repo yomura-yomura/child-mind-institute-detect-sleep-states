@@ -93,11 +93,20 @@ def get_feature_extractor(
     elif cfg.feature_extractor.name == "LSTMandCNNFeatureExtractor":
         assert cfg.model_dim == 2
         feature_extractor = LSTMandCNNFeatureExtractor(
+            model_dim =cfg.model_dim,
+            # LSTM
             in_channels=feature_dim,
             hidden_size=cfg.feature_extractor.hidden_size,
             num_layers=cfg.feature_extractor.num_layers,
             bidirectional=cfg.feature_extractor.bidirectional,
             out_size=num_time_steps,
+            # CNN
+            base_filters=cfg.feature_extractor.base_filters,
+            kernel_sizes=cfg.feature_extractor.kernel_sizes,
+            stride=cfg.feature_extractor.stride,
+            sigmoid=cfg.feature_extractor.sigmoid,
+            conv=nn.Conv1d,
+            reinit=cfg.feature_extractor.reinit,
         )
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")

@@ -14,8 +14,16 @@ class LSTMandCNNFeatureExtractor(nn.Module):
         bidirectional: bool,
         model_dim: int,
         out_size: Optional[int] = None,
+        #CNN
+        base_filters: int | Sequence[int] = 128,
+        kernel_sizes: Sequence[int] = (32, 16, 4, 2),
+        stride: int = 4,
+        sigmoid: bool = False,
+        conv: Callable = nn.Conv1d,
+        reinit: bool = True,
     ):
         super().__init__()
+        
         self.fc = nn.Linear(in_channels, hidden_size)
         self.height = hidden_size * (2 if bidirectional else 1)
         self.lstm = nn.LSTM(
@@ -28,6 +36,17 @@ class LSTMandCNNFeatureExtractor(nn.Module):
         self.out_chans = 1
         self.out_size = out_size
         self.model_dim = model_dim
+
+        # add cnn feature extractor
+        self.cnn_feature = CNNSpectrogram(in_channels=self.height,
+                                          base_filters=base_filters,
+                                          kernel_sizes=kernel_sizes,
+                                          stride = stride,
+                                          sigmoid=sigmoid,
+                                          output_size=out_size,
+                                          conv=conv,
+                                          reinit = reinit
+                                          )
 
         if self.out_size is not None:
             if self.model_dim == 1:
@@ -61,7 +80,12 @@ class LSTMandCNNFeatureExtractor(nn.Module):
 
         if self.model_dim == 2:
             # LSTM Feature Extractorの後にCNNSpectrogramを通しただけ
-            x = CNNSpectrogram(in_chanels=self.height)(x)# x: (batch_size, out_chans, hidden_size * num_directions, time_steps)
+            x = self.cnn_feature(x)# x: (batch_size, out_chans, hidden_size * num_directions, time_steps)
+            # average to dim channels
+            x = x.mean(dim=1, keepdim=False)# x: (batch_size, in_cannels, hidden_size * num_directions, time_steps)
+            x = x.unsqueeze(
+                1
+            )  # x: (batch_size, out_chans, hidden_size * num_directions, time_steps)
         return x
 
 
