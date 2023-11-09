@@ -24,7 +24,7 @@ post_process_modes = {
 
 
 model_dir_paths = [
-    project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    # project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2",
     project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
     project_root_path / "run" / "predicted" / "train" / "exp016-1d-resnet34",
@@ -117,7 +117,12 @@ if __name__ == "__main__":
     # weight = get_grid(step=0.1)
     weight = get_grid(step=0.1, target_sum=1)
 
-    target_csv_path = pathlib.Path("grid_search.csv")
+    # target_csv_path = pathlib.Path("grid_search.csv")
+    # target_csv_path = pathlib.Path("grid_search_2.csv")
+    target_csv_path = (
+        pathlib.Path("grid_search") / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
+    )
+
     if target_csv_path.exists():
         df = pd.read_csv(target_csv_path)
         df["scores"] = df["scores"].apply(
@@ -127,13 +132,13 @@ if __name__ == "__main__":
             lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
         )
 
-        if True:
-            target_weight = df.iloc[df["CV"].argmax()]["weights"]
-            print(f"{target_weight = }")
-            new_weight = target_weight + get_grid(0.05, 0, -0.5)
-            new_weight = new_weight[np.all(new_weight > 0, axis=1)]
-            assert np.all(np.isclose(np.sum(new_weight, axis=1), 1))
-            weight = np.concatenate([weight, new_weight], axis=0)
+        # if True:
+        #     target_weight = df.iloc[df["CV"].argmax()]["weights"]
+        #     print(f"{target_weight = }")
+        #     new_weight = target_weight + get_grid(0.05, 0, -0.5)
+        #     new_weight = new_weight[np.all(new_weight > 0, axis=1)]
+        #     assert np.all(np.isclose(np.sum(new_weight, axis=1), 1))
+        #     weight = np.concatenate([weight, new_weight], axis=0)
 
         loaded_weight = np.array(df["weights"].tolist())
         weight = np.array(

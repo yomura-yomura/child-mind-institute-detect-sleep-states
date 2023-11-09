@@ -28,8 +28,9 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
-        # "../output_dataset/train/exp016-1d-resnet34"
-        "../output_dataset/train/exp015-lstm-feature-108-sigma"
+        # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
+        "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
+        # "../config/omura/base.yaml",
     ]
 else:
     args = None
@@ -176,7 +177,7 @@ if __name__ == "__main__":
     args = parser.parse_args(args)
 
     for i_fold in range(5):
-        overrides_args = []
+        overrides_dict = {}
 
         fold_dir_path = args.model_path / f"fold_{i_fold}"
         if not fold_dir_path.exists():
@@ -186,9 +187,12 @@ if __name__ == "__main__":
             fold_dir_path / ".hydra" / "overrides.yaml",
             *args.config_path,
         ):
-            overrides_args += OmegaConf.load(p)
-        overrides_args.append(f"split=fold_{i_fold}")
-        overrides_args.append(f"dir.model_dir={args.model_path / f'fold_{i_fold}'}")
+            for k, v in (item.split("=") for item in OmegaConf.load(p)):
+                if k in overrides_dict.keys():
+                    print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
+                overrides_dict[k] = v
+        overrides_dict["split"] = f"fold_{i_fold}"
+        overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
         # overrides_args.append(f"phase=test")
-        sys.argv = sys.argv[:1] + overrides_args
+        sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
         main()
