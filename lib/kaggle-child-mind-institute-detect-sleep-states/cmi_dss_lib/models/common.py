@@ -7,6 +7,7 @@ from cmi_dss_lib.models.decoder.transformerdecoder import TransformerDecoder
 from cmi_dss_lib.models.decoder.unet1ddecoder import UNet1DDecoder
 from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
+from cmi_dss_lib.models.feature_extractor.lstm_cnn import LSTMandCNNFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
@@ -16,7 +17,7 @@ from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 
 from ..config import TrainConfig
 
-FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor,StackedGRUFeatureExtractor,StackedLSTMFeatureExtractor]
+FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor,StackedGRUFeatureExtractor,StackedLSTMFeatureExtractor,LSTMandCNNFeatureExtractor]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
@@ -89,6 +90,15 @@ def get_feature_extractor(
             out_size=num_time_steps,
         )
 
+    elif cfg.feature_extractor.name == "LSTMandCNNFeatureExtractor":
+        assert cfg.model_dim == 2
+        feature_extractor = LSTMandCNNFeatureExtractor(
+            in_channels=feature_dim,
+            hidden_size=cfg.feature_extractor.hidden_size,
+            num_layers=cfg.feature_extractor.num_layers,
+            bidirectional=cfg.feature_extractor.bidirectional,
+            out_size=num_time_steps,
+        )
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
 
