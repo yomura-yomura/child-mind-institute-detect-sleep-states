@@ -23,7 +23,9 @@ else:
     args = None
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
+)
 LOGGER = logging.getLogger(Path(__file__).name)
 
 
@@ -48,7 +50,9 @@ def main(cfg: TrainConfig):
         duration=cfg.duration,
     )
 
-    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    model_save_dir_path = (
+        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    )
 
     trainer = Trainer(
         devices=1,
@@ -105,9 +109,11 @@ if __name__ == "__main__":
     args = parser.parse_args(args)
 
     if args.folds is None:
-        folds = range(5)
+        folds = list(range(5))
     else:
-        folds = map(int, args.folds.split(","))
+        folds = list(map(int, args.folds.split(",")))
+
+    print(f"{folds = }")
 
     for i_fold in folds:
         overrides_args = []
