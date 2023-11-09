@@ -1,0 +1,10 @@
+- exp_name=exp023-TimesNetFeatureExtractor-1D
+- model.name=Spec1D
+- feature_extractor=TimesNetFeatureExtractor
+- feature_extractor.dim_model=256
+- feature_extractor.dim_fc=1024
+- use_amp=true
+- epoch=70
+- batch_size=4
+- early_stopping_patience=20
+- optimizer.lr=0.00025
