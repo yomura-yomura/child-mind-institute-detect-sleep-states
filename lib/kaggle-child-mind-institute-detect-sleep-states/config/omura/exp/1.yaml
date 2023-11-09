@@ -1,0 +1,6 @@
+- exp_name=exp016-1d-resnet34
+- model_dim=1
+- model=Spec1D
+- model.encoder_name=resnet34
+- batch_size=8
+- optimizer.lr=0.0001

@@ -1,0 +1,6 @@
+- exp_name=exp017-24h-duration-4bs
+- model.encoder_name=resnet34
+- feature_extractor.name=LSTMFeatureExtractor
+- duration=17280  # 24h
+- batch_size=4
+- optimizer.lr=0.00005

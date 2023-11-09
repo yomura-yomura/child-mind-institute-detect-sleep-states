@@ -1,10 +1,5 @@
-- exp_name=exp022-108sigma-720offset
-
+- exp_name=exp017-9h-duration
 - model.encoder_name=resnet34
-
 - feature_extractor.name=LSTMFeatureExtractor
-
-- offset=360  # 30m
-- sigma=108  # 9m
-
+- duration=6480  # 9h
 - batch_size=16

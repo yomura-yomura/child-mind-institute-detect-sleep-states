@@ -94,27 +94,65 @@ if __name__ == "__main__":
 
         mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
         print(f"{mean_score_str} ({', '.join(score_strs)})")
-        return np.array(scores), weights
+        return scores, weights
 
-    base_weight = pd.DataFrame(np.linspace(0, 1, 11, dtype="f4"))
-    weight = base_weight.copy()
-    for i, _ in enumerate(tqdm.trange(len(model_dir_paths) - 1)):
-        weight = weight.merge(base_weight.rename(columns={0: i}), how="cross")
-        weight = weight[np.sum(weight, axis=1) <= 1]
-    weight = weight.to_numpy()
-    weight = weight[np.sum(weight, axis=1) == 1]
-    print(f"{weight.shape = }")
+    def get_grid(step: float, target_sum: float = 1, start: float = 0):
+        assert step < 1
+        assert 0 <= target_sum
+
+        target_sum *= round(1 / step)
+        base_weight = pd.DataFrame(
+            np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4"
+        )
+
+        weight = base_weight.copy()
+        for i, _ in enumerate(tqdm.trange(len(model_dir_paths) - 1)):
+            weight = weight.merge(base_weight.rename(columns={0: i + 1}), how="cross")
+            weight = weight[np.sum(weight, axis=1) <= target_sum].reset_index(drop=True)
+        weight = weight.to_numpy()
+        weight = weight[np.sum(weight, axis=1) == target_sum]
+        print(f"{weight.shape = }")
+        return weight * step
+
+    # weight = get_grid(step=0.1)
+    weight = get_grid(step=0.1, target_sum=1)
 
     target_csv_path = pathlib.Path("grid_search.csv")
+    if target_csv_path.exists():
+        df = pd.read_csv(target_csv_path)
+        df["scores"] = df["scores"].apply(
+            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+        )
+        df["weights"] = df["weights"].apply(
+            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+        )
 
-    records = []
+        if True:
+            target_weight = df.iloc[df["CV"].argmax()]["weights"]
+            print(f"{target_weight = }")
+            new_weight = target_weight + get_grid(0.05, 0, -0.5)
+            new_weight = new_weight[np.all(new_weight > 0, axis=1)]
+            assert np.all(np.isclose(np.sum(new_weight, axis=1), 1))
+            weight = np.concatenate([weight, new_weight], axis=0)
+
+        loaded_weight = np.array(df["weights"].tolist())
+        weight = np.array(
+            [w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))]
+        )
+        print(f"-> {weight.shape = }")
+
+        records = df.to_dict("records")
+    else:
+        records = []
+
     n_steps_to_save = 30
     with multiprocessing.Pool(8) as p:
         with tqdm.tqdm(total=len(weight), desc="grid search") as t:
-            for scores, weights in p.imap_unordered(calc_all_scores, weight):
+            for scores, weights in p.imap_unordered(calc_all_scores, weight.tolist()):
                 t.update(1)
                 records.append({"CV": np.mean(scores), "scores": scores, "weights": weights})
-                if len(records) % n_steps_to_save == 0:
+
+                if len(records) % n_steps_to_save == 0 or t.n == t.total:
                     df = pd.DataFrame(records)
                     df.to_csv(target_csv_path, index=False)
 
@@ -128,6 +166,7 @@ max:
                             **record_at_max.to_dict()
                         )
                     )
+
 
 # scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]
 
