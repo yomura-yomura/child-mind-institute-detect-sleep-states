@@ -26,31 +26,12 @@ post_process_modes = {
 model_dir_paths = [
     project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2",
+    project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
+    project_root_path / "run" / "predicted" / "train" / "exp016-1d-resnet34",
 ]
 
-predicted_dict = {
-    i_fold: {
-        model_dir_path.name: np.load(model_dir_path / predicted_npz_format.format(i_fold=i_fold))
-        for model_dir_path in model_dir_paths
-    }
-    for i_fold in range(5)
-}
 
-keys_dict = {}
-preds_dict = {}
-for i_fold in range(5):
-    first, *others = predicted_dict[i_fold].values()
-    for other in others:
-        assert np.all(first["key"] == other["key"])
-        assert np.all(first["label"] == other["label"])
-    keys_dict[i_fold] = first["key"]
-    preds_dict[i_fold] = np.stack([data["pred"] for data in predicted_dict[i_fold].values()], axis=0)
-
-
-all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
-
-
-def calc_score(i_fold: int, weights: list[int]):
+def calc_score(i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict):
     keys = keys_dict[i_fold]
     unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
     event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)].dropna()
@@ -73,26 +54,88 @@ def calc_score(i_fold: int, weights: list[int]):
     )
 
 
-def calc_all_scores(weights: list[int]):
-    scores = []
-    for i_fold in tqdm.trange(5):
-        scores.append(calc_score(i_fold, weights))
-
-    mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
-    print(f"{mean_score_str} ({', '.join(score_strs)})")
-    return scores
+# scores = calc_all_scores(weights=[1, 1, 1, 1])
 
 
-calc_all_scores(weights=[1, 1])
+if __name__ == "__main__":
+    import multiprocessing
+
+    import numpy as np
+    import pandas as pd
+
+    predicted_dict = {
+        i_fold: {
+            model_dir_path.name: np.load(
+                model_dir_path / predicted_npz_format.format(i_fold=i_fold)
+            )
+            for model_dir_path in model_dir_paths
+        }
+        for i_fold in range(5)
+    }
+
+    keys_dict = {}
+    preds_dict = {}
+    for i_fold in range(5):
+        first, *others = predicted_dict[i_fold].values()
+        for other in others:
+            assert np.all(first["key"] == other["key"])
+            assert np.all(first["label"] == other["label"])
+        keys_dict[i_fold] = first["key"]
+        preds_dict[i_fold] = np.stack(
+            [data["pred"] for data in predicted_dict[i_fold].values()], axis=0
+        )
+
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
+
+    def calc_all_scores(weights: list[int]):
+        scores = []
+        for i_fold in tqdm.trange(5):
+            scores.append(calc_score(i_fold, weights, keys_dict, all_event_df, preds_dict))
+
+        mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
+        print(f"{mean_score_str} ({', '.join(score_strs)})")
+        return np.array(scores), weights
+
+    base_weight = pd.DataFrame(np.linspace(0, 1, 11, dtype="f4"))
+    weight = base_weight.copy()
+    for i, _ in enumerate(tqdm.trange(len(model_dir_paths) - 1)):
+        weight = weight.merge(base_weight.rename(columns={0: i}), how="cross")
+        weight = weight[np.sum(weight, axis=1) <= 1]
+    weight = weight.to_numpy()
+    weight = weight[np.sum(weight, axis=1) == 1]
+    print(f"{weight.shape = }")
+
+    target_csv_path = pathlib.Path("grid_search.csv")
+
+    records = []
+    n_steps_to_save = 30
+    with multiprocessing.Pool(8) as p:
+        with tqdm.tqdm(total=len(weight), desc="grid search") as t:
+            for scores, weights in p.imap_unordered(calc_all_scores, weight):
+                t.update(1)
+                records.append({"CV": np.mean(scores), "scores": scores, "weights": weights})
+                if len(records) % n_steps_to_save == 0:
+                    df = pd.DataFrame(records)
+                    df.to_csv(target_csv_path, index=False)
+
+                    record_at_max = df.iloc[df["CV"].argmax()]
+                    print(
+                        """
+max:
+  CV = {CV:.4f}
+  weights = {weights}
+""".format(
+                            **record_at_max.to_dict()
+                        )
+                    )
+
+# scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]
 
 
-weight_list = np.linspace(0, 1, 20)
-scores = [calc_all_scores(weights=[w, 1 - w]) for w in tqdm.tqdm(weight_list, desc="grid search")]
-
-mean_scores = np.mean(scores, axis=1)
-order = np.argsort(mean_scores)[::-1]
-mean_scores[order]
-weight_list[order]
+# mean_scores = np.mean(scores, axis=1)
+# order = np.argsort(mean_scores)[::-1]
+# mean_scores[order]
+# weight_list[order]
 
 # #
 #

@@ -26,8 +26,8 @@ PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
 
 
 def post_process_for_seg(
-    keys: list[str],
-    preds: np.ndarray,
+    keys: NDArray[np.str_],
+    preds: NDArray[np.float_],
     downsample_rate: int,
     score_th: float = 0.01,
     distance: int = 5000,

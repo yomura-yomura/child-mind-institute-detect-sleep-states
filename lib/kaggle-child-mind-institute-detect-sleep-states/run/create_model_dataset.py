@@ -20,8 +20,12 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp015-lstm-feature-sigma"
 
 # exp_name = "exp008-lstm-feature-half-lr"
-# exp_name = "exp012-lstm-feature"
-exp_name = "exp011-lstm-feature-1d-fp16"
+# exp_name = "exp012-lstm-feature"t
+# exp_name = "exp011-lstm-feature-1d-fp16"
+
+# exp_name = "exp016-1d-resnet34"
+exp_name = "exp015-lstm-feature-108-sigma"
+
 
 upload = False
 # upload = True
@@ -45,7 +49,9 @@ def main(cfg: DictConfig):
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
     (output_dir_path / ".hydra").mkdir(exist_ok=True)
-    shutil.copy(p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml")
+    shutil.copy(
+        p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml"
+    )
 
     torch.save(
         module.model.state_dict(),
@@ -68,7 +74,11 @@ if __name__ == "__main__":
         ],
         columns=["path", "i_fold", "version"],
     )
-    path_df = path_df.sort_values(["i_fold", "version"], ascending=[True, False]).groupby(["i_fold"]).head(1)
+    path_df = (
+        path_df.sort_values(["i_fold", "version"], ascending=[True, False])
+        .groupby(["i_fold"])
+        .head(1)
+    )
 
     scores = []
     for p, i_fold, version in tqdm.tqdm(path_df.itertuples(index=False)):

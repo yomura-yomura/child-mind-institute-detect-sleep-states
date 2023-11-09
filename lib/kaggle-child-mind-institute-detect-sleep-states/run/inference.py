@@ -26,11 +26,10 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        # "config/omura/3090/lstm-feature-extractor.yaml"
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
-        "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
-        # "output/train/exp005-lstm-feature-2/fold_0/.hydra/overrides.yaml"
-        # "output/train/exp014-lstm-feature/fold_0/.hydra/overrides.yaml"
+        # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
+        # "../output_dataset/train/exp016-1d-resnet34"
+        "../output_dataset/train/exp015-lstm-feature-108-sigma"
     ]
 else:
     args = None
@@ -130,7 +129,9 @@ def main(cfg: TrainConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
-    pred_dir_path = pathlib.Path(cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1])
+    pred_dir_path = pathlib.Path(
+        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+    )
     pred_dir_path.mkdir(parents=True, exist_ok=True)
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
@@ -176,8 +177,13 @@ if __name__ == "__main__":
 
     for i_fold in range(5):
         overrides_args = []
+
+        fold_dir_path = args.model_path / f"fold_{i_fold}"
+        if not fold_dir_path.exists():
+            raise FileNotFoundError(fold_dir_path)
+
         for p in (
-            args.model_path / f"fold_{i_fold}" / ".hydra" / "overrides.yaml",
+            fold_dir_path / ".hydra" / "overrides.yaml",
             *args.config_path,
         ):
             overrides_args += OmegaConf.load(p)
