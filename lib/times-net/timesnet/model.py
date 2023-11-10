@@ -168,6 +168,7 @@ class TimesNet(nn.Module):
 
     def classification(self, x_enc):
         # embedding
+        x_enc =x_enc.transpose(1,2)
         enc_out = self.enc_embedding(x_enc, None)  # [B,T,C]
         # TimesNet
         for i in range(self.layer):

@@ -1,8 +1,8 @@
 name: TimesNetFeatureExtractor
-height: 512
+height: 64
 
 
-is_fc: False # if false must be same dim_model
+is_fc: True # if false must be same dim_model
 
 # timesnet(default)
 dim_model: 512

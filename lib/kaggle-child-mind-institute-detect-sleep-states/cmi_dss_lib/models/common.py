@@ -200,12 +200,10 @@ def get_model(cfg: TrainConfig, feature_dim: int, n_classes: int, num_time_steps
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )
     
-    elif cfg.model_name == "EncoderDecoder"
+    elif cfg.model.name == "EncoderDecoder":
         model = EncoderDecoder(
             feature_extractor=feature_extractor,
             decoder=decoder,
-            num_time_steps=num_time_steps,
-            model_dim=cfg.model_dim,
             mixup_alpha=cfg.augmentation.mixup_alpha,
             cutmix_alpha=cfg.augmentation.cutmix_alpha,
         )

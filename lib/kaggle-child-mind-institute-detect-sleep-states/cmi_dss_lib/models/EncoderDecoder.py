@@ -13,17 +13,13 @@ class EncoderDecoder(nn.Module):
         self,
         feature_extractor: nn.Module,
         decoder: nn.Module,
-        num_time_steps: int,
-        model_dim: int,
         mixup_alpha: float = 0.5,
         cutmix_alpha: float = 0.5,
     ):
         super().__init__()
-        self.model_dim = model_dim
         self.feature_extractor = feature_extractor
         self.decoder = decoder
 
-        self.channels_fc = nn.Linear(block_dim[-1][1], num_time_steps)
         self.mixup = Mixup(mixup_alpha)
         self.cutmix = Cutmix(cutmix_alpha)
         self.loss_fn = nn.BCEWithLogitsLoss()
