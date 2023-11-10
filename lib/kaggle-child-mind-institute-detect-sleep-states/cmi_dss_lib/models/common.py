@@ -15,6 +15,7 @@ from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeature
 from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
+from cmi_dss_lib.models.EncoderDecoder import EncoderDecoder
 
 from ..config import TrainConfig
 
@@ -91,7 +92,6 @@ def get_feature_extractor(
             out_size=num_time_steps,
         )
     elif cfg.feature_extractor.name == "TimesNetFeatureExtractor":
-        assert cfg.model_dim == 2
         feature_extractor = TimesNetFeatureExtractor(
             in_channels=feature_dim,
             height = cfg.feature_extractor.height,
@@ -194,6 +194,16 @@ def get_model(cfg: TrainConfig, feature_dim: int, n_classes: int, num_time_steps
             feature_extractor=feature_extractor,
             decoder=decoder,
             encoder_name=cfg.model.encoder_name,
+            num_time_steps=num_time_steps,
+            model_dim=cfg.model_dim,
+            mixup_alpha=cfg.augmentation.mixup_alpha,
+            cutmix_alpha=cfg.augmentation.cutmix_alpha,
+        )
+    
+    elif cfg.model_name == "EncoderDecoder"
+        model = EncoderDecoder(
+            feature_extractor=feature_extractor,
+            decoder=decoder,
             num_time_steps=num_time_steps,
             model_dim=cfg.model_dim,
             mixup_alpha=cfg.augmentation.mixup_alpha,

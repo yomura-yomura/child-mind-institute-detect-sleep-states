@@ -102,7 +102,7 @@ class TimesNet(nn.Module):
             for Inception
         """
         super(TimesNet, self).__init__()
-        self.task_name = task #"anomaly_detection" #'imputation' 'anomaly_detection':
+        self.task_name = task #"anomaly_detection" #'imputation' 'anomaly_detection',"classification"
         self.seq_len = len_input # input sequence length
         self.pred_len = 0 # predict sequence length
         self.model = nn.ModuleList([TimesBlock(len_input,top_k,d_model,d_ff,num_kernels)
@@ -166,11 +166,33 @@ class TimesNet(nn.Module):
         #              1, self.pred_len + self.seq_len, 1))
         return enc_out
 
+    def classification(self, x_enc):
+        # embedding
+        enc_out = self.enc_embedding(x_enc, None)  # [B,T,C]
+        # TimesNet
+        for i in range(self.layer):
+            enc_out = self.layer_norm(self.model[i](enc_out))
+
+        ## Output
+        ## the output transformer encoder/decoder embeddings don't include non-linearity
+        #output = self.act(enc_out)
+        #output = self.dropout(output)
+        ## zero-out padding embeddings
+        #output = output * x_mark_enc.unsqueeze(-1)
+        ## (batch_size, seq_length * d_model)
+        #output = output.reshape(output.shape[0], -1)
+        #output = self.projection(output)  # (batch_size, num_classes)
+        return enc_out
+
+
     def forward(self, x_enc, x_mark_enc=None, mask=None):
         if self.task_name == 'forecast' :
             dec_out = self.forecast(x_enc, x_mark_enc)
             return dec_out # [B, L, D]
         if self.task_name == 'anomaly':
             dec_out = self.anomaly_detection(x_enc)
+            return dec_out  # [B, L, D]
+        if self.task_name == 'classification':
+            dec_out = self.classification(x_enc)
             return dec_out  # [B, L, D]
         return None

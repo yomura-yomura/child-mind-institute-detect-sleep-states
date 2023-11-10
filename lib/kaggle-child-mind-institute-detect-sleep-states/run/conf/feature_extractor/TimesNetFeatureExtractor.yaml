@@ -1,6 +1,8 @@
 name: TimesNetFeatureExtractor
-height: 64
-is_fc: ture
+height: 512
+
+
+is_fc: False # if false must be same dim_model
 
 # timesnet(default)
 dim_model: 512
@@ -9,8 +11,10 @@ times_blocks: 2
 num_kernels: 6
 dropout: 0.1
 dim_fc: 2048
+task: "classification" #"anomaly" #forecast
 
+# 時間情報をエンコーディングするときに使用
+# NOTE encoderとして使用するなら使わない
 embed_encoding: "timeF"
 freq: "s"
-task: "anomaly" #forecast
 
