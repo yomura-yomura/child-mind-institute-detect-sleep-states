@@ -10,16 +10,10 @@ project_root_path = pathlib.Path(__file__).parent.parent.parent
 
 def get_pred_data(i_fold):
     all_keys, all_preds, all_labels = np.load(
-        project_root_path
-        / "predicted"
-        / "ranchantan"
-        / "exp005-lstm-feature-2"
-        / f"predicted-fold_{i_fold}.npz"
+        project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2" / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
-    all_data = npu.from_dict(
-        {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
-    )
+    all_data = npu.from_dict({"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids})
     return all_data
 
 
@@ -30,9 +24,7 @@ i = 1
 
 record = data[i]
 
-df = pd.DataFrame(record["pred"], columns=["sleep", "onset", "wakeup"]).assign(
-    step=np.arange(record["pred"].shape[0])
-)
+df = pd.DataFrame(record["pred"], columns=["sleep", "onset", "wakeup"]).assign(step=np.arange(record["pred"].shape[0]))
 
 
 label_df = pd.DataFrame(record["label"], columns=["sleep", "onset", "wakeup"]).assign(

@@ -23,9 +23,7 @@ else:
     args = None
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
 LOGGER = logging.getLogger(Path(__file__).name)
 
 
@@ -50,9 +48,7 @@ def main(cfg: TrainConfig):
         duration=cfg.duration,
     )
 
-    model_save_dir_path = (
-        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
-    )
+    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
 
     trainer = Trainer(
         devices=1,

@@ -65,16 +65,10 @@ def get_submit_df(all_data, modes: PostProcessModes = None):
 
 def get_pred_data(i_fold):
     all_keys, all_preds, all_labels = np.load(
-        project_root_path
-        / "output"
-        / "train"
-        / "exp005-lstm-feature-2"
-        / f"predicted-fold_{i_fold}.npz"
+        project_root_path / "output" / "train" / "exp005-lstm-feature-2" / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
-    all_data = npu.from_dict(
-        {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
-    )
+    all_data = npu.from_dict({"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids})
     return all_data
 
 

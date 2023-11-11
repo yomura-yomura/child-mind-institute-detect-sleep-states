@@ -132,9 +132,7 @@ def main(cfg: TrainConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
-    pred_dir_path = pathlib.Path(
-        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
-    )
+    pred_dir_path = pathlib.Path(cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1])
     pred_dir_path.mkdir(parents=True, exist_ok=True)
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
