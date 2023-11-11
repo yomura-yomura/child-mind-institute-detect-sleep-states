@@ -1,0 +1,16 @@
+- exp_name=exp018-balanced
+
+- duration=12960  # 18h
+
+- batch_size=1
+- optimizer.lr=0.00001
+
+- sigma=108
+
+- feature_extractor=StackedGRUFeatureExtractor
+- feature_extractor.num_layers=4
+
+- model.encoder_name=resnet34
+
+- decoder=TransformerDecoder
+

@@ -1,0 +1,10 @@
+- exp_name=exp022-108sigma-720offset
+
+- model.encoder_name=resnet34
+
+- feature_extractor.name=LSTMFeatureExtractor
+
+- offset=360  # 30m
+- sigma=108  # 9m
+
+- batch_size=16

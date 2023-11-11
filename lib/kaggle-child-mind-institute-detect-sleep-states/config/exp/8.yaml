@@ -1,0 +1,5 @@
+- exp_name=exp008-3sigma
+- model.encoder_name=resnet34
+- feature_extractor.name=LSTMFeatureExtractor
+- sigma=3
+- batch_size=16

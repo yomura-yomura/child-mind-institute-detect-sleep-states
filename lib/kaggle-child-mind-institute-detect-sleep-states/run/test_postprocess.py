@@ -8,11 +8,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy_utility as npu
 import tqdm
+from cmi_dss_lib.utils.post_process import PostProcessModes
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 from child_mind_institute_detect_sleep_states.data.comp_dataset import rolling
 
 project_root_path = pathlib.Path(__file__).parent.parent
+
+
+post_process_modes = {
+    "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
+        sleep_prob_th=0.2, min_sleeping_hours=6
+    ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=6, sleep_occupancy_th=0.3
+    ),
+}
 
 
 def get_corrected_pred(all_data, time_window=15, step_interval=1):
@@ -41,11 +52,10 @@ def get_corrected_pred(all_data, time_window=15, step_interval=1):
     return corrected_preds
 
 
-def get_submit_df(all_data, modes=None):
+def get_submit_df(all_data, modes: PostProcessModes = None):
     return cmi_dss_lib.utils.post_process.post_process_for_seg(
-        #
         preds=all_data["pred"],
-        # preds=corrected_preds[:, :, [1, 2]],
+        downsample_rate=2,
         keys=all_data["key"],
         score_th=0.005,
         distance=96,
@@ -53,14 +63,15 @@ def get_submit_df(all_data, modes=None):
     ).to_pandas()
 
 
+scores_list = []
 for i_fold in range(5):
     all_keys, all_preds, all_labels = np.load(
         project_root_path
-        # / "output"
-        # / "train"
-        # / "exp005-lstm-feature-2"
-        / "preds"
-        / "uchida-1"
+        / "output"
+        / "train"
+        / "exp005-lstm-feature-2"
+        # / "preds"
+        # / "uchida-1"
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
@@ -73,127 +84,50 @@ for i_fold in range(5):
     event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
     event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
 
+    scores = []
+
     print(f"{i_fold=}")
     df_submit = get_submit_df(all_data)
     prev_score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
     print(f"{prev_score:.4f} -> ", end="", flush=True)
-    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob"])
-    score = cmi_dss_lib.utils.metrics.event_detection_ap(
-        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
-    )
-    print(f"{score:.4f}")
+    scores.append(prev_score)
 
-    df_submit = get_submit_df(all_data, modes=["cut_sleep_prob"])
+    df_submit = get_submit_df(
+        all_data, modes={"sleeping_edges_as_probs": post_process_modes["sleeping_edges_as_probs"]}
+    )
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
-    print(f"cut_sleep_prob = {score:.4f}")
+    print(f"sleeping_edges_as_probs: {score:.4f}")
+    scores.append(score)
 
-    df_submit = get_submit_df(all_data, modes=["adapt_sleep_prob", "cut_sleep_prob"])
+    df_submit = get_submit_df(
+        all_data,
+        modes={"cutting_probs_by_sleep_prob": post_process_modes["cutting_probs_by_sleep_prob"]},
+    )
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
     )
-    print(f"both = {score:.4f}")
+    print(f"cutting_probs_by_sleep_prob: {score:.4f}")
+    scores.append(score)
+
+    df_submit = get_submit_df(all_data, modes=post_process_modes)
+    score = cmi_dss_lib.utils.metrics.event_detection_ap(
+        event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
+    )
+    print(f"both: {score:.4f}")
+    scores.append(score)
+
     print()
 
+    scores_list.append(scores)
 
-class Plotter:
-    def __init__(self, data):
-        self.series_ids = np.array(list(map(lambda x: x.split("_")[0], data["key"])))
-        self.keys = data["key"]
-        self.preds = data["pred"]
-        self.labels = data["label"]
-        self.df_submit = get_submit_df(data)
 
-        unique_series_ids = np.unique(self.series_ids)
+scores = np.array(scores_list)  # (fold, mode)
 
-        self.score = cmi_dss_lib.utils.metrics.event_detection_ap(
-            event_df[event_df["series_id"].isin(unique_series_ids)], self.df_submit
-        )
-        print(f"{self.score = :.4f}")
-
-    def plot(
-        self,
-        series_id: str,
-        num_chunks: int = 5,
-        mode: Literal["all", "onset", "wakeup"] = "all",
-        use_sleep: bool = True,
-    ):
-        series_idx = np.where(self.series_ids == series_id)[0]
-        this_series_preds = self.preds[series_idx].reshape(-1, 3)
-        this_series_labels = self.labels[series_idx].reshape(-1, 3)
-        this_series_df = self.df_submit[self.df_submit["series_id"] == series_id].reset_index(
-            drop=True
-        )
-        val_wakeup = this_series_df[this_series_df["event"] == "wakeup"]["step"].values
-        val_onset = this_series_df[this_series_df["event"] == "onset"]["step"].values
-        val_step = np.arange(1, self.preds[series_idx].reshape(-1, 3).shape[0] + 1)
-        this_onset = np.isin(val_step, val_onset).astype(int)
-        this_wakeup = np.isin(val_step, val_wakeup).astype(int)
-
-        # split series
-        this_series_preds = np.split(this_series_preds, num_chunks)
-        this_series_wakeup = np.split(this_wakeup, num_chunks)
-        this_series_onset = np.split(this_onset, num_chunks)
-        this_series_labels = np.split(this_series_labels, num_chunks)
-
-        fig, axs = plt.subplots(num_chunks, 1, figsize=(20, 5 * num_chunks))
-        if num_chunks == 1:
-            axs = [axs]
-        for j in range(num_chunks):
-            this_series_preds_chunk = this_series_preds[j]
-            this_series_labels_chunk = this_series_labels[j]
-
-            # get onset and wakeup idx
-            onset_idx = np.nonzero(this_series_labels_chunk[:, 1])[0] * 2
-            wakeup_idx = np.nonzero(this_series_labels_chunk[:, 2])[0] * 2
-
-            pred_onset_idx = np.nonzero(this_series_onset[j])[0]
-            pred_wakeup_idx = np.nonzero(this_series_wakeup[j])[0]
-
-            if use_sleep:
-                axs[j].plot(this_series_preds_chunk[:, 0], label="pred_sleep")
-            if mode == "all" or mode == "onset":
-                axs[j].plot(this_series_preds_chunk[:, 1], label="pred_onset")
-                axs[j].vlines(
-                    pred_onset_idx, 0, 1, label="pred_label_onset", linestyles="dotted", color="C1"
-                )
-                axs[j].vlines(
-                    onset_idx,
-                    0,
-                    1,
-                    label="actual_onset",
-                    linestyles="dashed",
-                    color="C1",
-                    linewidth=4,
-                )
-            if mode == "all" or mode == "wakeup":
-                axs[j].plot(this_series_preds_chunk[:, 2], label="pred_wakeup")
-                axs[j].vlines(
-                    pred_wakeup_idx,
-                    0,
-                    1,
-                    label="pred_label_wakeup",
-                    linestyles="dotted",
-                    color="C4",
-                )
-                axs[j].vlines(
-                    wakeup_idx,
-                    0,
-                    1,
-                    label="actual_wakeup",
-                    linestyles="dashed",
-                    color="C4",
-                    linewidth=4,
-                )
-
-            axs[j].set_ylim(0, 1)
-            axs[j].set_title(f"series_id: {series_id} chunk_id: {j}")
-            axs[j].legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0)
-        plt.tight_layout()
-        plt.show()
+print(f"mean score = {', '.join(map('{:.4f}'.format, np.mean(scores, axis=0)))}")
 
 
 #
@@ -223,5 +157,7 @@ series_id = str(unique_series_ids[order][i])
 
 data = all_data[all_data["series_id"] == series_id]
 
-plotter = Plotter(data)
+import cmi_dss_lib.utils.visualize
+
+plotter = cmi_dss_lib.utils.visualize.Plotter(data, post_process_modes)
 plotter.plot(series_id)
