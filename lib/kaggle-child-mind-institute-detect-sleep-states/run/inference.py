@@ -29,7 +29,9 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
-        "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
+        # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
+        # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
+        "../output_dataset/train/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
         # "../config/omura/base.yaml",
     ]
 else:

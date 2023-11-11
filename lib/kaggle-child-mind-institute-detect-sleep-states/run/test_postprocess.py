@@ -63,23 +63,26 @@ def get_submit_df(all_data, modes: PostProcessModes = None):
     ).to_pandas()
 
 
-scores_list = []
-for i_fold in range(5):
+def get_pred_data(i_fold):
     all_keys, all_preds, all_labels = np.load(
         project_root_path
         / "output"
         / "train"
         / "exp005-lstm-feature-2"
-        # / "preds"
-        # / "uchida-1"
         / f"predicted-fold_{i_fold}.npz"
     ).values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
     all_data = npu.from_dict(
         {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
     )
+    return all_data
 
-    unique_series_ids = np.unique(all_series_ids)
+
+scores_list = []
+for i_fold in range(5):
+    all_data = get_pred_data(i_fold)
+
+    unique_series_ids = np.unique(all_data["series_id"])
 
     event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
     event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()

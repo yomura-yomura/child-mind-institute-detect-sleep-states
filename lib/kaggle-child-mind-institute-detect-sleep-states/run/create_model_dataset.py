@@ -25,10 +25,11 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 # exp_name = "exp016-1d-resnet34"
 # exp_name = "exp015-lstm-feature-108-sigma"
-exp_name = "exp008-3sigma"
+# exp_name = "exp008-3sigma"
+exp_name = "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma"
 
-upload = False
-# upload = True
+# upload = False
+upload = True
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")

@@ -1,0 +1,11 @@
+- exp_name=exp029-stacked-gru-4-layers-28h-duration
+
+- feature_extractor=StackedGRUFeatureExtractor
+- feature_extractor.num_layers=4
+
+- duration=21600  # 30h
+
+- batch_size=8
+- optimizer.lr=0.0001
+
+- early_stopping_patience=10
