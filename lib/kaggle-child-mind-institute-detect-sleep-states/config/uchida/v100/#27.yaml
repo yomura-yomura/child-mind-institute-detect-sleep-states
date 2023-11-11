@@ -1,9 +1,8 @@
-- exp_name=exp026-EncoderDecoder-TimesNetFeatureExtractor-1DUnet
-- model.name=EncoderDecoder
+- exp_name=exp027-TimesNetFeatureExtractor-1DUnet-Unet
 - feature_extractor=TimesNetFeatureExtractor
-- feature_extractor.height=256
-- feature_extractor.dim_model=256
-- feature_extractor.dim_fc=1024
+- feature_extractor.height=64
+- feature_extractor.dim_model=64
+- feature_extractor.dim_fc=256
 - feature_extractor.is_fc=false
 #- decoder=MLPDecoder
 - use_amp=true
