@@ -20,7 +20,7 @@ from child_mind_institute_detect_sleep_states.model.callbacks import (
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["config/omura/v100/1d.yaml"]
+    args = ["config/exp/36.yaml", "--folds", "1,2,3,4"]
 else:
     args = None
 

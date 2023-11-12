@@ -13,3 +13,5 @@
 - sigma=108
 
 - features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos]
+
+- early_stopping_patience=10

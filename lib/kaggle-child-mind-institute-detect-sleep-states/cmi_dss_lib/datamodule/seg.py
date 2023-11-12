@@ -65,15 +65,37 @@ def load_chunk_features(
 
     for series_id in series_ids:
         series_dir = phase_dir_path / series_id
-        this_feature = []
-        for feature_name in feature_names:
-            this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
-        this_feature = np.stack(this_feature, axis=1)
+
+        this_feature = np.stack(
+            [np.load(series_dir / f"{feature_name}.npy") for feature_name in feature_names], axis=1
+        )  # (duration, feature)
+
         num_chunks = (len(this_feature) // duration) + 1
         for i in range(num_chunks):
-            chunk_feature = this_feature[i * duration : (i + 1) * duration]
-            chunk_feature = pad_if_needed(chunk_feature, duration, pad_value=0)  # type: ignore
-            features[f"{series_id}_{i:07}"] = chunk_feature
+            key = f"{series_id}_{i:07}"
+
+            start = i * duration
+            end = (i + 1) * duration
+
+            mask = np.zeros(this_feature.shape[0], dtype=bool)
+            mask[start:end] = True
+            features[f"{key}_mask"] = mask
+
+            n_inputs_to_model = duration + prev_margin_steps + next_margin_steps
+
+            # extend crop area with margins
+            start -= prev_margin_steps
+            end += next_margin_steps
+            if start < 0:
+                end -= start
+                start = 0
+            elif end > this_feature.shape[0] + duration:
+                start += end - this_feature.shape[0]
+                end = this_feature.shape[0] - 1
+            assert end - start == n_inputs_to_model, (start, end, n_inputs_to_model)
+
+            chunk_feature = pad_if_needed(this_feature[start:end], n_inputs_to_model, pad_value=0)
+            features[key] = chunk_feature
 
     return features  # type: ignore
 
@@ -372,6 +394,8 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="train",
                 scale_type=self.cfg.scale_type,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
             )
         if stage == "test":
             series_ids = [
@@ -385,6 +409,8 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="test",
                 scale_type=self.cfg.scale_type,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
             )
 
     def train_dataloader(self):

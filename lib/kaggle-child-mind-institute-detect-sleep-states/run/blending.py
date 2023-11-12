@@ -39,10 +39,10 @@ def calc_score(
     i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes
 ):
     keys = keys_dict[i_fold]
-    unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
+    # unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
+    unique_series_ids = np.unique(keys)
     event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)].dropna()
 
-    # labels = labels_dict[i_fold]
     preds = np.average(preds_dict[i_fold], axis=0, weights=weights)
     df_submit = cmi_dss_lib.utils.post_process.post_process_for_seg(
         #
@@ -79,17 +79,31 @@ if __name__ == "__main__":
         for i_fold in range(5)
     }
 
+    import itertools
+
+    import cmi_dss_lib.utils.common
+    import tqdm
+
     keys_dict = {}
     preds_dict = {}
-    for i_fold in range(5):
-        first, *others = predicted_dict[i_fold].values()
-        for other in others:
-            assert np.all(first["key"] == other["key"])
-            assert np.all(first["label"] == other["label"])
-        keys_dict[i_fold] = first["key"]
-        preds_dict[i_fold] = np.stack(
-            [data["pred"] for data in predicted_dict[i_fold].values()], axis=0
+    for i_fold in tqdm.trange(5):
+        (
+            keys_dict[i_fold],
+            preds_dict[i_fold],
+        ) = cmi_dss_lib.utils.common.get_predicted_group_by_series_id(
+            predicted_dict[i_fold].values()
         )
+
+        # preds = [data["pred"].reshape(-1, 3) for data in predicted_dict[i_fold].values()]
+
+        # first, *others = predicted_dict[i_fold].values()
+        # for other in others:
+        #     assert np.all(first["key"] == other["key"])
+        #     assert np.all(first["label"] == other["label"])
+        # keys_dict[i_fold] = first["key"]
+        # preds_dict[i_fold] = np.stack(
+        #     [data["pred"] for data in predicted_dict[i_fold].values()], axis=0
+        # )
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
@@ -130,8 +144,8 @@ if __name__ == "__main__":
         return weight * step
 
     # weight = get_grid(step=0.1)
-    # weight = get_grid(step=0.1, target_sum=1)
-    weight = get_grid(step=0.02, target_sum=1)
+    weight = get_grid(step=0.1, target_sum=1)
+    # weight = get_grid(step=0.02, target_sum=1)
 
     target_csv_path = (
         pathlib.Path("grid_search") / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
