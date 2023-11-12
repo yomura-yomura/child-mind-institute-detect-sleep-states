@@ -72,12 +72,13 @@ def main(cfg: TrainConfig):
         callbacks=[
             ModelCheckpointWithSymlinkToBest(
                 dirpath=model_save_dir_path,
-                filename="{epoch}-{EventDetectionAP:.3f}",
+                filename="{epoch}-{step}-{EventDetectionAP:.3f}",
                 verbose=True,
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
                 save_top_k=2,
                 save_last=True,
+                every_n_train_steps=
             ),
             EarlyStopping(
                 monitor=cfg.monitor,

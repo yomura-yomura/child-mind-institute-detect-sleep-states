@@ -48,22 +48,22 @@ def get_predicted_group_by_series_id(data_list: Iterable[NDArray[np.float_]]):
         }
         for data in data_list
     ]
-    first_key, *other_keys = (pred.keys() for pred in preds_list)
-    for key in other_keys:
-        assert first_key == key
+    first_series_ids, *other_series_ids = (pred.keys() for pred in preds_list)
+    for series_id in other_series_ids:
+        assert first_series_ids == series_id
 
     min_durations = [
-        min(preds[series_id].shape[0] for preds in preds_list) for series_id in first_key
+        min(preds[series_id].shape[0] for preds in preds_list) for series_id in first_series_ids
     ]
     preds_list = [
         np.stack([preds[series_id][:min_duration] for preds in preds_list], axis=0)
-        for series_id, min_duration in zip(first_key, min_durations)
+        for series_id, min_duration in zip(first_series_ids, min_durations)
     ]
-    keys = np.array(
+    series_ids = np.array(
         [
             key
-            for key, preds in zip(first_key, preds_list, strict=True)
+            for key, preds in zip(first_series_ids, preds_list, strict=True)
             for _ in range(preds.shape[1])
         ]
     )
-    return keys, np.concatenate(preds_list, axis=1)
+    return series_ids, np.concatenate(preds_list, axis=1)

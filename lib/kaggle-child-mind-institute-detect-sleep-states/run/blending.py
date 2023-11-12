@@ -28,7 +28,7 @@ pred_dir_path = project_root_path / "run" / "predicted" / "train"
 model_dir_paths = [
     project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     # project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2",
-    # project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
+    project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
     # project_root_path / "run" / "predicted" / "train" / "exp016-1d-resnet34",
     pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
     pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",

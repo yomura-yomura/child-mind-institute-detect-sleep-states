@@ -50,6 +50,7 @@ monitor: EventDetectionAP
 monitor_mode: max
 check_val_every_n_epoch: 1
 
+
 # Dataset
 offset: 10  # how long gaussian sigma spreads at most on half side
 sigma: 10

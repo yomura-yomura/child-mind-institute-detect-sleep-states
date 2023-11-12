@@ -278,7 +278,7 @@ class ValidDataset(Dataset):
     ):
         self.cfg = cfg
         self.chunk_features = chunk_features
-        self.keys = list(chunk_features.keys())
+        self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.event_df = (
             event_df.pivot(index=["series_id", "night"], columns="event", values="step")
             .drop_nulls()
@@ -329,7 +329,7 @@ class TestDataset(Dataset):
     ):
         self.cfg = cfg
         self.chunk_features = chunk_features
-        self.keys = list(chunk_features.keys())
+        self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate

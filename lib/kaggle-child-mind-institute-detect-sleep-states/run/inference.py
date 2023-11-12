@@ -132,7 +132,9 @@ def main(cfg: TrainConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
-    pred_dir_path = pathlib.Path(cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1])
+    pred_dir_path = pathlib.Path(
+        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+    )
     pred_dir_path.mkdir(parents=True, exist_ok=True)
     if cfg.phase == "train":
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
@@ -173,7 +175,7 @@ def main(cfg: TrainConfig):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", type=pathlib.Path)
-    parser.add_argument("config_path", nargs="*")
+    parser.add_argument("config_path_or_hydra_arguments", nargs="*")
     args = parser.parse_args(args)
 
     for i_fold in range(5):
@@ -185,12 +187,16 @@ if __name__ == "__main__":
 
         for p in (
             fold_dir_path / ".hydra" / "overrides.yaml",
-            *args.config_path,
+            *args.config_path_or_hydra_arguments,
         ):
-            for k, v in (item.split("=") for item in OmegaConf.load(p)):
-                if k in overrides_dict.keys():
-                    print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
-                overrides_dict[k] = v
+            if p.exists():
+                for k, v in (item.split("=", maxsplit=1) for item in OmegaConf.load(p)):
+                    if k in overrides_dict.keys():
+                        print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
+                    overrides_dict[k] = v
+            else:
+                p.split("=", maxsplit=1)
+                overrides_dict
         overrides_dict["split"] = f"fold_{i_fold}"
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
         # overrides_args.append(f"phase=test")
