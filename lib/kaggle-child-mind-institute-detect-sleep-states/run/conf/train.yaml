@@ -48,8 +48,9 @@ accumulate_grad_batches: 1
 #monitor_mode: min
 monitor: EventDetectionAP
 monitor_mode: max
-check_val_every_n_epoch: 1
 
+check_val_every_n_epoch: 1
+val_check_interval: 1
 
 # Dataset
 offset: 10  # how long gaussian sigma spreads at most on half side

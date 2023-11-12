@@ -51,7 +51,9 @@ class TrainConfig:
     accumulate_grad_batches: int
     monitor: Literal["EventDetectionAP"]
     monitor_mode: Literal["min", "max"]
-    check_val_every_n_epoch: int
+
+    check_val_every_n_epoch: int | None
+    val_check_interval: float | int | None
 
     offset: int
     sigma: int

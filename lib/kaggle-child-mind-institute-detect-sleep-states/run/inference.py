@@ -189,14 +189,14 @@ if __name__ == "__main__":
             fold_dir_path / ".hydra" / "overrides.yaml",
             *args.config_path_or_hydra_arguments,
         ):
-            if p.exists():
+            if os.path.exists(p):
                 for k, v in (item.split("=", maxsplit=1) for item in OmegaConf.load(p)):
                     if k in overrides_dict.keys():
                         print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
                     overrides_dict[k] = v
             else:
-                p.split("=", maxsplit=1)
-                overrides_dict
+                k, v = p.split("=", maxsplit=1)
+                overrides_dict[k] = v
         overrides_dict["split"] = f"fold_{i_fold}"
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
         # overrides_args.append(f"phase=test")

@@ -78,7 +78,7 @@ def main(cfg: TrainConfig):
                 mode=cfg.monitor_mode,
                 save_top_k=2,
                 save_last=True,
-                every_n_train_steps=
+                every_n_train_steps=cfg.val_check_interval,
             ),
             EarlyStopping(
                 monitor=cfg.monitor,
@@ -99,6 +99,7 @@ def main(cfg: TrainConfig):
         log_every_n_steps=int(len(datamodule.train_dataloader()) * 0.1),
         sync_batchnorm=True,
         check_val_every_n_epoch=cfg.check_val_every_n_epoch,
+        val_check_interval=cfg.val_check_interval,
     )
 
     trainer.fit(model, datamodule=datamodule)
