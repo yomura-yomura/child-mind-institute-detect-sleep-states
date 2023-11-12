@@ -17,16 +17,16 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-    #     watch_interval_hour=6, sleep_occupancy_th=0.3
-    # ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=6, sleep_occupancy_th=0.3
+    ),
 }
 
 
 pred_dir_path = project_root_path / "run" / "predicted" / "train"
 
 model_dir_paths = [
-    # project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     # project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2",
     # project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
     # project_root_path / "run" / "predicted" / "train" / "exp016-1d-resnet34",
@@ -35,7 +35,9 @@ model_dir_paths = [
 ]
 
 
-def calc_score(i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict):
+def calc_score(
+    i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes
+):
     keys = keys_dict[i_fold]
     unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
     event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)].dropna()
@@ -58,7 +60,7 @@ def calc_score(i_fold: int, weights: list[int], keys_dict, all_event_df, preds_d
     )
 
 
-# scores = calc_all_scores(weights=[1, 1, 1, 1])
+# scores = calc_all_scores(weights=[1, 1])
 
 
 if __name__ == "__main__":
@@ -91,10 +93,19 @@ if __name__ == "__main__":
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
-    def calc_all_scores(weights: list[int]):
+    def calc_all_scores(weights: list[int], post_process_modes=None):
         scores = []
         for i_fold in tqdm.trange(5):
-            scores.append(calc_score(i_fold, weights, keys_dict, all_event_df, preds_dict))
+            scores.append(
+                calc_score(
+                    i_fold,
+                    weights,
+                    keys_dict,
+                    all_event_df,
+                    preds_dict,
+                    post_process_modes=post_process_modes,
+                )
+            )
 
         mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
         print(f"{mean_score_str} ({', '.join(score_strs)})")
@@ -119,7 +130,8 @@ if __name__ == "__main__":
         return weight * step
 
     # weight = get_grid(step=0.1)
-    weight = get_grid(step=0.1, target_sum=1)
+    # weight = get_grid(step=0.1, target_sum=1)
+    weight = get_grid(step=0.02, target_sum=1)
 
     target_csv_path = (
         pathlib.Path("grid_search") / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
@@ -161,6 +173,7 @@ if __name__ == "__main__":
 
                 if len(records) % n_steps_to_save == 0 or t.n == t.total:
                     df = pd.DataFrame(records)
+                    target_csv_path.parent.mkdir(parents=True, exist_ok=True)
                     df.to_csv(target_csv_path, index=False)
 
                     record_at_max = df.iloc[df["CV"].argmax()]
@@ -173,6 +186,8 @@ max:
                             **record_at_max.to_dict()
                         )
                     )
+
+            score = calc_all_scores(record_at_max["weights"], post_process_modes)
 
 
 # scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]

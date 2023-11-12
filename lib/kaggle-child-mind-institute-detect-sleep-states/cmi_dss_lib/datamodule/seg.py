@@ -25,14 +25,17 @@ def load_features(
     series_ids: Optional[list[str]],
     processed_dir: Path,
     phase: str,
+    scale_type: str,
 ) -> dict[str, np.ndarray]:
     features = {}
 
+    phase_dir_path = processed_dir / phase / scale_type
+
     if series_ids is None:
-        series_ids = [series_dir.name for series_dir in (processed_dir / phase).glob("*")]
+        series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
-        series_dir = processed_dir / phase / series_id
+        series_dir = phase_dir_path / series_id
         this_feature = []
         for feature_name in feature_names:
             this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
@@ -47,10 +50,13 @@ def load_chunk_features(
     series_ids: Optional[list[str]],
     processed_dir: Path,
     phase: str,
+    scale_type: str,
+    prev_margin_steps: int = 0,
+    next_margin_steps: int = 0,
 ) -> dict[str, np.ndarray]:
     features = {}
 
-    phase_dir_path = processed_dir / phase
+    phase_dir_path = processed_dir / phase / scale_type
     if not phase_dir_path.exists():
         raise FileNotFoundError(f"{phase_dir_path.resolve()}")
 
@@ -58,7 +64,7 @@ def load_chunk_features(
         series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
-        series_dir = processed_dir / phase / series_id
+        series_dir = phase_dir_path / series_id
         this_feature = []
         for feature_name in feature_names:
             this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
@@ -87,7 +93,9 @@ def random_crop(pos: int, duration: int, max_end) -> tuple[int, int]:
 ###################
 # Label
 ###################
-def get_label(this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int) -> np.ndarray:
+def get_label(
+    this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int
+) -> np.ndarray:
     # # (start, end)の範囲と(onset, wakeup)の範囲が重なるものを取得
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
@@ -165,7 +173,9 @@ class TrainDataset(Dataset):
     ):
         self.cfg = cfg
         self.event_df: pd.DataFrame = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
+            .drop_nulls()
+            .to_pandas()
         )
         self.features = features
         self.num_features = len(cfg.features)
@@ -178,23 +188,45 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         event = np.random.choice(["onset", "wakeup"], p=[0.5, 0.5])
-        pos = self.event_df.at[idx, event]
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
         # extract data matching series_id
         this_feature = self.features[series_id]  # (n_steps, num_features)
         n_steps = this_feature.shape[0]
 
-        # sample background
         if random.random() < self.cfg.bg_sampling_rate:
+            # sample background (potentially include labels in duration)
             pos = negative_sampling(this_event_df, n_steps)
+        else:
+            # always include labels in duration
+            pos = self.event_df.at[idx, event]
 
         # crop
-        start, end = random_crop(pos, self.cfg.duration, n_steps)
+        start, end = random_crop(
+            pos,
+            self.cfg.duration + self.cfg.prev_margin_steps + self.cfg.next_margin_steps,
+            n_steps,
+        )
+
+        # n_inputs_to_model = (
+        #     self.cfg.duration + self.cfg.prev_margin_steps + self.cfg.next_margin_steps
+        # )
+        #
+        # # extend crop area with margins
+        # start -= self.cfg.prev_margin_steps
+        # end += self.cfg.next_margin_steps
+        # if start < 0:
+        #     end -= start
+        #     start = 0
+        # elif end >= n_steps:
+        #     start += end - n_steps
+        #     end = n_steps - 1
+        # assert end - start == n_inputs_to_model
+
         feature = this_feature[start:end]  # (duration, num_features)
 
         # upsample
-        feature = torch.FloatTensor(feature.T).unsqueeze(0)  # (1, num_features, duration)
+        feature = torch.FloatTensor(feature.T).unsqueeze(0)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -204,7 +236,9 @@ class TrainDataset(Dataset):
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(this_event_df, num_frames, self.cfg.duration, start, end)
-        label[:, [1, 2]] = gaussian_label(label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma)
+        label[:, [1, 2]] = gaussian_label(
+            label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma
+        )
 
         return {
             "series_id": series_id,
@@ -224,7 +258,9 @@ class ValidDataset(Dataset):
         self.chunk_features = chunk_features
         self.keys = list(chunk_features.keys())
         self.event_df = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
+            .drop_nulls()
+            .to_pandas()
         )
         self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
@@ -304,10 +340,16 @@ class SegDataModule(LightningDataModule):
         super().__init__()
         self.cfg = cfg
         self.data_dir = Path(cfg.dir.data_dir)
-        self.processed_dir = project_root_path / cfg.dir.processed_dir
+        self.processed_dir = project_root_path / cfg.dir.output_dir / "prepare_data"
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
-        self.train_event_df = self.event_df.filter(pl.col("series_id").is_in(self.cfg.split.train_series_ids))
-        self.valid_event_df = self.event_df.filter(pl.col("series_id").is_in(self.cfg.split.valid_series_ids))
+        self.train_series_ids = self.cfg.split.train_series_ids
+        self.valid_series_ids = self.cfg.split.valid_series_ids
+        self.train_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.train_series_ids)
+        )
+        self.valid_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.valid_series_ids)
+        )
 
         self.train_features = None
         self.valid_chunk_features = None
@@ -317,27 +359,32 @@ class SegDataModule(LightningDataModule):
         if stage == "fit":
             self.train_features = load_features(
                 feature_names=self.cfg.features,
-                series_ids=self.cfg.split.train_series_ids,
+                series_ids=self.train_series_ids,
                 processed_dir=self.processed_dir,
                 phase="train",
+                scale_type=self.cfg.scale_type,
             )
         if stage in ("fit", "valid"):
             self.valid_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
-                series_ids=self.cfg.split.valid_series_ids,
+                series_ids=self.valid_series_ids,
                 processed_dir=self.processed_dir,
                 phase="train",
+                scale_type=self.cfg.scale_type,
             )
         if stage == "test":
-            feature_dir = Path(self.cfg.dir.processed_dir) / self.cfg.phase
-            series_ids = [x.name for x in feature_dir.glob("*")]
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
                 phase="test",
+                scale_type=self.cfg.scale_type,
             )
 
     def train_dataloader(self):
