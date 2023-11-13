@@ -31,7 +31,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
         # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
-        "../output_dataset/train/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
+        "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
         # "../config/omura/base.yaml",
     ]
 else:
@@ -119,6 +119,9 @@ def main(cfg: TrainConfig):
         data_module = SegDataModule(cfg)
 
         if cfg.phase == "train":
+            data_module.setup("train")
+            dataloader = data_module.train_dataloader()
+        elif cfg.phase == "valid":
             data_module.setup("valid")
             dataloader = data_module.val_dataloader()
         elif cfg.phase == "test":
@@ -196,6 +199,8 @@ if __name__ == "__main__":
                     overrides_dict[k] = v
             else:
                 k, v = p.split("=", maxsplit=1)
+                if k in overrides_dict.keys():
+                    print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
                 overrides_dict[k] = v
         overrides_dict["split"] = f"fold_{i_fold}"
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"

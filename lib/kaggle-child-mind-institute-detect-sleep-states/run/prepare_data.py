@@ -64,14 +64,13 @@ def main(cfg: DictConfig):
 
     with trace("Load series"):
         # scan parquet
-        if cfg.phase in ["train", "test"]:
+        if cfg.phase in ["train", "valid", "test"]:
+            if cfg.phase in ["train", "valid"]:
+                phase = "train"
+            else:
+                phase = "test"
             series_lf = pl.scan_parquet(
-                Path(cfg.dir.data_dir) / f"{cfg.phase}_series.parquet",
-                low_memory=True,
-            )
-        elif cfg.phase == "dev":
-            series_lf = pl.scan_parquet(
-                Path(cfg.dir.processed_dir) / f"{cfg.phase}_series.parquet",
+                Path(cfg.dir.data_dir) / f"{phase}_series.parquet",
                 low_memory=True,
             )
         else:

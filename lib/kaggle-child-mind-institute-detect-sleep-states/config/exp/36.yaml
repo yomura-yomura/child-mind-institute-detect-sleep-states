@@ -1,4 +1,4 @@
-- exp_name=exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma
+- exp_name=exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation
 
 - scale_type=robust_scaler
 
@@ -14,7 +14,7 @@
 
 - features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos]
 
-- early_stopping_patience=10
+- early_stopping_patience=20
 
 - val_check_interval=200
 - check_val_every_n_epoch=null

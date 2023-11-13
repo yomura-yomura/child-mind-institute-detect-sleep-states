@@ -70,18 +70,17 @@ def load_chunk_features(
             [np.load(series_dir / f"{feature_name}.npy") for feature_name in feature_names], axis=1
         )  # (duration, feature)
 
-        num_chunks = (len(this_feature) // duration) + 1
+        interest_duration = duration - prev_margin_steps - next_margin_steps
+
+        num_chunks = (len(this_feature) // interest_duration) + 1
         for i in range(num_chunks):
             key = f"{series_id}_{i:07}"
 
-            start = i * duration
-            end = (i + 1) * duration
+            start = i * interest_duration
+            end = (i + 1) * interest_duration
 
             mask = np.zeros(this_feature.shape[0], dtype=bool)
             mask[start:end] = True
-            features[f"{key}_mask"] = mask
-
-            n_inputs_to_model = duration + prev_margin_steps + next_margin_steps
 
             # extend crop area with margins
             start -= prev_margin_steps
@@ -92,9 +91,11 @@ def load_chunk_features(
             elif end > this_feature.shape[0] + duration:
                 start += end - this_feature.shape[0]
                 end = this_feature.shape[0] - 1
-            assert end - start == n_inputs_to_model, (start, end, n_inputs_to_model)
+            assert end - start == duration, (start, end, duration)
 
-            chunk_feature = pad_if_needed(this_feature[start:end], n_inputs_to_model, pad_value=0)
+            features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
+
+            chunk_feature = pad_if_needed(this_feature[start:end], duration, pad_value=0)
             features[key] = chunk_feature
 
     return features  # type: ignore
@@ -126,9 +127,9 @@ def get_label(
     for onset, wakeup in this_event_df[["onset", "wakeup"]].to_numpy():
         onset = int((onset - start) / duration * num_frames)
         wakeup = int((wakeup - start) / duration * num_frames)
-        if onset >= 0 and onset < num_frames:
+        if 0 <= onset < num_frames:
             label[onset, 1] = 1
-        if wakeup < num_frames and wakeup >= 0:
+        if num_frames > wakeup >= 0:
             label[wakeup, 2] = 1
 
         onset = max(0, onset)
@@ -226,24 +227,9 @@ class TrainDataset(Dataset):
         # crop
         start, end = random_crop(
             pos,
-            self.cfg.duration + self.cfg.prev_margin_steps + self.cfg.next_margin_steps,
+            self.cfg.duration,
             n_steps,
         )
-
-        # n_inputs_to_model = (
-        #     self.cfg.duration + self.cfg.prev_margin_steps + self.cfg.next_margin_steps
-        # )
-        #
-        # # extend crop area with margins
-        # start -= self.cfg.prev_margin_steps
-        # end += self.cfg.next_margin_steps
-        # if start < 0:
-        #     end -= start
-        #     start = 0
-        # elif end >= n_steps:
-        #     start += end - n_steps
-        #     end = n_steps - 1
-        # assert end - start == n_inputs_to_model
 
         feature = this_feature[start:end]  # (duration, num_features)
 
@@ -317,6 +303,7 @@ class ValidDataset(Dataset):
         return {
             "key": key,
             "feature": feature,  # (num_features, duration)
+            "mask": self.chunk_features[f"{key}_mask"],
             "label": torch.FloatTensor(label),  # (duration, num_classes)
         }
 
@@ -351,6 +338,7 @@ class TestDataset(Dataset):
         return {
             "key": key,
             "feature": feature,  # (num_features, duration)
+            "mask": self.chunk_features[f"{key}_mask"],
         }
 
 

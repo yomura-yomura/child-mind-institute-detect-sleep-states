@@ -61,8 +61,8 @@ def get_predicted_group_by_series_id(data_list: Iterable[NDArray[np.float_]]):
     ]
     series_ids = np.array(
         [
-            key
-            for key, preds in zip(first_series_ids, preds_list, strict=True)
+            series_id
+            for series_id, preds in zip(first_series_ids, preds_list, strict=True)
             for _ in range(preds.shape[1])
         ]
     )

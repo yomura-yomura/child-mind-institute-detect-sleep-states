@@ -148,7 +148,10 @@ if __name__ == "__main__":
     # weight = get_grid(step=0.02, target_sum=1)
 
     target_csv_path = (
-        pathlib.Path("grid_search") / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
+        pathlib.Path(__file__).parent
+        / "grid_search"
+        / "_".join(p.name for p in model_dir_paths)
+        / "grid_search.csv"
     )
 
     if target_csv_path.exists():
