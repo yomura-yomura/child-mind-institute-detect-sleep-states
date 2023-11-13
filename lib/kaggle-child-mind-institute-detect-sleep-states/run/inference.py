@@ -119,7 +119,7 @@ def main(cfg: TrainConfig):
         data_module = SegDataModule(cfg)
 
         if cfg.phase == "train":
-            data_module.setup("train")
+            data_module.setup("fit")
             dataloader = data_module.train_dataloader()
         elif cfg.phase == "valid":
             data_module.setup("valid")
@@ -139,7 +139,7 @@ def main(cfg: TrainConfig):
         cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
     )
     pred_dir_path.mkdir(parents=True, exist_ok=True)
-    if cfg.phase == "train":
+    if cfg.phase in ["train", "valid"]:
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
         np.savez(
             pred_dir_path / f"predicted-{cfg.split.name}.npz",

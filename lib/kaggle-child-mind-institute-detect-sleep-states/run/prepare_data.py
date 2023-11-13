@@ -66,11 +66,11 @@ def main(cfg: DictConfig):
         # scan parquet
         if cfg.phase in ["train", "valid", "test"]:
             if cfg.phase in ["train", "valid"]:
-                phase = "train"
+                dataset_type = "train"
             else:
-                phase = "test"
+                dataset_type = "test"
             series_lf = pl.scan_parquet(
-                Path(cfg.dir.data_dir) / f"{phase}_series.parquet",
+                Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
                 low_memory=True,
             )
         else:
