@@ -14,11 +14,13 @@ from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
+from child_mind_institute_detect_sleep_states.model.callbacks import (
+    ModelCheckpointWithSymlinkToBest,
+)
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["config/omura/v100/1d.yaml"]
+    args = ["config/exp/36.yaml", "--folds", "1,2,3,4"]
 else:
     args = None
 
@@ -70,12 +72,13 @@ def main(cfg: TrainConfig):
         callbacks=[
             ModelCheckpointWithSymlinkToBest(
                 dirpath=model_save_dir_path,
-                filename="{epoch}-{EventDetectionAP:.3f}",
+                filename="{epoch}-{step}-{EventDetectionAP:.3f}",
                 verbose=True,
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
                 save_top_k=2,
                 save_last=True,
+                every_n_train_steps=cfg.val_check_interval,
             ),
             EarlyStopping(
                 monitor=cfg.monitor,
@@ -96,6 +99,7 @@ def main(cfg: TrainConfig):
         log_every_n_steps=int(len(datamodule.train_dataloader()) * 0.1),
         sync_batchnorm=True,
         check_val_every_n_epoch=cfg.check_val_every_n_epoch,
+        val_check_interval=cfg.val_check_interval,
     )
 
     trainer.fit(model, datamodule=datamodule)

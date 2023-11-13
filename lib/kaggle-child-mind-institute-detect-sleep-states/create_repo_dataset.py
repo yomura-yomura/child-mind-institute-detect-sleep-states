@@ -3,9 +3,19 @@ import pathlib
 import subprocess
 import sys
 
-subprocess.run(["rm", "-rf", "child-mind-institute-detect-sleep-states"])
+# dir_to_upload = "child-mind-institute-detect-sleep-states"
+dir_to_upload = "temp-child-mind-institute-detect-sleep-states"
 
-subprocess.run(["git", "clone", "git@github.com:yomura-yomura/child-mind-institute-detect-sleep-states.git"])
+subprocess.run(["rm", "-rf", dir_to_upload])
+
+subprocess.run(
+    [
+        "git",
+        "clone",
+        "git@github.com:yomura-yomura/child-mind-institute-detect-sleep-states.git",
+        dir_to_upload,
+    ]
+)
 
 
 dataset_metadata_json = {
@@ -15,7 +25,7 @@ dataset_metadata_json = {
 }
 
 dataset_dir_path = (
-    pathlib.Path("child-mind-institute-detect-sleep-states") / "lib" / "kaggle-child-mind-institute-detect-sleep-states"
+    pathlib.Path(dir_to_upload) / "lib" / "kaggle-child-mind-institute-detect-sleep-states"
 )
 with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
     json.dump(dataset_metadata_json, f, indent=2)

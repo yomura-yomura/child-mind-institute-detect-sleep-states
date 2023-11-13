@@ -1,4 +1,4 @@
-from typing import TypeAlias, TypedDict
+from typing import TypeAlias, TypedDict, Sequence
 
 import numpy as np
 import numpy_utility as npu
@@ -26,7 +26,7 @@ PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
 
 
 def post_process_for_seg(
-    keys: NDArray[np.str_],
+    keys: Sequence[str],
     preds: NDArray[np.float_],
     downsample_rate: int,
     score_th: float = 0.01,

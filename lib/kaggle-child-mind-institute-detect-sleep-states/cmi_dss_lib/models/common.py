@@ -5,6 +5,7 @@ from cmi_dss_lib.models.decoder.lstmdecoder import LSTMDecoder
 from cmi_dss_lib.models.decoder.mlpdecoder import MLPDecoder
 from cmi_dss_lib.models.decoder.transformerdecoder import TransformerDecoder
 from cmi_dss_lib.models.decoder.unet1ddecoder import UNet1DDecoder
+from cmi_dss_lib.models.EncoderDecoder import EncoderDecoder
 from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
 from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
 from cmi_dss_lib.models.feature_extractor.lstm_cnn import LSTMandCNNFeatureExtractor
@@ -15,11 +16,18 @@ from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeature
 from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtractor
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
-from cmi_dss_lib.models.EncoderDecoder import EncoderDecoder
 
 from ..config import TrainConfig
 
-FEATURE_EXTRACTORS = Union[CNNSpectrogram, PANNsFeatureExtractor, LSTMFeatureExtractor, SpecFeatureExtractor,StackedGRUFeatureExtractor,StackedLSTMFeatureExtractor,LSTMandCNNFeatureExtractor]
+FEATURE_EXTRACTORS = Union[
+    CNNSpectrogram,
+    PANNsFeatureExtractor,
+    LSTMFeatureExtractor,
+    SpecFeatureExtractor,
+    StackedGRUFeatureExtractor,
+    StackedLSTMFeatureExtractor,
+    TimesNetFeatureExtractor,
+]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 

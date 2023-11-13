@@ -4,7 +4,7 @@ hydra:
     name: prepare_data
     chdir: false
   run:
-    dir: ${dir.output_dir}/${hydra.job.name}/${hydra.job.override_dirname}
+    dir: ${dir.output_dir}/prepare_data/${phase}/${scale_type}
   sweep:
     dir: ${dir.output_dir}/${hydra.job.name}/
     subdir: ${hydra.job.override_dirname}
@@ -14,3 +14,6 @@ defaults:
   - dir: local
 
 phase: train
+
+scale_type: constant
+#scale_type: robust_scaler

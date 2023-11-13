@@ -3,7 +3,6 @@ import os
 import pathlib
 
 import lightning as L
-import polars as pl
 import toml
 import wandb
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor

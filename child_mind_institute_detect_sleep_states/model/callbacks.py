@@ -1,3 +1,6 @@
+import os.path
+import warnings
+
 import lightning as L
 from lightning.pytorch.callbacks import ModelCheckpoint
 from torch import Tensor
@@ -28,7 +31,10 @@ class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
         # set the last model path before saving because it will be part of the state.
         previous, self.previous_best_model_path = getattr(self, "previous_best_model_path", ""), filepath
         if self._fs.protocol == "file" and self._last_checkpoint_saved and self.save_top_k != 0:
-            self._link_checkpoint(trainer, self.best_model_path, filepath)
+            if not os.path.join(self.best_model_path):
+                warnings.warn(f"'{self.best_model_path}' not found")
+            else:
+                self._link_checkpoint(trainer, self.best_model_path, filepath)
         else:
             self._save_checkpoint(trainer, filepath)
         if previous and self._should_remove_checkpoint(trainer, previous, filepath):

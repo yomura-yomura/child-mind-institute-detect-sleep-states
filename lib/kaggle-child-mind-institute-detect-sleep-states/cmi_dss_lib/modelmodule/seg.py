@@ -27,20 +27,22 @@ class SegModel(LightningModule):
         super().__init__()
         self.cfg = cfg
         self.val_event_df = val_event_df
-        num_time_steps = cmi_dss_lib.datamodule.seg.nearest_valid_size(
-            int(duration * cfg.upsample_rate), cfg.downsample_rate
+        self.num_time_steps = (
+            cmi_dss_lib.datamodule.seg.nearest_valid_size(
+                int(duration * cfg.upsample_rate), cfg.downsample_rate
+            )
+            // cfg.downsample_rate
         )
         self.model = cmi_dss_lib.models.common.get_model(
-            cfg,
-            feature_dim=feature_dim,
-            n_classes=num_classes,
-            num_time_steps=num_time_steps // cfg.downsample_rate,
+            cfg, feature_dim=feature_dim, n_classes=num_classes, num_time_steps=self.num_time_steps
         )
         self.duration = duration
         self.validation_step_outputs: list = []
         self.__best_loss = np.inf
 
-    def forward(self, batch: dict, *, do_mixup=False, do_cutmix=False) -> dict[str, Optional[torch.Tensor]]:
+    def forward(
+        self, batch: dict[str : torch.Tensor], *, do_mixup=False, do_cutmix=False
+    ) -> dict[str, Optional[torch.Tensor]]:
         return self.model(batch["feature"], batch["label"], do_mixup, do_cutmix)
 
     def training_step(self, batch):
@@ -60,9 +62,9 @@ class SegModel(LightningModule):
         )
         return loss
 
-    def validation_step(self, batch):
+    def validation_step(self, batch: dict[str : torch.Tensor]):
         output = self.forward(batch)
-        loss: torch.Tensor = output["loss"]
+        loss = output["loss"]
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
 
         resized_probs = resize(
@@ -75,6 +77,14 @@ class SegModel(LightningModule):
             size=[self.duration, logits.shape[2]],
             antialias=False,
         )
+
+        n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
+        mask = batch["mask"].detach().cpu()[::n_interval]
+        if not np.all(mask):
+            resized_masks = resize(mask, size=[self.duration, logits.shape[2]], antialias=False)
+            resized_probs = resized_probs[resized_masks]
+            resized_labels = resized_labels[resized_masks]
+
         self.validation_step_outputs.append(
             (
                 batch["key"],
@@ -110,8 +120,12 @@ class SegModel(LightningModule):
             score_th=self.cfg.post_process.score_th,
             distance=self.cfg.post_process.distance,
         )
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), val_pred_df.to_pandas())
-        self.log("EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(
+            self.val_event_df.to_pandas(), val_pred_df.to_pandas()
+        )
+        self.log(
+            "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
+        )
 
         # if loss < self.__best_loss:
         #     np.save("keys.npy", np.array(keys))

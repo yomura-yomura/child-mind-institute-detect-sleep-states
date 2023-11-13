@@ -25,14 +25,17 @@ def load_features(
     series_ids: Optional[list[str]],
     processed_dir: Path,
     phase: str,
+    scale_type: str,
 ) -> dict[str, np.ndarray]:
     features = {}
 
+    phase_dir_path = processed_dir / phase / scale_type
+
     if series_ids is None:
-        series_ids = [series_dir.name for series_dir in (processed_dir / phase).glob("*")]
+        series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
-        series_dir = processed_dir / phase / series_id
+        series_dir = phase_dir_path / series_id
         this_feature = []
         for feature_name in feature_names:
             this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
@@ -47,10 +50,13 @@ def load_chunk_features(
     series_ids: Optional[list[str]],
     processed_dir: Path,
     phase: str,
+    scale_type: str,
+    prev_margin_steps: int = 0,
+    next_margin_steps: int = 0,
 ) -> dict[str, np.ndarray]:
     features = {}
 
-    phase_dir_path = processed_dir / phase
+    phase_dir_path = processed_dir / phase / scale_type
     if not phase_dir_path.exists():
         raise FileNotFoundError(f"{phase_dir_path.resolve()}")
 
@@ -58,16 +64,39 @@ def load_chunk_features(
         series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
-        series_dir = processed_dir / phase / series_id
-        this_feature = []
-        for feature_name in feature_names:
-            this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
-        this_feature = np.stack(this_feature, axis=1)
-        num_chunks = (len(this_feature) // duration) + 1
+        series_dir = phase_dir_path / series_id
+
+        this_feature = np.stack(
+            [np.load(series_dir / f"{feature_name}.npy") for feature_name in feature_names], axis=1
+        )  # (duration, feature)
+
+        interest_duration = duration - prev_margin_steps - next_margin_steps
+
+        num_chunks = (len(this_feature) // interest_duration) + 1
         for i in range(num_chunks):
-            chunk_feature = this_feature[i * duration : (i + 1) * duration]
-            chunk_feature = pad_if_needed(chunk_feature, duration, pad_value=0)  # type: ignore
-            features[f"{series_id}_{i:07}"] = chunk_feature
+            key = f"{series_id}_{i:07}"
+
+            start = i * interest_duration
+            end = (i + 1) * interest_duration
+
+            mask = np.zeros(this_feature.shape[0], dtype=bool)
+            mask[start:end] = True
+
+            # extend crop area with margins
+            start -= prev_margin_steps
+            end += next_margin_steps
+            if start < 0:
+                end -= start
+                start = 0
+            elif end > this_feature.shape[0] + duration:
+                start += end - this_feature.shape[0]
+                end = this_feature.shape[0] - 1
+            assert end - start == duration, (start, end, duration)
+
+            features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
+
+            chunk_feature = pad_if_needed(this_feature[start:end], duration, pad_value=0)
+            features[key] = chunk_feature
 
     return features  # type: ignore
 
@@ -98,9 +127,9 @@ def get_label(
     for onset, wakeup in this_event_df[["onset", "wakeup"]].to_numpy():
         onset = int((onset - start) / duration * num_frames)
         wakeup = int((wakeup - start) / duration * num_frames)
-        if onset >= 0 and onset < num_frames:
+        if 0 <= onset < num_frames:
             label[onset, 1] = 1
-        if wakeup < num_frames and wakeup >= 0:
+        if num_frames > wakeup >= 0:
             label[wakeup, 2] = 1
 
         onset = max(0, onset)
@@ -182,23 +211,30 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         event = np.random.choice(["onset", "wakeup"], p=[0.5, 0.5])
-        pos = self.event_df.at[idx, event]
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
         # extract data matching series_id
         this_feature = self.features[series_id]  # (n_steps, num_features)
         n_steps = this_feature.shape[0]
 
-        # sample background
         if random.random() < self.cfg.bg_sampling_rate:
+            # sample background (potentially include labels in duration)
             pos = negative_sampling(this_event_df, n_steps)
+        else:
+            # always include labels in duration
+            pos = self.event_df.at[idx, event]
 
         # crop
-        start, end = random_crop(pos, self.cfg.duration, n_steps)
+        start, end = random_crop(
+            pos,
+            self.cfg.duration,
+            n_steps,
+        )
+
         feature = this_feature[start:end]  # (duration, num_features)
 
         # upsample
-        feature = torch.FloatTensor(feature.T).unsqueeze(0)  # (1, num_features, duration)
+        feature = torch.FloatTensor(feature.T).unsqueeze(0)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -228,7 +264,7 @@ class ValidDataset(Dataset):
     ):
         self.cfg = cfg
         self.chunk_features = chunk_features
-        self.keys = list(chunk_features.keys())
+        self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.event_df = (
             event_df.pivot(index=["series_id", "night"], columns="event", values="step")
             .drop_nulls()
@@ -267,6 +303,7 @@ class ValidDataset(Dataset):
         return {
             "key": key,
             "feature": feature,  # (num_features, duration)
+            "mask": self.chunk_features[f"{key}_mask"],
             "label": torch.FloatTensor(label),  # (duration, num_classes)
         }
 
@@ -279,7 +316,7 @@ class TestDataset(Dataset):
     ):
         self.cfg = cfg
         self.chunk_features = chunk_features
-        self.keys = list(chunk_features.keys())
+        self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
@@ -301,6 +338,7 @@ class TestDataset(Dataset):
         return {
             "key": key,
             "feature": feature,  # (num_features, duration)
+            "mask": self.chunk_features[f"{key}_mask"],
         }
 
 
@@ -312,13 +350,15 @@ class SegDataModule(LightningDataModule):
         super().__init__()
         self.cfg = cfg
         self.data_dir = Path(cfg.dir.data_dir)
-        self.processed_dir = project_root_path / cfg.dir.processed_dir
+        self.processed_dir = project_root_path / cfg.dir.output_dir / "prepare_data"
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
+        self.train_series_ids = self.cfg.split.train_series_ids
+        self.valid_series_ids = self.cfg.split.valid_series_ids
         self.train_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.cfg.split.train_series_ids)
+            pl.col("series_id").is_in(self.train_series_ids)
         )
         self.valid_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.cfg.split.valid_series_ids)
+            pl.col("series_id").is_in(self.valid_series_ids)
         )
 
         self.train_features = None
@@ -329,27 +369,36 @@ class SegDataModule(LightningDataModule):
         if stage == "fit":
             self.train_features = load_features(
                 feature_names=self.cfg.features,
-                series_ids=self.cfg.split.train_series_ids,
+                series_ids=self.train_series_ids,
                 processed_dir=self.processed_dir,
                 phase="train",
+                scale_type=self.cfg.scale_type,
             )
         if stage in ("fit", "valid"):
             self.valid_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
-                series_ids=self.cfg.split.valid_series_ids,
+                series_ids=self.valid_series_ids,
                 processed_dir=self.processed_dir,
                 phase="train",
+                scale_type=self.cfg.scale_type,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
             )
         if stage == "test":
-            feature_dir = Path(self.cfg.dir.processed_dir) / self.cfg.phase
-            series_ids = [x.name for x in feature_dir.glob("*")]
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
                 phase="test",
+                scale_type=self.cfg.scale_type,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
             )
 
     def train_dataloader(self):

@@ -28,11 +28,16 @@ class TrainConfig:
 
     seed: int
     exp_name: str
+
     phase: Literal["train", "test"]
+    scale_type: Literal["constant", "robust_scaler"]
 
     # weight
 
     duration: int
+    prev_margin_steps: int
+    next_margin_steps: int
+
     downsample_rate: int
     upsample_rate: int
 
@@ -46,7 +51,9 @@ class TrainConfig:
     accumulate_grad_batches: int
     monitor: Literal["EventDetectionAP"]
     monitor_mode: Literal["min", "max"]
-    check_val_every_n_epoch: int
+
+    check_val_every_n_epoch: int | None
+    val_check_interval: float | int | None
 
     offset: int
     sigma: int

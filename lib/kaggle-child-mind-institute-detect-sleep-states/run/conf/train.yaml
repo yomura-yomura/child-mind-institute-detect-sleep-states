@@ -21,9 +21,14 @@ model_dim: 2
 
 seed: 42
 exp_name: dummy
+
 phase: train
+scale_type: constant
 
 duration: 5760 # duration * 5 = 秒数
+prev_margin_steps: 0
+next_margin_steps: 0
+
 downsample_rate: 2
 upsample_rate: 1
 
@@ -43,7 +48,9 @@ accumulate_grad_batches: 1
 #monitor_mode: min
 monitor: EventDetectionAP
 monitor_mode: max
+
 check_val_every_n_epoch: 1
+val_check_interval: 1
 
 # Dataset
 offset: 10  # how long gaussian sigma spreads at most on half side

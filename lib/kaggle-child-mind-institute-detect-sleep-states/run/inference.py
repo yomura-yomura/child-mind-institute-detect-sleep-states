@@ -29,7 +29,9 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
-        "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
+        # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
+        # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
+        "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
         # "../config/omura/base.yaml",
     ]
 else:
@@ -80,7 +82,11 @@ def inference(
                     size=[duration, pred.shape[2]],
                     antialias=False,
                 )
-            key = batch["key"]
+
+            if "key" in batch.keys():
+                key = batch["key"]
+            else:
+                key = batch["series_id"]
             preds.append(pred.detach().cpu().numpy())
             keys.extend(key)
 
@@ -117,6 +123,9 @@ def main(cfg: TrainConfig):
         data_module = SegDataModule(cfg)
 
         if cfg.phase == "train":
+            data_module.setup("fit")
+            dataloader = data_module.train_dataloader()
+        elif cfg.phase == "valid":
             data_module.setup("valid")
             dataloader = data_module.val_dataloader()
         elif cfg.phase == "test":
@@ -134,7 +143,7 @@ def main(cfg: TrainConfig):
         cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
     )
     pred_dir_path.mkdir(parents=True, exist_ok=True)
-    if cfg.phase == "train":
+    if cfg.phase in ["train", "valid"]:
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
         np.savez(
             pred_dir_path / f"predicted-{cfg.split.name}.npz",
@@ -173,7 +182,7 @@ def main(cfg: TrainConfig):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", type=pathlib.Path)
-    parser.add_argument("config_path", nargs="*")
+    parser.add_argument("config_path_or_hydra_arguments", nargs="*")
     args = parser.parse_args(args)
 
     for i_fold in range(5):
@@ -185,9 +194,15 @@ if __name__ == "__main__":
 
         for p in (
             fold_dir_path / ".hydra" / "overrides.yaml",
-            *args.config_path,
+            *args.config_path_or_hydra_arguments,
         ):
-            for k, v in (item.split("=") for item in OmegaConf.load(p)):
+            if os.path.exists(p):
+                for k, v in (item.split("=", maxsplit=1) for item in OmegaConf.load(p)):
+                    if k in overrides_dict.keys():
+                        print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
+                    overrides_dict[k] = v
+            else:
+                k, v = p.split("=", maxsplit=1)
                 if k in overrides_dict.keys():
                     print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
                 overrides_dict[k] = v

@@ -44,9 +44,7 @@ class Plotter:
         series_idx = np.where(self.series_ids == series_id)[0]
         this_series_preds = self.preds[series_idx].reshape(-1, 3)
         this_series_labels = self.labels[series_idx].reshape(-1, 3)
-        this_series_df = self.df_submit[self.df_submit["series_id"] == series_id].reset_index(
-            drop=True
-        )
+        this_series_df = self.df_submit[self.df_submit["series_id"] == series_id].reset_index(drop=True)
         val_wakeup = this_series_df[this_series_df["event"] == "wakeup"]["step"].values
         val_onset = this_series_df[this_series_df["event"] == "onset"]["step"].values
         val_anglez = self.feat[self.feat["series_id"] == series_id]["anglez"].values
