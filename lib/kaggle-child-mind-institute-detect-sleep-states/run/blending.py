@@ -35,9 +35,7 @@ model_dir_paths = [
 ]
 
 
-def calc_score(
-    i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes
-):
+def calc_score(i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes):
     keys = keys_dict[i_fold]
     # unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
     unique_series_ids = np.unique(keys)
@@ -71,9 +69,7 @@ if __name__ == "__main__":
 
     predicted_dict = {
         i_fold: {
-            model_dir_path.name: np.load(
-                model_dir_path / predicted_npz_format.format(i_fold=i_fold)
-            )
+            model_dir_path.name: np.load(model_dir_path / predicted_npz_format.format(i_fold=i_fold))
             for model_dir_path in model_dir_paths
         }
         for i_fold in range(5)
@@ -90,9 +86,7 @@ if __name__ == "__main__":
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
-        ) = cmi_dss_lib.utils.common.get_predicted_group_by_series_id(
-            predicted_dict[i_fold].values()
-        )
+        ) = cmi_dss_lib.utils.common.get_predicted_group_by_series_id(predicted_dict[i_fold].values())
 
         # preds = [data["pred"].reshape(-1, 3) for data in predicted_dict[i_fold].values()]
 
@@ -130,9 +124,7 @@ if __name__ == "__main__":
         assert 0 <= target_sum
 
         target_sum *= round(1 / step)
-        base_weight = pd.DataFrame(
-            np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4"
-        )
+        base_weight = pd.DataFrame(np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4")
 
         weight = base_weight.copy()
         for i, _ in enumerate(tqdm.trange(len(model_dir_paths) - 1)):
@@ -148,20 +140,13 @@ if __name__ == "__main__":
     # weight = get_grid(step=0.02, target_sum=1)
 
     target_csv_path = (
-        pathlib.Path(__file__).parent
-        / "grid_search"
-        / "_".join(p.name for p in model_dir_paths)
-        / "grid_search.csv"
+        pathlib.Path(__file__).parent / "grid_search" / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
     )
 
     if target_csv_path.exists():
         df = pd.read_csv(target_csv_path)
-        df["scores"] = df["scores"].apply(
-            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
-        )
-        df["weights"] = df["weights"].apply(
-            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
-        )
+        df["scores"] = df["scores"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
+        df["weights"] = df["weights"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
 
         # if True:
         #     target_weight = df.iloc[df["CV"].argmax()]["weights"]
@@ -172,9 +157,7 @@ if __name__ == "__main__":
         #     weight = np.concatenate([weight, new_weight], axis=0)
 
         loaded_weight = np.array(df["weights"].tolist())
-        weight = np.array(
-            [w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))]
-        )
+        weight = np.array([w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))])
         print(f"-> {weight.shape = }")
 
         records = df.to_dict("records")

@@ -1,4 +1,4 @@
-from typing import TypeAlias, TypedDict, Sequence
+from typing import Sequence, TypeAlias, TypedDict
 
 import numpy as np
 import numpy_utility as npu

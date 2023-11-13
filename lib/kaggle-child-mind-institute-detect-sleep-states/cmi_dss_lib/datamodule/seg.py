@@ -116,9 +116,7 @@ def random_crop(pos: int, duration: int, max_end) -> tuple[int, int]:
 ###################
 # Label
 ###################
-def get_label(
-    this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int
-) -> np.ndarray:
+def get_label(this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int) -> np.ndarray:
     # # (start, end)の範囲と(onset, wakeup)の範囲が重なるものを取得
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
@@ -196,9 +194,7 @@ class TrainDataset(Dataset):
     ):
         self.cfg = cfg
         self.event_df: pd.DataFrame = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
-            .drop_nulls()
-            .to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
         )
         self.features = features
         self.num_features = len(cfg.features)
@@ -244,9 +240,7 @@ class TrainDataset(Dataset):
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(this_event_df, num_frames, self.cfg.duration, start, end)
-        label[:, [1, 2]] = gaussian_label(
-            label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma
-        )
+        label[:, [1, 2]] = gaussian_label(label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma)
 
         return {
             "series_id": series_id,
@@ -266,9 +260,7 @@ class ValidDataset(Dataset):
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.event_df = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
-            .drop_nulls()
-            .to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
         )
         self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
@@ -354,12 +346,8 @@ class SegDataModule(LightningDataModule):
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
         self.train_series_ids = self.cfg.split.train_series_ids
         self.valid_series_ids = self.cfg.split.valid_series_ids
-        self.train_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.train_series_ids)
-        )
-        self.valid_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.valid_series_ids)
-        )
+        self.train_event_df = self.event_df.filter(pl.col("series_id").is_in(self.train_series_ids))
+        self.valid_event_df = self.event_df.filter(pl.col("series_id").is_in(self.valid_series_ids))
 
         self.train_features = None
         self.valid_chunk_features = None
@@ -386,10 +374,7 @@ class SegDataModule(LightningDataModule):
                 next_margin_steps=self.cfg.next_margin_steps,
             )
         if stage == "test":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
+            series_ids = [x.name for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,

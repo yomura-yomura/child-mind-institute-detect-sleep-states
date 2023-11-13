@@ -14,9 +14,7 @@ from lightning import Trainer, seed_everything
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import (
-    ModelCheckpointWithSymlinkToBest,
-)
+from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -25,9 +23,7 @@ else:
     args = None
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
 LOGGER = logging.getLogger(Path(__file__).name)
 
 
@@ -52,9 +48,7 @@ def main(cfg: TrainConfig):
         duration=cfg.duration,
     )
 
-    model_save_dir_path = (
-        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
-    )
+    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
 
     trainer = Trainer(
         devices=1,

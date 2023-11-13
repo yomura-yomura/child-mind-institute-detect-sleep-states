@@ -28,9 +28,7 @@ class SegModel(LightningModule):
         self.cfg = cfg
         self.val_event_df = val_event_df
         self.num_time_steps = (
-            cmi_dss_lib.datamodule.seg.nearest_valid_size(
-                int(duration * cfg.upsample_rate), cfg.downsample_rate
-            )
+            cmi_dss_lib.datamodule.seg.nearest_valid_size(int(duration * cfg.upsample_rate), cfg.downsample_rate)
             // cfg.downsample_rate
         )
         self.model = cmi_dss_lib.models.common.get_model(
@@ -120,12 +118,8 @@ class SegModel(LightningModule):
             score_th=self.cfg.post_process.score_th,
             distance=self.cfg.post_process.distance,
         )
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(
-            self.val_event_df.to_pandas(), val_pred_df.to_pandas()
-        )
-        self.log(
-            "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
-        )
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), val_pred_df.to_pandas())
+        self.log("EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True)
 
         # if loss < self.__best_loss:
         #     np.save("keys.npy", np.array(keys))

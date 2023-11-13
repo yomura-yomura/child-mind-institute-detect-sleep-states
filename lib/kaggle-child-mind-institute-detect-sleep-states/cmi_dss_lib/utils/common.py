@@ -52,9 +52,7 @@ def get_predicted_group_by_series_id(data_list: Iterable[NDArray[np.float_]]):
     for series_id in other_series_ids:
         assert first_series_ids == series_id
 
-    min_durations = [
-        min(preds[series_id].shape[0] for preds in preds_list) for series_id in first_series_ids
-    ]
+    min_durations = [min(preds[series_id].shape[0] for preds in preds_list) for series_id in first_series_ids]
     preds_list = [
         np.stack([preds[series_id][:min_duration] for preds in preds_list], axis=0)
         for series_id, min_duration in zip(first_series_ids, min_durations)
