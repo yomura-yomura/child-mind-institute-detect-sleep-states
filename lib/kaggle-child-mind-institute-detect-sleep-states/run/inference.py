@@ -82,7 +82,11 @@ def inference(
                     size=[duration, pred.shape[2]],
                     antialias=False,
                 )
-            key = batch["key"]
+
+            if "key" in batch.keys():
+                key = batch["key"]
+            else:
+                key = batch["series_id"]
             preds.append(pred.detach().cpu().numpy())
             keys.extend(key)
 
