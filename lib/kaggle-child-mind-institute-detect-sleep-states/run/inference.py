@@ -105,7 +105,7 @@ def make_submission(
     score_th: float,
     distance: int,
     post_process_modes: PostProcessModes = None,
-) -> pl.DataFrame:
+) -> pd.DataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds,
@@ -181,7 +181,7 @@ def main(cfg: TrainConfig):
         event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
         event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
 
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df.to_pandas())
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
         print(f"{cfg.split.name}: {score:.4f}")
 
     sub_df.write_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv")

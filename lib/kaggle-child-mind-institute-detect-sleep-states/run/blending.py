@@ -64,7 +64,7 @@ def calc_score(
                 distance=96,
                 post_process_modes=post_process_modes,
                 print_msg=False,
-            ).to_pandas()
+            )
         )
     df_submit = pd.concat(df_submit_list)
 

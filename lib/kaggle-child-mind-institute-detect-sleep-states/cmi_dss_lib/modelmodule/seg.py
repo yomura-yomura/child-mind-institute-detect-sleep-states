@@ -151,7 +151,7 @@ class SegModel(LightningModule):
                     downsample_rate=self.cfg.downsample_rate,
                     score_th=self.cfg.post_process.score_th,
                     distance=self.cfg.post_process.distance,
-                ).to_pandas()
+                )
             )
         sub_df = pd.concat(sub_df_list)
 

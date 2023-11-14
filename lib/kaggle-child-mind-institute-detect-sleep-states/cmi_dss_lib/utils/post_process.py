@@ -2,6 +2,7 @@ from typing import Sequence, TypeAlias, TypedDict
 
 import numpy as np
 import numpy_utility as npu
+import pandas as pd
 import polars as pl
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
@@ -33,7 +34,7 @@ def post_process_for_seg(
     distance: int = 5000,
     post_process_modes: PostProcessModes = None,
     print_msg: bool = True,
-) -> pl.DataFrame:
+) -> pd.DataFrame:
     """make submission dataframe for segmentation task
 
     Args:
@@ -135,9 +136,9 @@ def post_process_for_seg(
             }
         )
 
-    sub_df = pl.DataFrame(records).sort(by=["series_id", "step"])
-    row_ids = pl.Series(name="row_id", values=np.arange(len(sub_df)))
-    sub_df = sub_df.with_columns(row_ids).select(["row_id", "series_id", "step", "event", "score"])
+    sub_df = pd.DataFrame(records).sort_values(by=["series_id", "step"])
+    sub_df["row_id"] = np.arange(len(sub_df))
+    sub_df = sub_df[["row_id", "series_id", "step", "event", "score"]]
     return sub_df
 
 
