@@ -55,6 +55,7 @@ class TrainConfig:
 
     check_val_every_n_epoch: int | None
     val_check_interval: float | int | None
+    val_after_steps: int
 
     offset: int
     sigma: int

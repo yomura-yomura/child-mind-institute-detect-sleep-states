@@ -72,6 +72,7 @@ def main(cfg: TrainConfig):
         max_steps=cfg.epoch * len(datamodule.train_dataloader()),
         gradient_clip_val=cfg.gradient_clip_val,
         accumulate_grad_batches=cfg.accumulate_grad_batches,
+        limit_val_batches=0.0 if cfg.val_after_steps > 0 else 1.0,
         callbacks=[
             ModelCheckpointWithSymlinkToBest(
                 dirpath=model_save_dir_path,
@@ -82,6 +83,7 @@ def main(cfg: TrainConfig):
                 save_top_k=2,
                 save_last=True,
                 every_n_train_steps=cfg.val_check_interval,
+                val_after_steps=cfg.val_after_steps,
             ),
             EarlyStopping(
                 monitor=cfg.monitor,

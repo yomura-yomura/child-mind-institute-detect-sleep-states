@@ -13,7 +13,8 @@ df = df.collect()
 
 
 split_type_dict = {
-    "0.8-nan": dict(lower_nan_fraction_to_exclude=0.8),
+    "base": dict(lower_nan_fraction_to_exclude=None, lower_repeat_rate_to_exclude=None),
+    "0.8-nan": dict(lower_nan_fraction_to_exclude=0.8, lower_repeat_rate_to_exclude=None),
     "0.8-nan_0.6-repeat-rate": dict(
         lower_nan_fraction_to_exclude=0.8, lower_repeat_rate_to_exclude=0.6
     ),

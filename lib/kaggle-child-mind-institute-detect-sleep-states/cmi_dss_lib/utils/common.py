@@ -1,6 +1,7 @@
 import math
 import os
 import pathlib
+import shutil
 import sys
 import time
 from contextlib import contextmanager
@@ -57,13 +58,15 @@ def save_predicted_npz_group_by_series_id(
 
     common_series_ids = None
     for predicted_npz_path in predicted_npz_paths:
-        target_path = predicted_npz_path.with_stem(
+        target_dir_path = predicted_npz_path.with_name(
             f"{predicted_npz_path.stem}-grouped-by-series_id"
         )
-        if not target_path.exists():
-            print(f"[Info] Create {target_path}")
-        elif recreate and target_path.exists():
-            print(f"[Info] Recreate {target_path}")
+        if not target_dir_path.exists():
+            print(f"[Info] Create {target_dir_path}")
+            target_dir_path.mkdir()
+        elif recreate and target_dir_path.exists():
+            print(f"[Info] Recreate {target_dir_path}")
+            shutil.rmtree(target_dir_path)
         else:
             continue
 
@@ -76,35 +79,11 @@ def save_predicted_npz_group_by_series_id(
         else:
             assert np.all(common_series_ids == series_ids)
 
-        np.savez(
-            target_path,
-            **{
-                series_id: preds[series_ids == series_id].reshape(-1, 3)[
-                    : min_duration_dict[series_id]
-                ]
-                for series_id in np.unique(series_ids)
-            },
-        )
-
-    # first_series_ids, *other_series_ids = (pred.keys() for pred in preds_list)
-    # for series_id in other_series_ids:
-    #     assert first_series_ids == series_id
-    #
-    # min_duration_dict = [
-    #     min(preds[series_id].shape[0] for preds in preds_list) for series_id in first_series_ids
-    # ]
-    # preds_list = [
-    #     np.stack([preds[series_id][:min_duration] for preds in preds_list], axis=0)
-    #     for series_id, min_duration in zip(first_series_ids, min_duration_dict)
-    # ]
-    # series_ids = np.array(
-    #     [
-    #         series_id
-    #         for series_id, preds in zip(first_series_ids, preds_list, strict=True)
-    #         for _ in range(preds.shape[1])
-    #     ]
-    # )
-    # return series_ids, np.concatenate(preds_list, axis=1)
+        for series_id in np.unique(series_ids):
+            np.save(
+                target_dir_path / f"{series_id}.npy",
+                preds[series_ids == series_id].reshape(-1, 3)[: min_duration_dict[series_id]],
+            )
 
 
 def load_predicted_npz_group_by_series_id(

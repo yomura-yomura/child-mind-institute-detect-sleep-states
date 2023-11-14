@@ -59,7 +59,7 @@ def calc_score(
                 preds=mean_preds,
                 # preds=corrected_preds[:, :, [1, 2]],
                 downsample_rate=2,
-                keys=[series_id],
+                keys=[series_id] * len(mean_preds),
                 score_th=0.005,
                 distance=96,
                 post_process_modes=post_process_modes,
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
-    # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, post_process_modes)
+    # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, None)
 
     def calc_all_scores(weights: list[int], post_process_modes=None):
         scores = []
