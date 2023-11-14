@@ -26,32 +26,47 @@ post_process_modes = {
 pred_dir_path = project_root_path / "run" / "predicted" / "train"
 
 model_dir_paths = [
-    project_root_path / "predicted" / "jumtras" / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
-    # project_root_path / "predicted" / "ranchantan" / "exp005-lstm-feature-2",
-    project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
-    # project_root_path / "run" / "predicted" / "train" / "exp016-1d-resnet34",
+    # project_root_path
+    # / "run"
+    # / "predicted"
+    # / "jumtras"
+    # / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    # project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
     pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
-    # pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
+    project_root_path
+    / "run"
+    / "predicted"
+    / "ranchantan"
+    / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+    pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
 ]
 
 
-def calc_score(i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes):
-    keys = keys_dict[i_fold]
+def calc_score(
+    i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes
+):
+    series_ids = keys_dict[i_fold]
     # unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
-    unique_series_ids = np.unique(keys)
+    unique_series_ids = np.unique(series_ids)
     event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)].dropna()
 
-    preds = np.average(preds_dict[i_fold], axis=0, weights=weights)
-    df_submit = cmi_dss_lib.utils.post_process.post_process_for_seg(
-        #
-        preds=preds,
-        # preds=corrected_preds[:, :, [1, 2]],
-        downsample_rate=2,
-        keys=keys,
-        score_th=0.005,
-        distance=96,
-        post_process_modes=post_process_modes,
-    ).to_pandas()
+    df_submit_list = []
+    for series_id, preds in zip(series_ids, preds_dict[i_fold], strict=True):
+        mean_preds = np.average(preds, axis=0, weights=weights)
+        df_submit_list.append(
+            cmi_dss_lib.utils.post_process.post_process_for_seg(
+                #
+                preds=mean_preds,
+                # preds=corrected_preds[:, :, [1, 2]],
+                downsample_rate=2,
+                keys=[series_id],
+                score_th=0.005,
+                distance=96,
+                post_process_modes=post_process_modes,
+                print_msg=False,
+            ).to_pandas()
+        )
+    df_submit = pd.concat(df_submit_list)
 
     return cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
@@ -67,13 +82,23 @@ if __name__ == "__main__":
     import numpy as np
     import pandas as pd
 
-    predicted_dict = {
-        i_fold: {
-            model_dir_path.name: np.load(model_dir_path / predicted_npz_format.format(i_fold=i_fold))
+    # predicted_dict = {
+    #     i_fold: {
+    #         model_dir_path.name: np.load(
+    #             model_dir_path / predicted_npz_format.format(i_fold=i_fold)
+    #         )
+    #         for model_dir_path in model_dir_paths
+    #     }
+    #     for i_fold in range(5)
+    # }
+
+    predicted_npz_paths = [
+        [
+            model_dir_path / predicted_npz_format.format(i_fold=i_fold)
             for model_dir_path in model_dir_paths
-        }
+        ]
         for i_fold in range(5)
-    }
+    ]  # (fold, model)
 
     import itertools
 
@@ -83,10 +108,15 @@ if __name__ == "__main__":
     keys_dict = {}
     preds_dict = {}
     for i_fold in tqdm.trange(5):
+        cmi_dss_lib.utils.common.save_predicted_npz_group_by_series_id(
+            predicted_npz_paths[i_fold], dataset_type="train"
+        )
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
-        ) = cmi_dss_lib.utils.common.get_predicted_group_by_series_id(predicted_dict[i_fold].values())
+        ) = cmi_dss_lib.utils.common.load_predicted_npz_group_by_series_id(
+            predicted_npz_paths[i_fold]
+        )
 
         # preds = [data["pred"].reshape(-1, 3) for data in predicted_dict[i_fold].values()]
 
@@ -100,6 +130,8 @@ if __name__ == "__main__":
         # )
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
+
+    # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, post_process_modes)
 
     def calc_all_scores(weights: list[int], post_process_modes=None):
         scores = []
@@ -124,7 +156,9 @@ if __name__ == "__main__":
         assert 0 <= target_sum
 
         target_sum *= round(1 / step)
-        base_weight = pd.DataFrame(np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4")
+        base_weight = pd.DataFrame(
+            np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4"
+        )
 
         weight = base_weight.copy()
         for i, _ in enumerate(tqdm.trange(len(model_dir_paths) - 1)):
@@ -140,13 +174,20 @@ if __name__ == "__main__":
     # weight = get_grid(step=0.02, target_sum=1)
 
     target_csv_path = (
-        pathlib.Path(__file__).parent / "grid_search" / "_".join(p.name for p in model_dir_paths) / "grid_search.csv"
+        pathlib.Path(__file__).parent
+        / "grid_search"
+        / "_".join(p.name for p in model_dir_paths)
+        / "grid_search.csv"
     )
 
     if target_csv_path.exists():
         df = pd.read_csv(target_csv_path)
-        df["scores"] = df["scores"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
-        df["weights"] = df["weights"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
+        df["scores"] = df["scores"].apply(
+            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+        )
+        df["weights"] = df["weights"].apply(
+            lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+        )
 
         # if True:
         #     target_weight = df.iloc[df["CV"].argmax()]["weights"]
@@ -157,7 +198,9 @@ if __name__ == "__main__":
         #     weight = np.concatenate([weight, new_weight], axis=0)
 
         loaded_weight = np.array(df["weights"].tolist())
-        weight = np.array([w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))])
+        weight = np.array(
+            [w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))]
+        )
         print(f"-> {weight.shape = }")
 
         records = df.to_dict("records")

@@ -16,6 +16,7 @@ defaults:
   - feature_extractor: LSTMFeatureExtractor
   - decoder: UNet1DDecoder
   - split: fold_0
+  - split_type: 08_nan
 
 model_dim: 2
 

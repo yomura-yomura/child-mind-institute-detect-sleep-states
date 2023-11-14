@@ -26,3 +26,8 @@ if __name__ == "__main__":
     rate_dict = get_repeat_rate()
     with open(project_root_path / "data" / "repeat_rate.json", "w") as f:
         json.dump(rate_dict, f)
+
+    import pandas as pd
+
+    df = pd.DataFrame.from_dict(rate_dict, orient="index", columns=["repeat_rate"])
+    print(f"""{(df["repeat_rate"] > 0.6).value_counts() = }""")

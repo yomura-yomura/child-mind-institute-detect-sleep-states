@@ -3,7 +3,7 @@ import polars as pl
 from .. import pj_struct_paths
 
 
-def get_train_df(sigma: int, train_dataset_type: str) -> pl.LazyFrame:
+def get_train_df(sigma: int, train_dataset_type: str | None) -> pl.LazyFrame:
     df = pl.scan_parquet(
         pj_struct_paths.get_data_dir_path() / "cmi-dss-train-datasets" / "base" / f"all-corrected-sigma{sigma}.parquet"
     )

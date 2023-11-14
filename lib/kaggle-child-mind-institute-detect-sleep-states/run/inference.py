@@ -26,13 +26,16 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+        "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
         # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
-        "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
-        # "../config/omura/base.yaml",
+        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
+        # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+        # "phase=dev",
+        "phase=valid",
+        "batch_size=32",
     ]
 else:
     args = None
@@ -131,6 +134,11 @@ def main(cfg: TrainConfig):
         elif cfg.phase == "test":
             data_module.setup("test")
             dataloader = data_module.test_dataloader()
+        elif cfg.phase == "dev":
+            data_module.setup("dev")
+            dataloader = data_module.test_dataloader()
+        else:
+            raise ValueError(f"unexpected {cfg.phase=}")
 
     with trace("load model"):
         model = load_model(cfg)
@@ -139,7 +147,9 @@ def main(cfg: TrainConfig):
     with trace("inference"):
         keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
-    pred_dir_path = pathlib.Path(cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1])
+    pred_dir_path = pathlib.Path(
+        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+    )
     pred_dir_path.mkdir(parents=True, exist_ok=True)
     if cfg.phase in ["train", "valid"]:
         labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
@@ -206,6 +216,5 @@ if __name__ == "__main__":
                 overrides_dict[k] = v
         overrides_dict["split"] = f"fold_{i_fold}"
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
-        # overrides_args.append(f"phase=test")
         sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
         main()

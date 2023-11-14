@@ -1,4 +1,5 @@
 import copy
+import json
 import warnings
 
 import lightning as L
@@ -193,22 +194,32 @@ class DataModule(L.LightningDataModule):
         self.train_dataset = None
         self.valid_dataset = None
 
-        self.target_series_ids = None
+        self.target_series_ids = {}
         if 0 < (config["train"]["lower_nan_fraction_to_exclude"] or -1) < 1:
             event_df = get_event_df("train")
             nan_fraction_df = event_df.groupby("series_id")["step"].apply(
                 lambda steps: steps.isna().sum()
             ) / event_df.groupby("series_id")["step"].apply(len)
-            self.target_series_ids = list(nan_fraction_df[nan_fraction_df < 0.8].index)
+            self.target_series_ids["nan"] = list(
+                nan_fraction_df[nan_fraction_df < config["train"]["lower_nan_fraction_to_exclude"]].index
+            )
+
+        if 0 < (config["train"]["lower_repeat_rate_to_exclude"] or -1) < 1:
+            with open(pj_struct_paths.get_data_dir_path() / "repeat_rate.json") as f:
+                repeat_rate_dict = json.load(f)
+            repeat_rate_df = pd.DataFrame.from_dict(repeat_rate_dict, orient="index")[0]
+            self.target_series_ids["repeat_rate"] = list(
+                repeat_rate_df[repeat_rate_df < config["train"]["lower_repeat_rate_to_exclude"]].index
+            )
 
     def setup(self, stage: str) -> None:
         if stage == "fit":
             train_df = self.df.filter(pl.col("index").is_in(np.where(self.fold_indices_npz_data["train"])[0])).drop(
                 "index"
             )
-            if self.target_series_ids is not None:
-                print(f"nan ids removed: {len(train_df):,} -> ", end="")
-                train_df = train_df.filter(pl.col("series_id").is_in(self.target_series_ids))
+            for name, target_series_ids in self.target_series_ids.items():
+                print(f"{name} ids removed: {len(train_df):,} -> ", end="")
+                train_df = train_df.filter(pl.col("series_id").is_in(target_series_ids))
                 print(f"{len(train_df):,}")
             # train_df = train_df.filter(
             #     pl.col("series_id").is_in(train_df.select(pl.col("series_id").unique().head(3)).collect()["series_id"])
