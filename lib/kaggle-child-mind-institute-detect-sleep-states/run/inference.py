@@ -7,7 +7,6 @@ import cmi_dss_lib.utils.metrics
 import hydra
 import numpy as np
 import pandas as pd
-import polars as pl
 import torch
 import torch.nn as nn
 from cmi_dss_lib.config import TrainConfig
@@ -184,7 +183,7 @@ def main(cfg: TrainConfig):
         score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
         print(f"{cfg.split.name}: {score:.4f}")
 
-    sub_df.write_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv")
+    sub_df.to_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv", index=False)
 
 
 if __name__ == "__main__":
