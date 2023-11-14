@@ -21,7 +21,7 @@ from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "config/exp/39.yaml",
+        "config/exp/41.yaml",
         # "--folds", "1,2,3,4"
     ]
 else:

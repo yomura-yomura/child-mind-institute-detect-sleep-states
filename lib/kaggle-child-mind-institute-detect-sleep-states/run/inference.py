@@ -175,7 +175,7 @@ def main(cfg: TrainConfig):
             distance=cfg.post_process.distance,
         )
 
-    if cfg.phase == "train":
+    if cfg.phase in ["train", "valid"]:
         unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
 
         event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
