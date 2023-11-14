@@ -74,19 +74,18 @@ def save_predicted_npz_group_by_series_id(
 
         data = np.load(predicted_npz_path)
         preds = data["pred"]
-        unique_series_ids = np.unique([key.split("_")[0] for key in data["key"]])
+        series_ids = np.array([key.split("_")[0] for key in data["key"]])
+        unique_series_ids = np.unique(series_ids)
 
         if common_unique_series_ids is None:
             common_unique_series_ids = unique_series_ids
         else:
             assert np.all(common_unique_series_ids == unique_series_ids)
 
-        for series_id in unique_series_ids:
+        for series_id in common_unique_series_ids:
             np.save(
                 target_dir_path / f"{series_id}.npy",
-                preds[unique_series_ids == series_id].reshape(-1, 3)[
-                    : min_duration_dict[series_id]
-                ],
+                preds[series_ids == series_id].reshape(-1, 3)[: min_duration_dict[series_id]],
             )
     return common_unique_series_ids
 

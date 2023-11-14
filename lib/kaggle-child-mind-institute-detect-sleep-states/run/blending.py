@@ -32,12 +32,12 @@ model_dir_paths = [
     / "jumtras"
     / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     # project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
-    # pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
-    project_root_path
-    / "run"
-    / "predicted"
-    / "ranchantan"
-    / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+    pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    # project_root_path
+    # / "run"
+    # / "predicted"
+    # / "ranchantan"
+    # / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
     pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
 ]
 
@@ -74,6 +74,23 @@ def calc_score(
 
 
 # scores = calc_all_scores(weights=[1, 1])
+
+
+def print_():
+    df = pd.DataFrame(records)
+    target_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(target_csv_path, index=False)
+
+    record_at_max = df.iloc[df["CV"].argmax()]
+    print(
+        """
+max:
+CV = {CV:.4f}
+weights = {weights}
+""".format(
+            **record_at_max.to_dict()
+        )
+    )
 
 
 if __name__ == "__main__":
@@ -214,7 +231,7 @@ if __name__ == "__main__":
                 t.update(1)
                 records.append({"CV": np.mean(scores), "scores": scores, "weights": weights})
 
-                if len(records) % n_steps_to_save == 0 or t.n == t.total:
+                if len(records) % n_steps_to_save == 0:
                     df = pd.DataFrame(records)
                     target_csv_path.parent.mkdir(parents=True, exist_ok=True)
                     df.to_csv(target_csv_path, index=False)
@@ -230,7 +247,22 @@ max:
                         )
                     )
 
-            score = calc_all_scores(record_at_max["weights"], post_process_modes)
+    df = pd.DataFrame(records)
+    target_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(target_csv_path, index=False)
+
+    record_at_max = df.iloc[df["CV"].argmax()]
+    print(
+        """
+max:
+CV = {CV:.4f}
+weights = {weights}
+""".format(
+            **record_at_max.to_dict()
+        )
+    )
+
+    score = calc_all_scores(record_at_max["weights"], post_process_modes)
 
 
 # scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]

@@ -69,7 +69,7 @@ class SegModel(LightningModule):
             self.trainer.limit_val_batches = 1.0
             print(f"enabled validation")
 
-    def validation_step(self, batch: dict[str : torch.Tensor]):
+    def _evaluation_step(self, batch: dict[str : torch.Tensor], step_outputs: list) -> float:
         output = self.forward(batch)
         loss = output["loss"]
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
@@ -98,7 +98,7 @@ class SegModel(LightningModule):
         )
 
         if torch.all(masks):
-            self.validation_step_outputs.append((series_ids, resized_labels, resized_probs))
+            step_outputs.append((series_ids, resized_labels, resized_probs))
         else:
             resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
             resized_masks = resized_masks.squeeze(2)
@@ -109,11 +109,15 @@ class SegModel(LightningModule):
                 if not torch.all(resized_mask):
                     resized_label = resized_label[resized_mask].reshape(-1, 3)
                     resized_prob = resized_prob[resized_mask].reshape(-1, 3)
-                self.validation_step_outputs.append(([series_id], [resized_label], [resized_prob]))
+                step_outputs.append(([series_id], [resized_label], [resized_prob]))
+        return loss.detach().item()
+
+    def validation_step(self, batch: dict[str : torch.Tensor]):
+        loss = self._evaluation_step(batch, self.validation_step_outputs)
 
         self.log(
             f"valid_loss",
-            loss.detach().item(),
+            loss,
             on_step=False,
             on_epoch=True,
             logger=True,
@@ -172,6 +176,9 @@ class SegModel(LightningModule):
         #     torch.save(self.model.state_dict(), "best_model.pth")
         #     print(f"Saved best model {self.__best_loss} -> {loss}")
         #     self.__best_loss = loss
+
+    def predict_step(self, batch: dict[str : torch.Tensor]):
+        pass
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.cfg.optimizer.lr)
