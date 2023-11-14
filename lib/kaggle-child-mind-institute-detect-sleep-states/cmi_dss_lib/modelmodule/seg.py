@@ -85,18 +85,8 @@ class SegModel(LightningModule):
             antialias=False,
         )
 
-        # n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
-        # mask = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
-
-        # mask = batch["mask"].detach().cpu().unsqueeze(2)
-        # # print(mask.shape)
-        # if not torch.all(mask):
-        #     # resized_masks = resize(mask, size=[self.duration, 1], antialias=False)
-        #     resized_masks = mask
-        #     # print(resized_masks.shape)
-        #     resized_masks = resized_masks.squeeze(2)
-        #     resized_probs = resized_probs[resized_masks].reshape(mask.shape[0], -1, 3)
-        #     resized_labels = resized_labels[resized_masks].reshape(mask.shape[0], -1, 3)
+        n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
+        masks = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
         resized_labels = resized_labels.numpy()
@@ -106,7 +96,21 @@ class SegModel(LightningModule):
             len(resized_labels),
             len(resized_probs),
         )
-        self.validation_step_outputs.append((series_ids, resized_labels, resized_probs))
+
+        if torch.all(masks):
+            self.validation_step_outputs.append((series_ids, resized_labels, resized_probs))
+        else:
+            resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
+            resized_masks = resized_masks.squeeze(2)
+
+            for series_id, resized_mask, resized_label, resized_prob in zip(
+                series_ids, resized_masks, resized_labels, resized_probs, strict=True
+            ):
+                if not torch.all(resized_mask):
+                    resized_label = resized_label[resized_mask].reshape(-1, 3)
+                    resized_prob = resized_prob[resized_mask].reshape(-1, 3)
+                self.validation_step_outputs.append(([series_id], [resized_label], [resized_prob]))
+
         self.log(
             f"valid_loss",
             loss.detach().item(),

@@ -58,7 +58,7 @@ def save_predicted_npz_group_by_series_id(
     )
     min_duration_dict = dict(count_by_series_id_df.iter_rows())
 
-    common_series_ids = None
+    common_unique_series_ids = None
     for predicted_npz_path in predicted_npz_paths:
         target_dir_path = predicted_npz_path.with_name(
             f"{predicted_npz_path.stem}-grouped-by-series_id"
@@ -74,27 +74,37 @@ def save_predicted_npz_group_by_series_id(
 
         data = np.load(predicted_npz_path)
         preds = data["pred"]
-        series_ids = np.array([key.split("_")[0] for key in data["key"]])
+        unique_series_ids = np.unique([key.split("_")[0] for key in data["key"]])
 
-        if common_series_ids is None:
-            common_series_ids = series_ids
+        if common_unique_series_ids is None:
+            common_unique_series_ids = unique_series_ids
         else:
-            assert np.all(common_series_ids == series_ids)
+            assert np.all(common_unique_series_ids == unique_series_ids)
 
-        for series_id in np.unique(series_ids):
+        for series_id in unique_series_ids:
             np.save(
                 target_dir_path / f"{series_id}.npy",
-                preds[series_ids == series_id].reshape(-1, 3)[: min_duration_dict[series_id]],
+                preds[unique_series_ids == series_id].reshape(-1, 3)[
+                    : min_duration_dict[series_id]
+                ],
             )
-    return common_series_ids
+    return common_unique_series_ids
 
 
 def load_predicted_npz_group_by_series_id(
     predicted_npz_paths: Sequence[pathlib.Path],
 ) -> tuple[tuple[str], list[NDArray[np.float_]]]:
-    data_list = [
-        np.load(predicted_npz_path.with_stem(f"{predicted_npz_path.stem}-grouped-by-series_id"))
+    series_id_grouped_npz_dir_paths = [
+        predicted_npz_path.with_name(f"{predicted_npz_path.stem}-grouped-by-series_id")
         for predicted_npz_path in predicted_npz_paths
+    ]
+
+    data_list = [
+        {
+            series_id_npz_path.stem: np.load(series_id_npz_path)
+            for series_id_npz_path in series_id_grouped_npz_dir_path.glob("*.npy")
+        }
+        for series_id_grouped_npz_dir_path in series_id_grouped_npz_dir_paths
     ]
     common_series_ids = tuple(data_list[0].keys())
 

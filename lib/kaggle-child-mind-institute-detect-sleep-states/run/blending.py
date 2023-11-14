@@ -26,13 +26,13 @@ post_process_modes = {
 pred_dir_path = project_root_path / "run" / "predicted" / "train"
 
 model_dir_paths = [
-    # project_root_path
-    # / "run"
-    # / "predicted"
-    # / "jumtras"
-    # / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    project_root_path
+    / "run"
+    / "predicted"
+    / "jumtras"
+    / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     # project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
-    pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    # pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
     project_root_path
     / "run"
     / "predicted"

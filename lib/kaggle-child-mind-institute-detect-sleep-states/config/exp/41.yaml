@@ -1,4 +1,5 @@
-- exp_name=exp041
+#- exp_name=exp041
+- exp_name=exp041_
 
 - split_type=base
 
@@ -20,4 +21,4 @@
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=3000
+#- val_after_steps=3000
