@@ -3,22 +3,19 @@ import os
 import pathlib
 import sys
 
-import cmi_dss_lib.utils.metrics
 import hydra
+import lightning as L
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
 from cmi_dss_lib.config import TrainConfig
-from cmi_dss_lib.datamodule.seg import SegDataModule, nearest_valid_size
-from cmi_dss_lib.models.common import get_model
+from cmi_dss_lib.datamodule.seg import SegDataModule
+from cmi_dss_lib.modelmodule.seg import SegModel
 from cmi_dss_lib.utils.common import trace
 from cmi_dss_lib.utils.post_process import PostProcessModes, post_process_for_seg
 from lightning import seed_everything
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
-from torchvision.transforms.functional import resize
-from tqdm import tqdm
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
@@ -40,13 +37,21 @@ else:
     args = None
 
 
-def load_model(cfg: TrainConfig) -> nn.Module:
-    num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
-    model = get_model(
+def load_model(cfg: TrainConfig) -> L.LightningModule:
+    # num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
+    # model = get_model(
+    #     cfg,
+    #     feature_dim=len(cfg.features),
+    #     n_classes=len(cfg.labels),
+    #     num_time_steps=num_time_steps // cfg.downsample_rate,
+    # )
+
+    module = SegModel(
         cfg,
+        val_event_df=None,
         feature_dim=len(cfg.features),
-        n_classes=len(cfg.labels),
-        num_time_steps=num_time_steps // cfg.downsample_rate,
+        num_classes=len(cfg.labels),
+        duration=cfg.duration,
     )
 
     # load weights
@@ -60,41 +65,64 @@ def load_model(cfg: TrainConfig) -> nn.Module:
         # / cfg.split.name
         / "best_model.pth"
     )
-    model.load_state_dict(torch.load(weight_path))
+    module.model.load_state_dict(torch.load(weight_path))
     print(f'load weight from "{weight_path}"')
 
-    return model
+    return module
 
 
 def inference(
-    duration: int, loader: DataLoader, model: nn.Module, device: torch.device, use_amp
-) -> tuple[list[str], np.ndarray]:
-    model = model.to(device)
-    model.eval()
+    loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path
+):
+    # ) -> tuple[list[str], np.ndarray]:
+    # model = model.to(device)
+    # model.eval()
 
-    preds = []
-    keys = []
-    for batch in tqdm(loader, desc="inference"):
-        with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=use_amp):
-                x = batch["feature"].to(device)
-                pred = model(x)["logits"].sigmoid()
-                pred = resize(
-                    pred.detach().cpu(),
-                    size=[duration, pred.shape[2]],
-                    antialias=False,
-                )
+    # preds = []
+    # keys = []
 
-            if "key" in batch.keys():
-                key = batch["key"]
-            else:
-                key = batch["series_id"]
-            preds.append(pred.detach().cpu().numpy())
-            keys.extend(key)
+    trainer = L.Trainer(
+        devices=1,
+        precision=16 if use_amp else 32,
+    )
+    predictions = trainer.predict(model, loader)
 
-    preds = np.concatenate(preds)
+    series_id_preds_dict = dict(
+        SegModel._evaluation_epoch_end([pred for preds in predictions for pred in preds])
+    )
 
-    return keys, preds  # type: ignore
+    for series_id, preds in series_id_preds_dict.items():
+        np.save(pred_dir_path / f"{series_id}.npy", preds)
+
+    # for batch in tqdm(loader, desc="inference"):
+    #     with torch.no_grad():
+    #         with torch.cuda.amp.autocast(enabled=use_amp):
+    #             x = batch["feature"].to(device)
+    #             pred = model(x)["logits"].sigmoid()
+    #             pred = resize(
+    #                 pred.detach().cpu(),
+    #                 size=[duration, pred.shape[2]],
+    #                 antialias=False,
+    #             )
+    #
+    #         if "key" in batch.keys():
+    #             key = batch["key"]
+    #         else:
+    #             key = batch["series_id"]
+    #         preds.append(pred.detach().cpu().numpy())
+    #         keys.extend(key)
+    # keys = np.array(
+    #     [
+    #         key
+    #         for keys_batch, _, preds_batch in predictions
+    #         for key in keys_batch
+    #         for _ in np.reshape(preds_batch, (-1, 3))
+    #     ]
+    # )
+    # preds = np.concatenate(
+    #     [preds for _, _, preds_batch in predictions for preds in preds_batch], axis=0
+    # )
+    # return keys, preds  # type: ignore
 
 
 def make_submission(
@@ -141,49 +169,56 @@ def main(cfg: TrainConfig):
 
     with trace("load model"):
         model = load_model(cfg)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    with trace("inference"):
-        keys, preds = inference(cfg.duration, dataloader, model, device, use_amp=cfg.use_amp)
 
     pred_dir_path = pathlib.Path(
-        cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+        cfg.dir.sub_dir,
+        "predicted",
+        *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
+        f"{cfg.split_type}_{cfg.split}",
     )
-    pred_dir_path.mkdir(parents=True, exist_ok=True)
-    if cfg.phase in ["train", "valid"]:
-        labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
-        np.savez(
-            pred_dir_path / f"predicted-{cfg.split.name}.npz",
-            key=keys,
-            pred=preds,
-            label=labels,
-        )
-    else:
-        np.savez(
-            pred_dir_path / f"predicted-{cfg.split.name}.npz",
-            key=keys,
-            pred=preds,
-        )
+    pred_dir_path.mkdir(exist_ok=True, parents=True)
+    with trace("inference"):
+        # keys, preds = inference(dataloader, model, use_amp=cfg.use_amp)
+        inference(dataloader, model, use_amp=cfg.use_amp, pred_dir_path=pred_dir_path)
 
-    with trace("make submission"):
-        sub_df = make_submission(
-            keys,
-            preds,
-            downsample_rate=cfg.downsample_rate,
-            score_th=cfg.post_process.score_th,
-            distance=cfg.post_process.distance,
-        )
-
-    if cfg.phase in ["train", "valid"]:
-        unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
-
-        event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
-        event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
-
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
-        print(f"{cfg.split.name}: {score:.4f}")
-
-    sub_df.to_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv", index=False)
+    # pred_dir_path = pathlib.Path(
+    #     cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
+    # )
+    # pred_dir_path.mkdir(parents=True, exist_ok=True)
+    # if cfg.phase in ["train", "valid"]:
+    #     labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
+    #     np.savez(
+    #         pred_dir_path / f"predicted-{cfg.split.name}.npz",
+    #         key=keys,
+    #         pred=preds,
+    #         label=labels,
+    #     )
+    # else:
+    #     np.savez(
+    #         pred_dir_path / f"predicted-{cfg.split.name}.npz",
+    #         key=keys,
+    #         pred=preds,
+    #     )
+    #
+    # with trace("make submission"):
+    #     sub_df = make_submission(
+    #         keys,
+    #         preds,
+    #         downsample_rate=cfg.downsample_rate,
+    #         score_th=cfg.post_process.score_th,
+    #         distance=cfg.post_process.distance,
+    #     )
+    #
+    # if cfg.phase in ["train", "valid"]:
+    #     unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
+    #
+    #     event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
+    #     event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
+    #
+    #     score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
+    #     print(f"{cfg.split.name}: {score:.4f}")
+    #
+    # sub_df.to_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv", index=False)
 
 
 if __name__ == "__main__":
