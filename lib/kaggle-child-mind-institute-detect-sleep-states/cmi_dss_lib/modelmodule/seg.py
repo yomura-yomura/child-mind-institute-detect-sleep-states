@@ -87,15 +87,16 @@ class SegModel(LightningModule):
 
         # n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
         # mask = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
-        mask = batch["mask"].detach().cpu().unsqueeze(2)
-        # print(mask.shape)
-        if not torch.all(mask):
-            # resized_masks = resize(mask, size=[self.duration, 1], antialias=False)
-            resized_masks = mask
-            # print(resized_masks.shape)
-            resized_masks = resized_masks.squeeze(2)
-            resized_probs = resized_probs[resized_masks].reshape(mask.shape[0], -1, 3)
-            resized_labels = resized_labels[resized_masks].reshape(mask.shape[0], -1, 3)
+
+        # mask = batch["mask"].detach().cpu().unsqueeze(2)
+        # # print(mask.shape)
+        # if not torch.all(mask):
+        #     # resized_masks = resize(mask, size=[self.duration, 1], antialias=False)
+        #     resized_masks = mask
+        #     # print(resized_masks.shape)
+        #     resized_masks = resized_masks.squeeze(2)
+        #     resized_probs = resized_probs[resized_masks].reshape(mask.shape[0], -1, 3)
+        #     resized_labels = resized_labels[resized_masks].reshape(mask.shape[0], -1, 3)
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
         resized_labels = resized_labels.numpy()

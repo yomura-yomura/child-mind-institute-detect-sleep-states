@@ -36,7 +36,7 @@ import collections
 
 # should be moved to proper place
 import itertools
-from typing import Sequence
+from typing import Literal, Sequence
 
 from numpy.typing import NDArray
 
@@ -44,7 +44,9 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 
 
 def save_predicted_npz_group_by_series_id(
-    predicted_npz_paths: Sequence[pathlib.Path], dataset_type: str, recreate: bool = False
+    predicted_npz_paths: Sequence[pathlib.Path],
+    dataset_type: Literal["train", "test"],
+    recreate: bool = False,
 ) -> NDArray[np.str_]:
     count_by_series_id_df = (
         child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
@@ -84,7 +86,7 @@ def save_predicted_npz_group_by_series_id(
                 target_dir_path / f"{series_id}.npy",
                 preds[series_ids == series_id].reshape(-1, 3)[: min_duration_dict[series_id]],
             )
-        return common_series_ids
+    return common_series_ids
 
 
 def load_predicted_npz_group_by_series_id(
