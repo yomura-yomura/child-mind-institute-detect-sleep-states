@@ -238,7 +238,11 @@ class TrainDataset(Dataset):
         )
         self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
         if self.use_psuedo_label:
-            self.psuedo_id,self.psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
+            self.id_to_psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
+            self.id_to_label_interval = {}
+            for s_id,df in self.event_df.groupby("series_id"):
+                self.id_to_label_interval[s_id] =get_labeling_interval(this_event_df =df.reset_index(drop = True),max_steps = self.id_to_psuedo_label[s_id].shape[0])//self.cfg.downsample_rate
+
 
     def __len__(self):
         return len(self.event_df)
@@ -285,8 +289,7 @@ class TrainDataset(Dataset):
 
         # Psuedo Labeling
         if self.use_psuedo_label:
-            label_interval = get_labeling_interval(this_event_df,max_steps=n_steps)//self.cfg.downsample_rate
-            label = self.psuedo_labeling(label = label,label_interval = label_interval,start = start,end = end,num_frames = num_frames,series_id = series_id,th_sleep=self.cfg.psuedo_label.th_sleep,th_prop = self.cfg.psuedo_label.th_prop)
+            label = self.psuedo_labeling(label = label,start = start,end = end,num_frames = num_frames,series_id = series_id,th_sleep=self.cfg.psuedo_label.th_sleep,th_prop = self.cfg.psuedo_label.th_prop)
 
         return {
             "series_id": series_id,
@@ -294,10 +297,10 @@ class TrainDataset(Dataset):
             "label": torch.FloatTensor(label),  # (pred_length, num_classes)
         }
     
-    def psuedo_labeling(self,label,label_interval,start:int,end:int,num_frames:int,series_id:str,th_sleep:float = 0.8,th_prop:float = 0.5):
+    def psuedo_labeling(self,label,start:int,end:int,num_frames:int,series_id:str,th_sleep:float = 0.8,th_prop:float = 0.5):
         psuedo_idx = np.arange(start//self.cfg.downsample_rate,end//self.cfg.downsample_rate)
         is_psuedo = False
-        for wakeup,onset in label_interval:
+        for wakeup,onset in self.id_to_label_interval[series_id]:
             mask = (psuedo_idx >= wakeup) & (psuedo_idx <= onset)
             if np.any(mask):
                 is_psuedo = True
@@ -306,9 +309,17 @@ class TrainDataset(Dataset):
         if is_psuedo:
             psuedo_idx = np.arange(num_frames)[mask]
 
+            
             # Psuedo labelを呼び出し
-            psuedo_label = self.psuedo_label[self.psuedo_id==series_id].reshape(-1,3)
-            psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
+            psuedo_label = self.id_to_psuedo_label[series_id].reshape(-1,3)[start:end]
+
+            # down sampling with mean
+            #psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
+            psuedo_label = resize(
+                torch.from_numpy(psuedo_label).unsqueeze(0),
+                size=[num_frames, 3],
+                antialias=False,
+            ).squeeze(0).numpy()
             psuedo_label = psuedo_label[psuedo_idx]
 
             # crop wakeup and onset prop
