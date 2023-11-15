@@ -172,6 +172,7 @@ def main(cfg: TrainConfig):
         cfg.dir.sub_dir,
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
+        cfg.phase,
         f"{cfg.split_type.name}_{cfg.split.name}",
     )
     pred_dir_path.mkdir(exist_ok=True, parents=True)
