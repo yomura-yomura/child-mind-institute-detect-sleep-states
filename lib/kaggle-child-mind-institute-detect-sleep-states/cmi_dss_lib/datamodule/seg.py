@@ -9,6 +9,7 @@ import pandas as pd
 import polars as pl
 import torch
 import yaml
+from cmi_dss_lib.utils.load_predicted import load_predicted
 from lightning import LightningDataModule
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
@@ -40,7 +41,11 @@ def load_features(
         series_dir = phase_dir_path / series_id
         this_feature = []
         for feature_name in feature_names:
-            this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
+            this_feature.append(
+                np.load(series_dir / f"{feature_name}.npy")
+                if (series_dir / f"{feature_name}.npy").exists()
+                else np.load(series_dir / f"{feature_name}.npz")["arr_0"]
+            )
         features[series_dir.name] = np.stack(this_feature, axis=1)
 
     return features
@@ -69,7 +74,13 @@ def load_chunk_features(
         series_dir = phase_dir_path / series_id
 
         this_feature = np.stack(
-            [np.load(series_dir / f"{feature_name}.npy") for feature_name in feature_names], axis=1
+            [
+                np.load(series_dir / f"{feature_name}.npy")
+                if (series_dir / f"{feature_name}.npy").exists()
+                else np.load(series_dir / f"{feature_name}.npz")["arr_0"]
+                for feature_name in feature_names
+            ],
+            axis=1,
         )  # (duration, feature)
 
         interest_duration = duration - prev_margin_steps - next_margin_steps
@@ -125,6 +136,7 @@ def get_label(
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
     label = np.zeros((num_frames, 3))
+        
     # onset, wakeup, sleepのラベルを作成
     for onset, wakeup in this_event_df[["onset", "wakeup"]].to_numpy():
         onset = int((onset - start) / duration * num_frames)
@@ -174,6 +186,22 @@ def negative_sampling(this_event_df: pd.DataFrame, num_steps: int) -> int:
 
 
 ###################
+# Psuedo label
+###################
+
+def get_labeling_interval(this_event_df:pd.DataFrame,max_steps:int,th_nan_label:int = 24*60*12,buffer:int = 8*60*12):
+    
+    this_event_df["shift_onset"] = this_event_df["onset"].shift(-1).fillna(max_steps)
+    psuedo_interval = this_event_df[this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label][["wakeup","shift_onset"]].values
+    first_onset = this_event_df.head(1)["onset"].values[0]
+    if first_onset >= th_nan_label:
+        psuedo_interval = np.concatenate([np.array([[-buffer,first_onset+buffer]]),psuedo_interval])
+    psuedo_interval[:,0] +=  buffer
+    psuedo_interval[:,1] -=  buffer
+    return psuedo_interval
+
+
+###################
 # Dataset
 ###################
 def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
@@ -187,6 +215,7 @@ def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
     assert (input_size // downsample_rate) % 32 == 0
 
     return input_size
+
 
 
 class TrainDataset(Dataset):
@@ -207,6 +236,8 @@ class TrainDataset(Dataset):
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
+        self.psuedo_id,self.psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
+        self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
 
     def __len__(self):
         return len(self.event_df)
@@ -233,6 +264,9 @@ class TrainDataset(Dataset):
             n_steps,
         )
 
+
+
+
         feature = this_feature[start:end]  # (duration, num_features)
 
         # upsample
@@ -246,15 +280,45 @@ class TrainDataset(Dataset):
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(this_event_df, num_frames, self.cfg.duration, start, end)
-        label[:, [1, 2]] = gaussian_label(
-            label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma
-        )
+        label[:, [1, 2]] = gaussian_label(label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma)
+
+        # Psuedo Labeling
+        if self.use_psuedo_label:
+            label_interval = get_labeling_interval(this_event_df,max_steps=n_steps)//self.cfg.downsample_rate
+            label = self.psuedo_labeling(label = label,label_interval = label_interval,start = start,end = end,num_frames = num_frames,series_id = series_id,th_sleep=self.cfg.psuedo_label.th_sleep,th_prop = self.cfg.psuedo_label.th_prop)
 
         return {
             "series_id": series_id,
             "feature": feature,  # (num_features, upsampled_num_frames)
             "label": torch.FloatTensor(label),  # (pred_length, num_classes)
         }
+    
+    def psuedo_labeling(self,label,label_interval,start:int,end:int,num_frames:int,series_id:str,th_sleep:float = 0.8,th_prop:float = 0.5):
+        psuedo_idx = np.arange(start//self.cfg.downsample_rate,end//self.cfg.downsample_rate)
+        is_psuedo = False
+        for wakeup,onset in label_interval:
+            mask = (psuedo_idx >= wakeup) & (psuedo_idx <= onset)
+            if np.any(mask):
+                is_psuedo = True
+                break
+
+        if is_psuedo:
+            psuedo_idx = np.arange(num_frames)[mask]
+
+            # Psuedo labelを呼び出し
+            psuedo_label = self.psuedo_label[self.psuedo_id==series_id].reshape(-1,3)
+            psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
+            psuedo_label = psuedo_label[psuedo_idx]
+
+            # crop wakeup and onset prop
+            psuedo_label = np.where(psuedo_label <= th_prop,0,psuedo_label)
+
+            label[psuedo_idx]  = psuedo_label
+
+            # crop sleep prob
+            label[:,[0]] = np.where(label[:,[0]] >= th_sleep ,1 ,0)
+        
+        return label
 
 
 class ValidDataset(Dataset):
@@ -423,7 +487,7 @@ class SegDataModule(LightningDataModule):
                 feature_names=self.cfg.features,
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
-                phase="train",
+                phase="dev",
                 scale_type=self.cfg.scale_type,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
@@ -468,3 +532,4 @@ class SegDataModule(LightningDataModule):
             pin_memory=True,
             drop_last=False,
         )
+

@@ -42,17 +42,24 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
     return series_df
 
 
-def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: Path):
+def save_each_series(
+    this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool
+):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
         x = this_series_df.get_column(col_name).to_numpy(zero_copy_only=True)
-        np.save(output_dir / f"{col_name}.npy", x)
+        if save_as_npz:
+            np.savez_compressed(output_dir / f"{col_name}.npz", x)
+        else:
+            np.save(output_dir / f"{col_name}.npy", x)
 
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: DictConfig):
-    processed_dir = Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    processed_dir = (
+        Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    )
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -62,8 +69,8 @@ def main(cfg: DictConfig):
 
     with trace("Load series"):
         # scan parquet
-        if cfg.phase in ["train", "valid", "test", "dev"]:
-            if cfg.phase in ["train", "valid", "dev"]:
+        if cfg.phase in ["train", "test", "dev"]:
+            if cfg.phase in ["train", "dev"]:
                 dataset_type = "train"
             else:
                 dataset_type = "test"
@@ -103,9 +110,9 @@ def main(cfg: DictConfig):
             feature_names_to_preprocess = ["anglez", "enmo"]
 
             for feature_name in feature_names_to_preprocess:
-                series_df[[feature_name]] = (series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]) / STD_DICT[
-                    feature_name
-                ]
+                series_df[[feature_name]] = (
+                    series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
+                ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
             feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff"]
 
@@ -134,9 +141,9 @@ def main(cfg: DictConfig):
             # 特徴量を追加
             this_series_df = add_feature(this_series_df, feature_names)
 
-            # 特徴量をそれぞれnpyで保存
+            # 特徴量をそれぞれnpy/npzで保存
             series_dir = processed_dir / series_id
-            save_each_series(this_series_df, feature_names, series_dir)
+            save_each_series(this_series_df, feature_names, series_dir, cfg.save_as_npz)
 
 
 if __name__ == "__main__":
