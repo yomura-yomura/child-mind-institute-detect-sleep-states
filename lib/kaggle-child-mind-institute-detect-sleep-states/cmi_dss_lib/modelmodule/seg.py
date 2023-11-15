@@ -68,6 +68,11 @@ class SegModel(LightningModule):
         )
         return loss
 
+    def on_fit_start(self) -> None:
+        if self.cfg.val_after_steps > 0:
+            print(f"validation will be enabled after {self.cfg.val_after_steps} steps")
+            self.trainer.limit_val_batches = 0.0
+
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         if self.global_step > self.cfg.val_after_steps and self.trainer.limit_val_batches == 0:
             self.trainer.limit_val_batches = 1.0
