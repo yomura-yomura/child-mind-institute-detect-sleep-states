@@ -4,9 +4,11 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import omegaconf
 import pandas as pd
 import polars as pl
 import torch
+import yaml
 from lightning import LightningDataModule
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
@@ -352,8 +354,18 @@ class SegDataModule(LightningDataModule):
         self.data_dir = Path(cfg.dir.data_dir)
         self.processed_dir = project_root_path / cfg.dir.output_dir / "prepare_data"
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
-        self.train_series_ids = self.cfg.split.train_series_ids
-        self.valid_series_ids = self.cfg.split.valid_series_ids
+
+        with open(
+            project_root_path
+            / "run"
+            / "conf"
+            / "split"
+            / self.cfg.split_type.name
+            / f"{self.cfg.split.name}.yaml"
+        ) as f:
+            series_ids_dict = omegaconf.OmegaConf.load(f)
+        self.train_series_ids = series_ids_dict["train_series_ids"]
+        self.valid_series_ids = series_ids_dict["valid_series_ids"]
         self.train_event_df = self.event_df.filter(
             pl.col("series_id").is_in(self.train_series_ids)
         )
@@ -380,7 +392,7 @@ class SegDataModule(LightningDataModule):
                 feature_names=self.cfg.features,
                 series_ids=self.valid_series_ids,
                 processed_dir=self.processed_dir,
-                phase="train",
+                phase=self.cfg.phase,
                 scale_type=self.cfg.scale_type,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
@@ -396,6 +408,22 @@ class SegDataModule(LightningDataModule):
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
                 phase="test",
+                scale_type=self.cfg.scale_type,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
+            )
+
+        if stage == "dev":
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
+            self.test_chunk_features = load_chunk_features(
+                duration=self.cfg.duration,
+                feature_names=self.cfg.features,
+                series_ids=series_ids,
+                processed_dir=self.processed_dir,
+                phase="train",
                 scale_type=self.cfg.scale_type,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,

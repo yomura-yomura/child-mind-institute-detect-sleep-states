@@ -2,7 +2,8 @@ import os.path
 import warnings
 
 import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks.model_checkpoint import *
+from lightning.pytorch.callbacks.model_checkpoint import _PATH
 from torch import Tensor
 
 __all__ = ["ModelCheckpointWithSymlinkToBest"]
@@ -11,10 +12,48 @@ __all__ = ["ModelCheckpointWithSymlinkToBest"]
 class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
     CHECKPOINT_NAME_BEST = "best"
 
+    def __init__(
+        self,
+        dirpath: Optional[_PATH] = None,
+        filename: Optional[str] = None,
+        monitor: Optional[str] = None,
+        verbose: bool = False,
+        save_last: Optional[bool] = None,
+        save_top_k: int = 1,
+        save_weights_only: bool = False,
+        mode: str = "min",
+        auto_insert_metric_name: bool = True,
+        every_n_train_steps: Optional[int] = None,
+        train_time_interval: Optional[timedelta] = None,
+        every_n_epochs: Optional[int] = None,
+        save_on_train_epoch_end: Optional[bool] = None,
+        enable_version_counter: bool = True,
+        val_after_steps: int = 0,
+    ):
+        self.val_after_steps = val_after_steps
+        super().__init__(
+            dirpath=dirpath,
+            filename=filename,
+            monitor=monitor,
+            verbose=verbose,
+            save_last=save_last,
+            save_top_k=save_top_k,
+            save_weights_only=save_weights_only,
+            mode=mode,
+            auto_insert_metric_name=auto_insert_metric_name,
+            every_n_train_steps=every_n_train_steps,
+            train_time_interval=train_time_interval,
+            every_n_epochs=every_n_epochs,
+            save_on_train_epoch_end=save_on_train_epoch_end,
+            enable_version_counter=enable_version_counter,
+        )
+
     def _save_last_checkpoint(self, trainer: L.Trainer, monitor_candidates: dict[str, Tensor]) -> None:
         """
         save last+best checkpoint
         """
+        if trainer.global_step <= self.val_after_steps:
+            return
 
         # save last
         super()._save_last_checkpoint(trainer, monitor_candidates)

@@ -60,7 +60,7 @@ def get_submit_df(all_data, modes: PostProcessModes = None):
         score_th=0.005,
         distance=96,
         post_process_modes=modes,
-    ).to_pandas()
+    )
 
 
 def get_pred_data(i_fold):

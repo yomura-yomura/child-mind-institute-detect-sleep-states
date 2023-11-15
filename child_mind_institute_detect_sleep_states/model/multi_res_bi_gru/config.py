@@ -58,6 +58,7 @@ class TrainConfig(TypedDict, total=False):
     learning_rate: Required[int]
 
     lower_nan_fraction_to_exclude: float
+    lower_repeat_rate_to_exclude: float
 
     fold_type: Required[TrainFoldType]
     n_folds: Required[int]

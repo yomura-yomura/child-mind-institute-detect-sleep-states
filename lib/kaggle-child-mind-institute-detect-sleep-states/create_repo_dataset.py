@@ -24,9 +24,7 @@ dataset_metadata_json = {
     "licenses": [{"name": "CC0-1.0"}],
 }
 
-dataset_dir_path = (
-    pathlib.Path(dir_to_upload) / "lib" / "kaggle-child-mind-institute-detect-sleep-states"
-)
+dataset_dir_path = pathlib.Path(dir_to_upload) / "lib" / "kaggle-child-mind-institute-detect-sleep-states"
 with open(dataset_dir_path / "dataset-metadata.json", "w") as f:
     json.dump(dataset_metadata_json, f, indent=2)
 
