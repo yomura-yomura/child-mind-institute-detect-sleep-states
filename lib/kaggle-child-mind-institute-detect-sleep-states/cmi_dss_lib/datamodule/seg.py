@@ -236,8 +236,9 @@ class TrainDataset(Dataset):
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
-        self.psuedo_id,self.psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
         self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
+        if self.use_psuedo_label:
+            self.psuedo_id,self.psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
 
     def __len__(self):
         return len(self.event_df)
