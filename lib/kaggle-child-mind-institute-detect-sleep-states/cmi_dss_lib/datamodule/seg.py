@@ -423,7 +423,7 @@ class SegDataModule(LightningDataModule):
                 feature_names=self.cfg.features,
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
-                phase="train",
+                phase="dev",
                 scale_type=self.cfg.scale_type,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
