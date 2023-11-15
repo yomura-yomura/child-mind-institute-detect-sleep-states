@@ -41,7 +41,11 @@ def load_features(
         series_dir = phase_dir_path / series_id
         this_feature = []
         for feature_name in feature_names:
-            this_feature.append(np.load(series_dir / f"{feature_name}.npy"))
+            this_feature.append(
+                np.load(series_dir / f"{feature_name}.npy")
+                if (series_dir / f"{feature_name}.npy").exists()
+                else np.load(series_dir / f"{feature_name}.npz")["arr_0"]
+            )
         features[series_dir.name] = np.stack(this_feature, axis=1)
 
     return features
@@ -70,7 +74,13 @@ def load_chunk_features(
         series_dir = phase_dir_path / series_id
 
         this_feature = np.stack(
-            [np.load(series_dir / f"{feature_name}.npy") for feature_name in feature_names], axis=1
+            [
+                np.load(series_dir / f"{feature_name}.npy")
+                if (series_dir / f"{feature_name}.npy").exists()
+                else np.load(series_dir / f"{feature_name}.npz")["arr_0"]
+                for feature_name in feature_names
+            ],
+            axis=1,
         )  # (duration, feature)
 
         interest_duration = duration - prev_margin_steps - next_margin_steps
@@ -477,7 +487,7 @@ class SegDataModule(LightningDataModule):
                 feature_names=self.cfg.features,
                 series_ids=series_ids,
                 processed_dir=self.processed_dir,
-                phase="train",
+                phase="dev",
                 scale_type=self.cfg.scale_type,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
