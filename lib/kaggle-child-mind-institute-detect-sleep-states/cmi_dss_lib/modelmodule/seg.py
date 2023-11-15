@@ -49,7 +49,7 @@ class SegModel(LightningModule):
     def forward(
         self, batch: dict[str : torch.Tensor], *, do_mixup=False, do_cutmix=False
     ) -> dict[str, Optional[torch.Tensor]]:
-        return self.model(batch["feature"], batch["label"], do_mixup, do_cutmix)
+        return self.model(batch["feature"], batch.get("label", None), do_mixup, do_cutmix)
 
     def training_step(self, batch):
         do_mixup = np.random.rand() < self.cfg.augmentation.mixup_prob
@@ -73,9 +73,11 @@ class SegModel(LightningModule):
             self.trainer.limit_val_batches = 1.0
             print(f"enabled validation")
 
-    def _evaluation_step(self, batch: dict[str : torch.Tensor], step_outputs: list) -> float:
+    def _evaluation_step(
+        self, batch: dict[str : torch.Tensor], step_outputs: list
+    ) -> float | None:
         output = self.forward(batch)
-        loss = output["loss"]
+        loss = output["loss"].detach().item() if "loss" in output.keys() else None
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
 
         resized_probs = resize(
@@ -83,50 +85,83 @@ class SegModel(LightningModule):
             size=[self.duration, logits.shape[2]],
             antialias=False,
         )
-        resized_labels = resize(
-            batch["label"].detach().cpu(),
-            size=[self.duration, logits.shape[2]],
-            antialias=False,
-        )
+        # resized_labels = resize(
+        #     batch["label"].detach().cpu(),
+        #     size=[self.duration, logits.shape[2]],
+        #     antialias=False,
+        # )
 
         n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
         masks = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
-        resized_labels = resized_labels.numpy()
+        # resized_labels = resized_labels.numpy()
         resized_probs = resized_probs.numpy()
-        assert len(series_ids) == len(resized_labels) == len(resized_probs), (
+        assert (
+            len(series_ids)
+            # == len(resized_labels)
+            == len(resized_probs)
+        ), (
             len(series_ids),
-            len(resized_labels),
+            # len(resized_labels),
             len(resized_probs),
         )
 
         if torch.all(masks):
-            step_outputs.append((series_ids, resized_labels, resized_probs))
+            step_outputs.append(
+                (
+                    series_ids,
+                    # resized_labels,
+                    resized_probs,
+                )
+            )
         else:
             resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
             resized_masks = resized_masks.squeeze(2)
 
-            for series_id, resized_mask, resized_label, resized_prob in zip(
-                series_ids, resized_masks, resized_labels, resized_probs, strict=True
+            for (
+                series_id,
+                resized_mask,
+                # resized_label,
+                resized_prob,
+            ) in zip(
+                series_ids,
+                resized_masks,
+                # resized_labels,
+                resized_probs,
+                strict=True,
             ):
                 if not torch.all(resized_mask):
-                    resized_label = resized_label[resized_mask].reshape(-1, 3)
+                    # resized_label = resized_label[resized_mask].reshape(-1, 3)
                     resized_prob = resized_prob[resized_mask].reshape(-1, 3)
-                step_outputs.append(([series_id], [resized_label], [resized_prob]))
-        return loss.detach().item()
+                step_outputs.append(
+                    (
+                        [series_id],
+                        # [resized_label],
+                        [resized_prob],
+                    )
+                )
+        return loss
 
     @staticmethod
     def _evaluation_epoch_end(step_outputs: list) -> list[tuple[str, NDArray[np.float_]]]:
         flatten_validation_step_outputs = [
-            (series_id, labels, preds)
+            (
+                series_id,
+                # labels,
+                preds,
+            )
             for args_in_batch in step_outputs
-            for series_id, labels, preds in zip(*args_in_batch, strict=True)
+            for (
+                series_id,
+                # labels,
+                preds,
+            ) in zip(*args_in_batch, strict=True)
         ]
         step_outputs.clear()
 
         return [
-            (series_id, np.concatenate([preds.reshape(-1, 3) for _, _, preds in g], axis=0))
+            (series_id, np.concatenate([preds.reshape(-1, 3) for _, preds in g], axis=0))
             for series_id, g in tqdm.tqdm(
                 itertools.groupby(
                     flatten_validation_step_outputs,

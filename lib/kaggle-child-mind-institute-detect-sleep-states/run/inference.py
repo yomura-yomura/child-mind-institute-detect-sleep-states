@@ -30,7 +30,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
         # "phase=dev",
-        "phase=train",
+        "phase=dev",
         "batch_size=32",
     ]
 else:
