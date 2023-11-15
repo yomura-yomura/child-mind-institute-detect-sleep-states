@@ -62,8 +62,8 @@ def main(cfg: DictConfig):
 
     with trace("Load series"):
         # scan parquet
-        if cfg.phase in ["train", "valid", "test", "dev"]:
-            if cfg.phase in ["train", "valid", "dev"]:
+        if cfg.phase in ["train", "test", "dev"]:
+            if cfg.phase in ["train", "dev"]:
                 dataset_type = "train"
             else:
                 dataset_type = "test"

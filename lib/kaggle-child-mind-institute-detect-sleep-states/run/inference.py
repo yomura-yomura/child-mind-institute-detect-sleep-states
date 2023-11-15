@@ -30,7 +30,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
         # "phase=dev",
-        "phase=valid",
+        "phase=train",
         "batch_size=32",
     ]
 else:
@@ -92,7 +92,8 @@ def inference(
     )
 
     for series_id, preds in series_id_preds_dict.items():
-        np.save(pred_dir_path / f"{series_id}.npy", preds)
+        # np.save(pred_dir_path / f"{series_id}.npy", preds)
+        np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
 
     # for batch in tqdm(loader, desc="inference"):
     #     with torch.no_grad():
@@ -153,9 +154,6 @@ def main(cfg: TrainConfig):
         data_module = SegDataModule(cfg)
 
         if cfg.phase == "train":
-            data_module.setup("fit")
-            dataloader = data_module.train_dataloader()
-        elif cfg.phase == "valid":
             data_module.setup("valid")
             dataloader = data_module.val_dataloader()
         elif cfg.phase == "test":
@@ -174,7 +172,7 @@ def main(cfg: TrainConfig):
         cfg.dir.sub_dir,
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
-        f"{cfg.split_type}_{cfg.split}",
+        f"{cfg.split_type.name}_{cfg.split.name}",
     )
     pred_dir_path.mkdir(exist_ok=True, parents=True)
     with trace("inference"):
