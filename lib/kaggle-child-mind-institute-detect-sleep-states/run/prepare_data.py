@@ -131,11 +131,14 @@ def main(cfg: DictConfig):
         *feature_names_to_preprocess,
         "hour_sin",
         "hour_cos",
-        # "month_sin",
-        # "month_cos",
+        "month_sin",
+        "month_cos",
+        "week_sin",
+        "week_cos",
         # "minute_sin",
         # "minute_cos",
     ]
+    print(f"{feature_names = }")
 
     with trace("Save features"):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
