@@ -1,7 +1,8 @@
-from typing import TypeAlias, TypedDict, Sequence
+from typing import Sequence, TypeAlias, TypedDict
 
 import numpy as np
 import numpy_utility as npu
+import pandas as pd
 import polars as pl
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
@@ -32,7 +33,8 @@ def post_process_for_seg(
     score_th: float = 0.01,
     distance: int = 5000,
     post_process_modes: PostProcessModes = None,
-) -> pl.DataFrame:
+    print_msg: bool = True,
+) -> pd.DataFrame:
     """make submission dataframe for segmentation task
 
     Args:
@@ -42,6 +44,7 @@ def post_process_for_seg(
         score_th (float, optional): threshold for score. Defaults to 0.5.
         distance: minimum interval between detectable peaks
         post_process_modes: extra post process names can be given
+        print_msg: print info
     Returns:
         pl.DataFrame: submission dataframe
     """
@@ -52,7 +55,8 @@ def post_process_for_seg(
     unique_series_ids = np.unique(series_ids)
 
     if "sleeping_edges_as_probs" in post_process_modes:
-        print("enable 'sleeping_edges_as_probs'")
+        if print_msg:
+            print("enable 'sleeping_edges_as_probs'")
         data = adapt_sleeping_edges_as_probs(
             npu.from_dict(
                 {
@@ -71,7 +75,8 @@ def post_process_for_seg(
 
     # preds = preds if "cutting_probs_by_sleep_prob" in post_process_modes else preds[:, :, [1, 2]]
     if "cutting_probs_by_sleep_prob" in post_process_modes:
-        print("enable 'cutting_probs_by_sleep_prob'")
+        if print_msg:
+            print("enable 'cutting_probs_by_sleep_prob'")
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
         sleep_occupancy_th = setting["sleep_occupancy_th"]
         th_hour_step = setting["watch_interval_hour"] * 60 * 12 // downsample_rate
@@ -131,9 +136,9 @@ def post_process_for_seg(
             }
         )
 
-    sub_df = pl.DataFrame(records).sort(by=["series_id", "step"])
-    row_ids = pl.Series(name="row_id", values=np.arange(len(sub_df)))
-    sub_df = sub_df.with_columns(row_ids).select(["row_id", "series_id", "step", "event", "score"])
+    sub_df = pd.DataFrame(records).sort_values(by=["series_id", "step"])
+    sub_df["row_id"] = np.arange(len(sub_df))
+    sub_df = sub_df[["row_id", "series_id", "step", "event", "score"]]
     return sub_df
 
 

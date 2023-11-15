@@ -13,13 +13,9 @@ target_pred_dir_path = project_root_path / "predicted" / "ranchantan" / "exp005-
 
 
 def get_pred_data(i_fold):
-    all_keys, all_preds, all_labels = np.load(
-        target_pred_dir_path / f"predicted-fold_{i_fold}.npz"
-    ).values()
+    all_keys, all_preds, all_labels = np.load(target_pred_dir_path / f"predicted-fold_{i_fold}.npz").values()
     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
-    all_data = npu.from_dict(
-        {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
-    )
+    all_data = npu.from_dict({"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids})
     return all_data
 
 

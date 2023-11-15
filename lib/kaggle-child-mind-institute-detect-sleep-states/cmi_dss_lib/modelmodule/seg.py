@@ -1,14 +1,19 @@
-from typing import Optional
+import itertools
+from typing import Any, Optional
 
 import cmi_dss_lib.datamodule.seg
 import cmi_dss_lib.models.common
 import cmi_dss_lib.utils.metrics
 import cmi_dss_lib.utils.post_process
 import numpy as np
+import pandas as pd
 import polars as pl
 import torch
 import torch.optim as optim
+import tqdm
 from lightning import LightningModule
+from lightning.pytorch.utilities.types import STEP_OUTPUT
+from numpy.typing import NDArray
 from torchvision.transforms.functional import resize
 from transformers import get_cosine_schedule_with_warmup
 
@@ -19,7 +24,7 @@ class SegModel(LightningModule):
     def __init__(
         self,
         cfg: TrainConfig,
-        val_event_df: pl.DataFrame,
+        val_event_df: pl.DataFrame | None,
         feature_dim: int,
         num_classes: int,
         duration: int,
@@ -38,6 +43,7 @@ class SegModel(LightningModule):
         )
         self.duration = duration
         self.validation_step_outputs: list = []
+        self.predict_step_outputs: list = []
         self.__best_loss = np.inf
 
     def forward(
@@ -62,7 +68,12 @@ class SegModel(LightningModule):
         )
         return loss
 
-    def validation_step(self, batch: dict[str : torch.Tensor]):
+    def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
+        if self.global_step > self.cfg.val_after_steps and self.trainer.limit_val_batches == 0:
+            self.trainer.limit_val_batches = 1.0
+            print(f"enabled validation")
+
+    def _evaluation_step(self, batch: dict[str : torch.Tensor], step_outputs: list) -> float:
         output = self.forward(batch)
         loss = output["loss"]
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
@@ -79,64 +90,95 @@ class SegModel(LightningModule):
         )
 
         n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
-        mask = batch["mask"].detach().cpu()[::n_interval]
-        if not np.all(mask):
-            resized_masks = resize(mask, size=[self.duration, logits.shape[2]], antialias=False)
-            resized_probs = resized_probs[resized_masks]
-            resized_labels = resized_labels[resized_masks]
+        masks = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
 
-        self.validation_step_outputs.append(
-            (
-                batch["key"],
-                resized_labels.numpy(),
-                resized_probs.numpy(),
-                loss.detach().item(),
-            )
+        series_ids = [key.split("_")[0] for key in batch["key"]]
+        resized_labels = resized_labels.numpy()
+        resized_probs = resized_probs.numpy()
+        assert len(series_ids) == len(resized_labels) == len(resized_probs), (
+            len(series_ids),
+            len(resized_labels),
+            len(resized_probs),
         )
+
+        if torch.all(masks):
+            step_outputs.append((series_ids, resized_labels, resized_probs))
+        else:
+            resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
+            resized_masks = resized_masks.squeeze(2)
+
+            for series_id, resized_mask, resized_label, resized_prob in zip(
+                series_ids, resized_masks, resized_labels, resized_probs, strict=True
+            ):
+                if not torch.all(resized_mask):
+                    resized_label = resized_label[resized_mask].reshape(-1, 3)
+                    resized_prob = resized_prob[resized_mask].reshape(-1, 3)
+                step_outputs.append(([series_id], [resized_label], [resized_prob]))
+        return loss.detach().item()
+
+    @staticmethod
+    def _evaluation_epoch_end(step_outputs: list) -> list[tuple[str, NDArray[np.float_]]]:
+        flatten_validation_step_outputs = [
+            (series_id, labels, preds)
+            for args_in_batch in step_outputs
+            for series_id, labels, preds in zip(*args_in_batch, strict=True)
+        ]
+        step_outputs.clear()
+
+        return [
+            (series_id, np.concatenate([preds.reshape(-1, 3) for _, _, preds in g], axis=0))
+            for series_id, g in tqdm.tqdm(
+                itertools.groupby(
+                    flatten_validation_step_outputs,
+                    key=lambda output: output[0],
+                ),
+                desc="calc val sub_df",
+                total=np.unique(
+                    [series_id for series_id, *_ in flatten_validation_step_outputs]
+                ).size,
+            )
+        ]
+
+    def validation_step(self, batch: dict[str : torch.Tensor]):
+        loss = self._evaluation_step(batch, self.validation_step_outputs)
         self.log(
             f"valid_loss",
-            loss.detach().item(),
+            loss,
             on_step=False,
             on_epoch=True,
             logger=True,
             prog_bar=True,
         )
-
         return loss
 
     def on_validation_epoch_end(self):
-        keys = []
-        for x in self.validation_step_outputs:
-            keys.extend(x[0])
-        # labels = np.concatenate([x[1] for x in self.validation_step_outputs])
-        preds = np.concatenate([x[2] for x in self.validation_step_outputs])
-        # losses = np.array([x[3] for x in self.validation_step_outputs])
-        # loss = losses.mean()
+        if len(self.validation_step_outputs) == 0:
+            return
 
-        val_pred_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-            keys=keys,
-            preds=preds,
-            downsample_rate=self.cfg.downsample_rate,
-            score_th=self.cfg.post_process.score_th,
-            distance=self.cfg.post_process.distance,
-        )
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(
-            self.val_event_df.to_pandas(), val_pred_df.to_pandas()
-        )
+        sub_df_list = []
+        for series_id, preds in self._evaluation_epoch_end(self.validation_step_outputs):
+            sub_df_list.append(
+                cmi_dss_lib.utils.post_process.post_process_for_seg(
+                    keys=[series_id] * len(preds),
+                    preds=preds,
+                    downsample_rate=self.cfg.downsample_rate,
+                    score_th=self.cfg.post_process.score_th,
+                    distance=self.cfg.post_process.distance,
+                )
+            )
+        sub_df = pd.concat(sub_df_list)
+
+        score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), sub_df)
         self.log(
             "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
         )
 
-        # if loss < self.__best_loss:
-        #     np.save("keys.npy", np.array(keys))
-        #     np.save("labels.npy", labels)
-        #     np.save("preds.npy", preds)
-        #     val_pred_df.write_csv("val_pred_df.csv")
-        #     torch.save(self.model.state_dict(), "best_model.pth")
-        #     print(f"Saved best model {self.__best_loss} -> {loss}")
-        #     self.__best_loss = loss
-
-        self.validation_step_outputs.clear()
+    def predict_step(
+        self, batch: dict[str : torch.Tensor]
+    ) -> list[tuple[str, NDArray[np.float_]]]:
+        step_outputs = []
+        self._evaluation_step(batch, step_outputs)
+        return step_outputs
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.cfg.optimizer.lr)

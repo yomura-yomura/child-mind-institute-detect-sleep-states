@@ -25,7 +25,8 @@ class TrainConfig:
     feature_extractor: FeatureExtractor
     decoder: Decoder
 
-    split: str  # TODO: should be removed
+    split: "TrainSplit"
+    split_type: "TrainSplitType"
 
     seed: int
     exp_name: str
@@ -58,6 +59,7 @@ class TrainConfig:
 
     check_val_every_n_epoch: int | None
     val_check_interval: float | int | None
+    val_after_steps: int
 
     offset: int
     sigma: int
@@ -96,6 +98,16 @@ class PsuedoLabelConfig:
     path_psuedo:str
     th_sleep:float
     th_prop:float
+
+@dataclasses.dataclass
+class TrainSplit:
+    name: Literal["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]
+
+
+@dataclasses.dataclass
+class TrainSplitType:
+    name: Literal["08_nan", "08_nan_06_repeat_rate"]
+
 
 @dataclasses.dataclass
 class TrainAugmentationConfig:

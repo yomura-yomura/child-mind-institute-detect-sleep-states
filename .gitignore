@@ -4,6 +4,7 @@ __pycache__/
 /models
 /data/
 !/data/.gitkeep
+!/data/repeat_rate.json
 
 /meta/
 /gcp/

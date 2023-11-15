@@ -23,7 +23,7 @@ class Plotter:
             score_th=0.005,
             distance=96,
             post_process_modes=post_process_modes,
-        ).to_pandas()
+        )
 
         event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
         unique_series_ids = np.unique(self.series_ids)
