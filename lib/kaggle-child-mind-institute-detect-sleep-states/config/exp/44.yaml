@@ -9,6 +9,8 @@
 
 - decoder=TransformerDecoder
 
+- use_amp=true
+
 - duration=17280  # 24h
 
 - batch_size=4
