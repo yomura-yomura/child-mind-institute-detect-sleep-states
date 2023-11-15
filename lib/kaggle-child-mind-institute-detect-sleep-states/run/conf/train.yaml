@@ -60,6 +60,13 @@ bg_sampling_rate: 0.5
 
 early_stopping_patience: 20
 
+# PsuedoLabeling
+psuedo_label:
+  use_psuedo: False
+  path_psuedo: None
+  th_sleep: 0.9
+  th_prop: 0.5
+
 # augmentation
 augmentation:
   mixup_prob: 0.0

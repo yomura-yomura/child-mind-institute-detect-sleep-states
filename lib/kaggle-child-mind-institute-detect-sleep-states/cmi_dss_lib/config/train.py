@@ -12,6 +12,7 @@ __all__ = [
     "TrainAugmentationConfig",
     "TrainPostProcessAugmentationConfig",
     "TrainOptimizerConfig",
+    "PsuedoLabelConfig"
 ]
 
 
@@ -31,6 +32,9 @@ class TrainConfig:
 
     phase: Literal["train", "test"]
     scale_type: Literal["constant", "robust_scaler"]
+
+    # psuedo labeling
+    psuedo_label:"PsuedoLabelConfig"
 
     # weight
 
@@ -84,6 +88,14 @@ class TrainConfig:
 
     early_stopping_patience: int
 
+
+
+@dataclasses.dataclass
+class PsuedoLabelConfig:
+    use_psuedo: bool
+    path_psuedo:str
+    th_sleep:float
+    th_prop:float
 
 @dataclasses.dataclass
 class TrainAugmentationConfig:

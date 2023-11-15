@@ -1,0 +1,10 @@
+- exp_name=exp009-StackedGRU-feature-layer4-psuedov2
+- feature_extractor=StackedGRUFeatureExtractor
+- use_amp=true
+- epoch=70
+- batch_size=16
+- feature_extractor.num_layers=4
+- early_stopping_patience=20
+- optimizer.lr=0.00025
+- psuedo_label.path_psuedo=/home/jumpei.uchida/develop/child-mind-institute-detect-sleep-states/data/eda
+- psuedo_label.use_psuedo=true
