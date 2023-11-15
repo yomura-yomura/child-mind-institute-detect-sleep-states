@@ -91,28 +91,24 @@ def save_predicted_npz_group_by_series_id(
 
 
 def load_predicted_npz_group_by_series_id(
-    predicted_npz_paths: Sequence[pathlib.Path],
+    predicted_npz_dir_paths: Sequence[pathlib.Path], min_duration_dict: dict[str, int],
 ) -> tuple[tuple[str], list[NDArray[np.float_]]]:
-    series_id_grouped_npz_dir_paths = [
-        predicted_npz_path.with_name(f"{predicted_npz_path.stem}-grouped-by-series_id")
-        for predicted_npz_path in predicted_npz_paths
-    ]
-
     data_list = [
         {
-            series_id_npz_path.stem: np.load(series_id_npz_path)
-            for series_id_npz_path in series_id_grouped_npz_dir_path.glob("*.npy")
+            series_id_npz_path.stem: np.load(series_id_npz_path)["arr_0"][:min_duration_dict[series_id_npz_path.stem]]
+            for series_id_npz_path in sorted(predicted_npz_dir_path.glob("*.npz"))
         }
-        for series_id_grouped_npz_dir_path in series_id_grouped_npz_dir_paths
+        for predicted_npz_dir_path in predicted_npz_dir_paths
     ]
     common_series_ids = tuple(data_list[0].keys())
-
-    assert common_series_ids is not None
+    assert len(common_series_ids) > 0
+    for data in data_list[1:]:
+        assert common_series_ids == tuple(data.keys())
 
     preds_list = [
         np.stack([data[series_id] for data in data_list], axis=0)
         for series_id in common_series_ids
     ]
-    assert all(preds.shape[0] == len(predicted_npz_paths) for preds in preds_list)
+    assert all(preds.shape[0] == len(predicted_npz_dir_paths) for preds in preds_list)
 
     return common_series_ids, preds_list

@@ -26,13 +26,15 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
-        # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
-        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
+        # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
+        "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-        "../output_dataset/train/exp041",
+        # "../output_dataset/train/exp041",
+        # "../output_dataset/train/exp045-lstm-feature-extractor",
         # "phase=dev",
         "phase=train",
-        "batch_size=32",
+        # "batch_size=32",
+        "batch_size=16",
     ]
 else:
     args = None
@@ -174,7 +176,7 @@ def main(cfg: TrainConfig):
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
         cfg.phase,
-        f"{cfg.split_type.name}_{cfg.split.name}",
+        f"{cfg.split.name}",
     )
     pred_dir_path.mkdir(exist_ok=True, parents=True)
     with trace("inference"):

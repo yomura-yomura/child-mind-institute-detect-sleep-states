@@ -24,21 +24,24 @@ post_process_modes = {
 
 
 pred_dir_path = project_root_path / "run" / "predicted" / "train"
+ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan"
+jumtras_pred_dir_path = project_root_path / "run" / "predicted" / "jumtras"
 
 model_dir_paths = [
-    project_root_path
-    / "run"
-    / "predicted"
-    / "jumtras"
-    / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
-    project_root_path / "run" / "predicted" / "train" / "exp015-lstm-feature-108-sigma",
-    pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    # project_root_path
+    # / "run"
+    # / "predicted"
+    # / "jumtras"
+    # / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",
+    ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    pred_dir_path / "exp041",
     # project_root_path
     # / "run"
     # / "predicted"
     # / "ranchantan"
     # / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-    pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
+    jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
 ]
 
 
@@ -109,11 +112,8 @@ if __name__ == "__main__":
     #     for i_fold in range(5)
     # }
 
-    predicted_npz_paths = [
-        [
-            model_dir_path / predicted_npz_format.format(i_fold=i_fold)
-            for model_dir_path in model_dir_paths
-        ]
+    predicted_npz_dir_paths = [
+        [model_dir_path / "train" / f"fold_{i_fold}" for model_dir_path in model_dir_paths]
         for i_fold in range(5)
     ]  # (fold, model)
 
@@ -122,17 +122,27 @@ if __name__ == "__main__":
     import cmi_dss_lib.utils.common
     import tqdm
 
+    count_by_series_id_df = (
+        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
+            "train", as_polars=True
+        )
+        .group_by("series_id")
+        .count()
+        .collect()
+    )
+    min_duration_dict = dict(count_by_series_id_df.iter_rows())
+
     keys_dict = {}
     preds_dict = {}
     for i_fold in tqdm.trange(5):
-        cmi_dss_lib.utils.common.save_predicted_npz_group_by_series_id(
-            predicted_npz_paths[i_fold], dataset_type="train"
-        )
+        # cmi_dss_lib.utils.common.save_predicted_npz_group_by_series_id(
+        #     predicted_npz_paths[i_fold], dataset_type="train"
+        # )
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
         ) = cmi_dss_lib.utils.common.load_predicted_npz_group_by_series_id(
-            predicted_npz_paths[i_fold]
+            predicted_npz_dir_paths[i_fold], min_duration_dict
         )
 
         # preds = [data["pred"].reshape(-1, 3) for data in predicted_dict[i_fold].values()]

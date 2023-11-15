@@ -38,6 +38,7 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
         *to_coord(pl.col("timestamp").dt.hour(), 24, "hour"),
         *to_coord(pl.col("timestamp").dt.month(), 12, "month"),
         *to_coord(pl.col("timestamp").dt.minute(), 60, "minute"),
+        *to_coord(pl.col("timestamp").dt.day(), 7, "week"),
     ).select("series_id", *feature_names)
     return series_df
 

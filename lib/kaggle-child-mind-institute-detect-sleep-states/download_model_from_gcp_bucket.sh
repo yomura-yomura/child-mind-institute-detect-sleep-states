@@ -13,3 +13,4 @@ if [ -e "output/train/$exp_name" ]; then
 fi
 
 gcloud storage cp -r --preserve-symlinks gs://omura-1/$exp_name/ output/train/
+
