@@ -40,12 +40,14 @@ model_dir_path_dict = {
     36: ranchantan_pred_dir_path
     / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
     41: pred_dir_path / "exp041",
+    44: pred_dir_path / "exp044-transformer-decoder",
     45: pred_dir_path / "exp045-lstm-feature-extractor",
 }
 
 # weight_dict = {7: 0.2, 19: 0.3, 27: 0.3, 41: 0.2}  # 12
-weight_dict = {7: 0.2, 19: 0.3, 27: 0.2, 41: 0.15, 45: 0.15}
-
+# weight_dict = {7: 0.2, 19: 0.3, 27: 0.2, 41: 0.15, 45: 0.15}
+# weight_dict = {3: 1, 7: 0, 19: 0, 41: 0, 27: 0}
+weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0}
 assert sum(weight_dict.values()) == 1
 
 
@@ -125,7 +127,9 @@ def get_grid(step: float, target_sum: float = 1, start: float = 0) -> NDArray[np
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(
+        # ["-s", "grid_search"]
+    )
 
     predicted_npz_dir_paths = [
         [model_dir_path / "train" / f"fold_{i_fold}" for model_dir_path in model_dir_paths]
@@ -230,13 +234,11 @@ if __name__ == "__main__":
 
                             record_at_max = df.iloc[df["CV"].argmax()]
                             print(
-                                """
+                                f"""
 max:
-  CV = {CV:.4f}
-  weights = {weights}
-""".format(
-                                    **record_at_max.to_dict()
-                                )
+CV = {record_at_max["CV"]:.4f}
+weights = {dict(zip(weight_dict, record_at_max["weights"]))}
+"""
                             )
 
             df = pd.DataFrame(records)
@@ -245,13 +247,11 @@ max:
 
             record_at_max = df.iloc[df["CV"].argmax()]
             print(
-                """
+                f"""
 max:
-CV = {CV:.4f}
-weights = {weights}
-""".format(
-                    **record_at_max.to_dict()
-                )
+CV = {record_at_max["CV"]:.4f}
+weights = {dict(zip(weight_dict, record_at_max["weights"]))}
+"""
             )
             print(dict(zip(model_dir_paths, record_at_max["weights"])))
 

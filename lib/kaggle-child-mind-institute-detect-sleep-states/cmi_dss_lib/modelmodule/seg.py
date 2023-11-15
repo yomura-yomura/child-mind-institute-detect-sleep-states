@@ -96,12 +96,18 @@ class SegModel(LightningModule):
         #     antialias=False,
         # )
 
-        n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
-        masks = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
+        masks = batch["mask"].detach().cpu()
+        # if masks.all():
+        #     resized_probs = resized_probs.numpy()
+        # else:
+        #     resized_probs = [
+        #         resized_prob[mask].reshape(-1, resized_prob.shape[1]).numpy()
+        #         for resized_prob, mask in zip(resized_probs, masks, strict=True)
+        #     ]
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
-        # resized_labels = resized_labels.numpy()
         resized_probs = resized_probs.numpy()
+        # resized_labels = resized_labels.numpy()
         assert (
             len(series_ids)
             # == len(resized_labels)
@@ -121,7 +127,7 @@ class SegModel(LightningModule):
                 )
             )
         else:
-            resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
+            resized_masks = resize(masks.unsqueeze(2), size=[self.duration, 1], antialias=False)
             resized_masks = resized_masks.squeeze(2)
 
             for (
