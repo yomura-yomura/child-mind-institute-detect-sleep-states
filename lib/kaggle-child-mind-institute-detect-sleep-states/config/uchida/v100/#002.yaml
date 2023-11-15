@@ -1,4 +1,4 @@
-- exp_name=exp009-StackedGRU-feature-layer4-psuedov2
+- exp_name=exp009-StackedGRU-feature-layer4-psuedov3
 - feature_extractor=StackedGRUFeatureExtractor
 - use_amp=true
 - epoch=70
@@ -8,6 +8,6 @@
 - optimizer.lr=0.00025
 - val_check_interval=null
 - check_val_every_n_epoch=1
-- val_after_steps=null
-- psuedo_label.path_psuedo=/home/jumpei.uchida/develop/child-mind-institute-detect-sleep-states/data/exp041/train
+- val_after_steps=1
+- psuedo_label.path_psuedo=/child-mind-institute-detect-sleep-states/data/exp041/train
 - psuedo_label.use_psuedo=true
