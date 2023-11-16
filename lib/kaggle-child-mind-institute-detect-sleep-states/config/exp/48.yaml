@@ -1,4 +1,4 @@
-- exp_name=exp042
+- exp_name=exp048
 
 - split_type=base
 
@@ -8,18 +8,16 @@
 - feature_extractor.num_layers=4
 
 - duration=17280  # 24h
-- prev_margin_steps=4320  # 6h
-- next_margin_steps=4320  # 6h
 
 - batch_size=4
 - optimizer.lr=0.00005
 
 - sigma=108
 
-- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos]
+- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos,week_sin,week_cos,month_sin,month_cos]
 
 - early_stopping_patience=20
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=3000
+- val_after_steps=5000

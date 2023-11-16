@@ -11,12 +11,10 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
+from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import (
-    ModelCheckpointWithSymlinkToBest,
-)
+from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping, ModelCheckpoint
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -72,9 +70,9 @@ def main(cfg: TrainConfig):
         max_steps=cfg.epoch * len(datamodule.train_dataloader()),
         gradient_clip_val=cfg.gradient_clip_val,
         accumulate_grad_batches=cfg.accumulate_grad_batches,
-        limit_val_batches=0.0 if cfg.val_after_steps > 0 else 1.0,
+        # limit_val_batches=0.0 if cfg.val_after_steps > 0 else 1.0,
         callbacks=[
-            ModelCheckpointWithSymlinkToBest(
+            ModelCheckpoint(
                 dirpath=model_save_dir_path,
                 filename="{epoch}-{step}-{EventDetectionAP:.3f}",
                 verbose=True,
@@ -89,6 +87,7 @@ def main(cfg: TrainConfig):
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
                 patience=cfg.early_stopping_patience,
+                val_after_steps=cfg.val_after_steps,
             ),
             LearningRateMonitor("epoch"),
             # RichProgressBar(),

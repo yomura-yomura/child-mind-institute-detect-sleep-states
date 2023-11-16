@@ -83,28 +83,19 @@ def load_chunk_features(
             axis=1,
         )  # (duration, feature)
 
-        interest_duration = duration - prev_margin_steps - next_margin_steps
+        indexer = Indexer(this_feature.shape[0], duration, prev_margin_steps, next_margin_steps)
 
-        num_chunks = (len(this_feature) // interest_duration) + 1
+        num_chunks = (len(this_feature) // indexer.interest_duration) + 1
         for i in range(num_chunks):
             key = f"{series_id}_{i:07}"
 
-            start = i * interest_duration
-            end = (i + 1) * interest_duration
+            start, end = indexer.get_interest_range(i)
 
             mask = np.zeros(this_feature.shape[0], dtype=bool)
             mask[start:end] = True
 
             # extend crop area with margins
-            start -= prev_margin_steps
-            end += next_margin_steps
-            if start < 0:
-                end -= start
-                start = 0
-            elif end > this_feature.shape[0] + duration:
-                start += end - this_feature.shape[0]
-                end = this_feature.shape[0] - 1
-            assert end - start == duration, (start, end, duration)
+            start, end = indexer.get_cropping_range(i)
 
             features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
 
@@ -112,6 +103,35 @@ def load_chunk_features(
             features[key] = chunk_feature
 
     return features  # type: ignore
+
+
+class Indexer:
+    def __init__(
+        self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int
+    ):
+        self.total_duration = total_duration
+        self.interest_duration = duration - prev_margin_steps - next_margin_steps
+        self.duration = duration
+        self.prev_margin_steps = prev_margin_steps
+        self.next_margin_steps = next_margin_steps
+
+    def get_interest_range(self, i: int) -> tuple[int, int]:
+        start = i * self.interest_duration
+        end = (i + 1) * self.interest_duration
+        return start, end
+
+    def get_cropping_range(self, i: int) -> tuple[int, int]:
+        start, end = self.get_interest_range(i)
+        start -= self.prev_margin_steps
+        end += self.next_margin_steps
+        if start < 0:
+            end -= start
+            start = 0
+        elif end > self.total_duration + self.duration:
+            start += end - self.total_duration
+            end = self.total_duration - 1
+        assert end - start == self.duration, (start, end, self.duration)
+        return start, end
 
 
 ###################
@@ -132,6 +152,7 @@ def random_crop(pos: int, duration: int, max_end) -> tuple[int, int]:
 def get_label(
     this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int
 ) -> np.ndarray:
+    assert start <= end
     # # (start, end)の範囲と(onset, wakeup)の範囲が重なるものを取得
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
@@ -368,9 +389,23 @@ class ValidDataset(Dataset):
 
         series_id, chunk_id = key.split("_")
         chunk_id = int(chunk_id)
-        start = chunk_id * self.cfg.duration
-        end = start + self.cfg.duration
+        # start = chunk_id * self.cfg.duration
+        # end = start + self.cfg.duration
+
+        total_duration = sum(
+            feature.shape[1]
+            for key, features in self.chunk_features.items()
+            if key.startswith(series_id)
+        )
+        start, end = Indexer(
+            total_duration,
+            self.cfg.duration,
+            self.cfg.prev_margin_steps,
+            self.cfg.next_margin_steps,
+        ).get_cropping_range(chunk_id)
+
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
+
         label = get_label(
             self.event_df.query("series_id == @series_id").reset_index(drop=True),
             num_frames,

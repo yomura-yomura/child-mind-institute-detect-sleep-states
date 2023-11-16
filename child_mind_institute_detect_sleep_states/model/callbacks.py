@@ -4,12 +4,13 @@ import warnings
 import lightning as L
 from lightning.pytorch.callbacks.model_checkpoint import *
 from lightning.pytorch.callbacks.model_checkpoint import _PATH
+from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint as _ModelCheckpoint
 from torch import Tensor
 
-__all__ = ["ModelCheckpointWithSymlinkToBest"]
+__all__ = ["ModelCheckpoint"]
 
 
-class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
+class ModelCheckpoint(_ModelCheckpoint):
     CHECKPOINT_NAME_BEST = "best"
 
     def __init__(
@@ -48,13 +49,13 @@ class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
             enable_version_counter=enable_version_counter,
         )
 
+    def _should_skip_saving_checkpoint(self, trainer: L.Trainer) -> bool:
+        return super()._should_skip_saving_checkpoint(trainer) or trainer.global_step <= self.val_after_steps
+
     def _save_last_checkpoint(self, trainer: L.Trainer, monitor_candidates: dict[str, Tensor]) -> None:
         """
         save last+best checkpoint
         """
-        if trainer.global_step <= self.val_after_steps:
-            return
-
         # save last
         super()._save_last_checkpoint(trainer, monitor_candidates)
 
@@ -78,3 +79,42 @@ class ModelCheckpointWithSymlinkToBest(ModelCheckpoint):
             self._save_checkpoint(trainer, filepath)
         if previous and self._should_remove_checkpoint(trainer, previous, filepath):
             self._remove_checkpoint(trainer, previous)
+
+
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping as _EarlyStopping
+from lightning.pytorch.callbacks.early_stopping import *
+
+
+class EarlyStopping(_EarlyStopping):
+    def __init__(
+        self,
+        monitor: str,
+        min_delta: float = 0.0,
+        patience: int = 3,
+        verbose: bool = False,
+        mode: str = "min",
+        strict: bool = True,
+        check_finite: bool = True,
+        stopping_threshold: Optional[float] = None,
+        divergence_threshold: Optional[float] = None,
+        check_on_train_epoch_end: Optional[bool] = None,
+        log_rank_zero_only: bool = False,
+        val_after_steps: int = 0,
+    ):
+        super().__init__(
+            monitor=monitor,
+            min_delta=min_delta,
+            patience=patience,
+            verbose=verbose,
+            mode=mode,
+            strict=strict,
+            check_finite=check_finite,
+            stopping_threshold=stopping_threshold,
+            divergence_threshold=divergence_threshold,
+            check_on_train_epoch_end=check_on_train_epoch_end,
+            log_rank_zero_only=log_rank_zero_only,
+        )
+        self.val_after_steps = val_after_steps
+
+    def _should_skip_check(self, trainer: "pl.Trainer") -> bool:
+        return super()._should_skip_check(trainer) | trainer.global_step <= self.val_after_steps

@@ -68,6 +68,11 @@ class SegModel(LightningModule):
         )
         return loss
 
+    def on_fit_start(self) -> None:
+        if self.cfg.val_after_steps > 0:
+            print(f"validation will be enabled after {self.cfg.val_after_steps} steps")
+            self.trainer.limit_val_batches = 0.0
+
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
         if self.global_step > self.cfg.val_after_steps and self.trainer.limit_val_batches == 0:
             self.trainer.limit_val_batches = 1.0
@@ -91,12 +96,18 @@ class SegModel(LightningModule):
         #     antialias=False,
         # )
 
-        n_interval = int(1 / (self.num_time_steps / self.cfg.duration))
-        masks = batch["mask"].detach().cpu()[:, ::n_interval].unsqueeze(2)
+        masks = batch["mask"].detach().cpu()
+        # if masks.all():
+        #     resized_probs = resized_probs.numpy()
+        # else:
+        #     resized_probs = [
+        #         resized_prob[mask].reshape(-1, resized_prob.shape[1]).numpy()
+        #         for resized_prob, mask in zip(resized_probs, masks, strict=True)
+        #     ]
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
-        # resized_labels = resized_labels.numpy()
         resized_probs = resized_probs.numpy()
+        # resized_labels = resized_labels.numpy()
         assert (
             len(series_ids)
             # == len(resized_labels)
@@ -116,7 +127,7 @@ class SegModel(LightningModule):
                 )
             )
         else:
-            resized_masks = resize(masks, size=[self.duration, 1], antialias=False)
+            resized_masks = resize(masks.unsqueeze(2), size=[self.duration, 1], antialias=False)
             resized_masks = resized_masks.squeeze(2)
 
             for (

@@ -22,16 +22,24 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
-        # "../output_dataset/train/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
-        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/"
+        # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
+        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+        # "../cmi-dss-ensemble-models/ranchantan/exp041",
+        # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
+        "../output_dataset/train/exp044-transformer-decoder",
         # "phase=dev",
-        "phase=dev",
+        "phase=train",
         "batch_size=32",
+        # "batch_size=16",
+        #
+        # "dir.sub_dir=tmp",
+        # "prev_margin_steps=4320",
+        # "next_margin_steps=4320",
     ]
 else:
     args = None
@@ -173,9 +181,9 @@ def main(cfg: TrainConfig):
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
         cfg.phase,
-        f"{cfg.split_type.name}_{cfg.split.name}",
+        f"{cfg.split.name}",
     )
-    pred_dir_path.mkdir(exist_ok=True, parents=True)
+    pred_dir_path.mkdir(exist_ok=False, parents=True)
     with trace("inference"):
         # keys, preds = inference(dataloader, model, use_amp=cfg.use_amp)
         inference(dataloader, model, use_amp=cfg.use_amp, pred_dir_path=pred_dir_path)
@@ -224,9 +232,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", type=pathlib.Path)
     parser.add_argument("config_path_or_hydra_arguments", nargs="*")
+    parser.add_argument("--folds", type=str, default=None)
     args = parser.parse_args(args)
 
-    for i_fold in range(5):
+    if args.folds is None:
+        folds = list(range(5))
+    else:
+        folds = list(map(int, args.folds.split(",")))
+
+    print(f"{folds = }")
+
+    for i_fold in folds:
         overrides_dict = {}
 
         fold_dir_path = args.model_path / f"fold_{i_fold}"

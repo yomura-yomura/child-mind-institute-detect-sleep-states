@@ -7,7 +7,7 @@ import toml
 import wandb
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 
-from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpointWithSymlinkToBest
+from child_mind_institute_detect_sleep_states.model.callbacks import ModelCheckpoint
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger, get_versioning_wandb_group_name
 
 this_dir_path = pathlib.Path(__file__).parent
@@ -132,7 +132,7 @@ for i_fold in range(config["train"]["n_folds"]):
                 mode="max",
                 patience=config["train"]["early_stopping_patience"],
             ),
-            ModelCheckpointWithSymlinkToBest(
+            ModelCheckpoint(
                 dirpath=exp_name_dir_path / f"fold{i_fold + 1}",
                 filename="{epoch}-{EventDetectionAP:.3f}",
                 monitor="EventDetectionAP",
