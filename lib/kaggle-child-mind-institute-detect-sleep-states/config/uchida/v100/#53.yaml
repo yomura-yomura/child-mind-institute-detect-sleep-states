@@ -5,7 +5,7 @@
 - feature_extractor.dim_fc=256
 - feature_extractor.is_fc=false
 - early_stopping_patience=20
-- decoder=transformer
+- decoder=TransformerDecoder
 - batch_size=4
 - optimizer.lr=0.00005
 - duration=17280 #24h 
