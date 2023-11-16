@@ -1,5 +1,6 @@
 import argparse
 import multiprocessing
+import os
 import pathlib
 
 import cmi_dss_lib.utils.common
@@ -15,6 +16,12 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 np.seterr(all="raise")
 
 project_root_path = pathlib.Path(__file__).parent.parent
+
+if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
+    args = ["-s", "grid_search"]
+else:
+    args = None
+
 
 predicted_npz_format = "predicted-fold_{i_fold}.npz"
 
@@ -32,26 +39,31 @@ pred_dir_path = project_root_path / "run" / "predicted" / "train"
 ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan"
 jumtras_pred_dir_path = project_root_path / "run" / "predicted" / "jumtras"
 
-model_dir_path_dict = {
+all_model_dir_path_dict = {
     3: jumtras_pred_dir_path / "exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
     7: ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",  # 7
     19: ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
     27: jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
     36: ranchantan_pred_dir_path
     / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-    41: pred_dir_path / "exp041",
-    44: pred_dir_path / "exp044-transformer-decoder",
-    45: pred_dir_path / "exp045-lstm-feature-extractor",
+    41: ranchantan_pred_dir_path / "exp041",
+    44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
+    45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
+    47: ranchantan_pred_dir_path / "exp047",
 }
 
 # weight_dict = {7: 0.2, 19: 0.3, 27: 0.3, 41: 0.2}  # 12
 # weight_dict = {7: 0.2, 19: 0.3, 27: 0.2, 41: 0.15, 45: 0.15}
 # weight_dict = {3: 1, 7: 0, 19: 0, 41: 0, 27: 0}
-weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0}
+# weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0}
+# weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 47: 0}
+weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0, 47: 0}
+
+
 assert sum(weight_dict.values()) == 1
+print(f"{len(weight_dict) = }")
 
-
-model_dir_paths = [model_dir_path_dict[i_exp] for i_exp in weight_dict]
+model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
 
 
 def calc_score(
@@ -64,6 +76,7 @@ def calc_score(
 
     df_submit_list = []
     for series_id, preds in zip(series_ids, preds_dict[i_fold], strict=True):
+        assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
         df_submit_list.append(
             cmi_dss_lib.utils.post_process.post_process_for_seg(
@@ -88,23 +101,6 @@ def calc_score(
 # scores = calc_all_scores(weights=[1, 1])
 
 
-def print_():
-    df = pd.DataFrame(records)
-    target_csv_path.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(target_csv_path, index=False)
-
-    record_at_max = df.iloc[df["CV"].argmax()]
-    print(
-        """
-max:
-CV = {CV:.4f}
-weights = {weights}
-""".format(
-            **record_at_max.to_dict()
-        )
-    )
-
-
 def get_grid(step: float, target_sum: float = 1, start: float = 0) -> NDArray[np.float_]:
     assert step < 1
     assert 0 <= target_sum
@@ -124,17 +120,18 @@ def get_grid(step: float, target_sum: float = 1, start: float = 0) -> NDArray[np
     return weight * step
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
-    args = parser.parse_args(
-        # ["-s", "grid_search"]
-    )
-
+def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
     predicted_npz_dir_paths = [
-        [model_dir_path / "train" / f"fold_{i_fold}" for model_dir_path in model_dir_paths]
+        [
+            pathlib.Path(model_dir_path) / "train" / f"fold_{i_fold}"
+            for model_dir_path in model_dir_paths
+        ]
         for i_fold in range(5)
     ]  # (fold, model)
+    for predicted_npz_dir_paths_by_fold in predicted_npz_dir_paths:
+        for path in predicted_npz_dir_paths_by_fold:
+            if not path.exists():
+                raise FileNotFoundError(path)
 
     count_by_series_id_df = (
         child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
@@ -155,6 +152,17 @@ if __name__ == "__main__":
         ) = cmi_dss_lib.utils.common.load_predicted_npz_group_by_series_id(
             predicted_npz_dir_paths[i_fold], min_duration_dict
         )
+    return keys_dict, preds_dict
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
+    parser.add_argument("--n-cpus", "-n", default=8, type=int)
+    args = parser.parse_args(args)
+
+    keys_dict, preds_dict = get_keys_and_preds(model_dir_paths)
+    # keys_dict, preds_dict = get_keys_and_preds(list(model_dir_path_dict.values()))
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
@@ -219,7 +227,7 @@ if __name__ == "__main__":
                 records = []
 
             n_steps_to_save = 30
-            with multiprocessing.Pool(8) as p:
+            with multiprocessing.Pool(args.n_cpus) as p:
                 with tqdm.tqdm(total=len(weight), desc="grid search") as t:
                     for scores, weights in p.imap_unordered(calc_all_scores, weight.tolist()):
                         t.update(1)
@@ -279,7 +287,7 @@ weights = {dict(zip(weight_dict, record_at_max["weights"]))}
                 study_name=models_dir_name,
             )
             study.enqueue_trial({f"w{i}": w for i, w in enumerate(weight_dict.values())})
-            study.optimize(objective, n_trials=100, n_jobs=8, show_progress_bar=True)
+            study.optimize(objective, n_trials=100, n_jobs=args.n_cpus, show_progress_bar=True)
 
 
 # scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]

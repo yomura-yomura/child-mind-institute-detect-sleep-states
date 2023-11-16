@@ -13,7 +13,7 @@ download_competition_dataset () {
 
 # Official Dataset
 
-#download_competition_dataset "kaggle competitions" "child-mind-institute-detect-sleep-states"
+download_competition_dataset "kaggle competitions" "child-mind-institute-detect-sleep-states"
 
 #
 
@@ -28,9 +28,9 @@ download_dataset () {
   rm -f ${dataset_fn}.zip
 }
 
-download_dataset "train dataset with part_id " "jumtras1/train-series-with-partid"
-download_dataset "train train datasets" "ranchantan/cmi-dss-train-datasets"
-download_dataset "train k-fold indices" "ranchantan/cmi-dss-train-k-fold-indices"
+#download_dataset "train dataset with part_id " "jumtras1/train-series-with-partid"
+#download_dataset "train train datasets" "ranchantan/cmi-dss-train-datasets"
+#download_dataset "train k-fold indices" "ranchantan/cmi-dss-train-k-fold-indices"
 
 #
 
