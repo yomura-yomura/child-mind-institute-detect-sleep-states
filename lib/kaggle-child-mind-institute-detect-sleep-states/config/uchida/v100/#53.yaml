@@ -1,11 +1,11 @@
-- exp_name=exp049-TimesNetFeatureExtractor-Transformer
+- exp_name=exp053-TimesNetFeatureExtractor-Transformer
 - feature_extractor=TimesNetFeatureExtractor
 - feature_extractor.height=64
 - feature_extractor.dim_model=64
 - feature_extractor.dim_fc=256
 - feature_extractor.is_fc=false
 - early_stopping_patience=20
-- use_amp=true
+- decoder=transformer
 - batch_size=4
 - optimizer.lr=0.00005
 - duration=17280 #24h 
