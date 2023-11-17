@@ -78,7 +78,7 @@ def main(cfg: TrainConfig):
                 verbose=True,
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
-                save_top_k=2,
+                save_top_k=3,
                 save_last=True,
                 every_n_train_steps=cfg.val_check_interval,
                 # val_after_steps=cfg.val_after_steps,
