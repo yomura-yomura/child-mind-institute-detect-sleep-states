@@ -11,10 +11,10 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping, ModelCheckpoint
+from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -45,16 +45,17 @@ def main(cfg: TrainConfig):
     datamodule = SegDataModule(cfg)
     LOGGER.info("Set Up DataModule")
 
+    model_save_dir_path = (
+        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    )
+
     model = SegModel(
         cfg=cfg,
         val_event_df=datamodule.valid_event_df,
         feature_dim=len(cfg.features),
         num_classes=len(cfg.labels),
         duration=cfg.duration,
-    )
-
-    model_save_dir_path = (
-        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+        model_save_dir_path=model_save_dir_path,
     )
 
     trainer = Trainer(
@@ -72,17 +73,17 @@ def main(cfg: TrainConfig):
         accumulate_grad_batches=cfg.accumulate_grad_batches,
         # limit_val_batches=0.0 if cfg.val_after_steps > 0 else 1.0,
         callbacks=[
-            ModelCheckpoint(
-                dirpath=model_save_dir_path,
-                filename="{epoch}-{step}-{EventDetectionAP:.3f}",
-                verbose=True,
-                monitor=cfg.monitor,
-                mode=cfg.monitor_mode,
-                save_top_k=2,
-                save_last=True,
-                every_n_train_steps=cfg.val_check_interval,
-                val_after_steps=cfg.val_after_steps,
-            ),
+            # ModelCheckpoint(
+            #     dirpath=model_save_dir_path,
+            #     filename="{epoch}-{step}-{EventDetectionAP:.3f}",
+            #     verbose=True,
+            #     monitor=cfg.monitor,
+            #     mode=cfg.monitor_mode,
+            #     save_top_k=3,
+            #     save_last=True,
+            #     every_n_train_steps=cfg.val_check_interval,
+            #     # val_after_steps=cfg.val_after_steps,
+            # ),
             EarlyStopping(
                 monitor=cfg.monitor,
                 mode=cfg.monitor_mode,
