@@ -11,10 +11,10 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import LearningRateMonitor
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from omegaconf import OmegaConf
 
-from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping, ModelCheckpoint
+from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -81,7 +81,7 @@ def main(cfg: TrainConfig):
                 save_top_k=2,
                 save_last=True,
                 every_n_train_steps=cfg.val_check_interval,
-                val_after_steps=cfg.val_after_steps,
+                # val_after_steps=cfg.val_after_steps,
             ),
             EarlyStopping(
                 monitor=cfg.monitor,

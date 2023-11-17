@@ -10,8 +10,9 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 
 # exp_name = "ranchantan/exp041"
 # exp_name = "ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma"
-exp_name = "ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
+# exp_name = "ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
 # exp_name = "jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet"
+exp_name = "jumtras/exp043"
 # exp_name = "ranchantan/exp050-transformer-decoder"
 
 # predicted_fold_dir_path = pathlib.Path("tmp/predicted/ranchantan/exp041/train/fold_0/")
