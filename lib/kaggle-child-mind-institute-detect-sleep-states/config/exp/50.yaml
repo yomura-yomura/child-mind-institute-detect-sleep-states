@@ -1,4 +1,5 @@
-- exp_name=exp050-transformer-decoder
+#- exp_name=exp050-transformer-decoder
+- exp_name=exp050-transformer-decoder_retry
 
 - split_type=base
 
@@ -22,6 +23,7 @@
 
 - early_stopping_patience=20
 
-- val_check_interval=200
+- val_check_interval=10
+#- val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=5000
+#- val_after_steps=5000

@@ -11,7 +11,11 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from cmi_dss_lib.utils.common import trace
-from cmi_dss_lib.utils.post_process import PostProcessModes, SubmissionDataFrame, post_process_for_seg
+from cmi_dss_lib.utils.post_process import (
+    PostProcessModes,
+    SubmissionDataFrame,
+    post_process_for_seg,
+)
 from lightning import seed_everything
 from nptyping import Float, NDArray, Shape
 from omegaconf import OmegaConf
@@ -28,7 +32,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
         # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
-        "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+        # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp041",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
         # "../cmi-dss-ensemble-models/jumtras/exp043",
