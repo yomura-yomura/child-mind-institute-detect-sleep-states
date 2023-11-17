@@ -251,11 +251,12 @@ class SegModel(LightningModule):
             last_ckpt_path.unlink(missing_ok=True)
             last_ckpt_path.symlink_to(self.last_path)
 
-        self.best_score_paths = best_score_paths_in_descending_order[:save_top_k]
-        for _, model_path in best_score_paths_in_descending_order[save_top_k:]:
+        for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[save_top_k:]):
             if model_path.samefile(self.last_path):
                 continue
             model_path.unlink(missing_ok=True)
+            best_score_paths_in_descending_order.pop(save_top_k + i)
+        self.best_score_paths = best_score_paths_in_descending_order
 
     def predict_step(
         self, batch: dict[str : torch.Tensor]
