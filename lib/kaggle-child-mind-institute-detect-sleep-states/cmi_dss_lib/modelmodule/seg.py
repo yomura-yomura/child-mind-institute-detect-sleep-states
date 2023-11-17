@@ -230,6 +230,8 @@ class SegModel(LightningModule):
 
         best_model_score, best_model_path = best_score_paths_in_descending_order[0]
 
+        self.trainer.save_checkpoint(current_model_path)
+
         if len(best_score_paths_in_descending_order) < save_top_k or current_model_path in (
             path for _, path in best_score_paths_in_descending_order[:save_top_k]
         ):
@@ -237,7 +239,6 @@ class SegModel(LightningModule):
                 f"Epoch {epoch:d}, global step {step:d}: {monitor!r} reached {score:0.5f}"
                 f" (best {best_model_score:0.5f}), saving model to {current_model_path} in top {save_top_k}"
             )
-            self.trainer.save_checkpoint(current_model_path)
             best_ckpt_path = self.model_save_dir_path / "best.ckpt"
             best_ckpt_path.unlink(missing_ok=True)
             best_ckpt_path.symlink_to(best_model_path)
@@ -251,11 +252,15 @@ class SegModel(LightningModule):
             last_ckpt_path.unlink(missing_ok=True)
             last_ckpt_path.symlink_to(self.last_path)
 
+        indices_to_remove = []
         for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[save_top_k:]):
-            if model_path.samefile(self.last_path):
+            if model_path == self.last_path:
                 continue
             model_path.unlink(missing_ok=True)
-            best_score_paths_in_descending_order.pop(save_top_k + i)
+            indices_to_remove.append(save_top_k + i)
+
+        for i in indices_to_remove[::-1]:
+            print(best_score_paths_in_descending_order.pop(i))
         self.best_score_paths = best_score_paths_in_descending_order
 
     def predict_step(
