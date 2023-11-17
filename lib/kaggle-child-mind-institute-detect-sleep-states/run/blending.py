@@ -47,6 +47,7 @@ all_model_dir_path_dict = {
     36: ranchantan_pred_dir_path
     / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
     41: ranchantan_pred_dir_path / "exp041",
+    # 43: jumtras_pred_dir_path / "exp043",
     44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
     45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
     47: ranchantan_pred_dir_path / "exp047",
@@ -57,8 +58,8 @@ all_model_dir_path_dict = {
 # weight_dict = {3: 1, 7: 0, 19: 0, 41: 0, 27: 0}
 # weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0}
 # weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 47: 0}
-weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0, 47: 0}
-
+# weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0, 47: 0}
+weight_dict = {3: 1, 7: 0, 19: 0, 36: 0, 44: 0, 45: 0, 47: 0}
 
 assert sum(weight_dict.values()) == 1
 print(f"{len(weight_dict) = }")
@@ -67,12 +68,19 @@ model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
 
 
 def calc_score(
-    i_fold: int, weights: list[int], keys_dict, all_event_df, preds_dict, post_process_modes
+    i_fold: int,
+    weights: list[int],
+    keys_dict,
+    all_event_df,
+    preds_dict,
+    post_process_modes,
+    score_th=0.005,
+    distance=96,
 ):
     series_ids = keys_dict[i_fold]
     # unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
     unique_series_ids = np.unique(series_ids)
-    event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)].dropna()
+    event_df = all_event_df[all_event_df["series_id"].isin(unique_series_ids)]
 
     df_submit_list = []
     for series_id, preds in zip(series_ids, preds_dict[i_fold], strict=True):
@@ -85,8 +93,8 @@ def calc_score(
                 # preds=corrected_preds[:, :, [1, 2]],
                 downsample_rate=2,
                 keys=[series_id] * len(mean_preds),
-                score_th=0.005,
-                distance=96,
+                score_th=score_th,
+                distance=distance,
                 post_process_modes=post_process_modes,
                 print_msg=False,
             )
@@ -164,7 +172,9 @@ if __name__ == "__main__":
     keys_dict, preds_dict = get_keys_and_preds(model_dir_paths)
     # keys_dict, preds_dict = get_keys_and_preds(list(model_dir_path_dict.values()))
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
 
     # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, None)
 
@@ -186,7 +196,7 @@ if __name__ == "__main__":
         print(f"{mean_score_str} ({', '.join(score_strs)})")
         return scores, weights
 
-    models_dir_name = "_".join(p.name for p in model_dir_paths)
+    models_dir_name = "_".join(str(exp) for exp in weight_dict)
 
     match args.search_type:
         case "grid_search":

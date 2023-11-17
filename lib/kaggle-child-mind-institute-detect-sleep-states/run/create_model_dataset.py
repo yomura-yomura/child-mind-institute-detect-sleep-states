@@ -31,8 +31,8 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp041"
 # exp_name = "exp045-lstm-feature-extractor"
 # exp_name = "exp044-transformer-decoder"
-exp_name = "exp047"
 
+exp_name = "exp050-transformer-decoder"
 
 upload = False
 # upload = True
@@ -40,7 +40,7 @@ upload = False
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
 def main(cfg: DictConfig):
-    dataset_output_dir_path = project_root_path / "output_dataset"
+    dataset_output_dir_path = project_root_path / "cmi-dss-ensemble-models" / "ranchantan"
 
     module = SegModel.load_from_checkpoint(
         f"{p}",
@@ -67,7 +67,7 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    train_output_dir_path = project_root_path / "output"
+    train_output_dir_path = project_root_path / "output" / "train"
     print(f"{train_output_dir_path.resolve()=}")
 
     path_df = pd.DataFrame(
@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 int(p.parts[-2][5:]),
                 int(p.parts[-1][6:-5]) if "-v" in p.parts[-1] else 0,
             )
-            for p in train_output_dir_path.glob(f"train/{exp_name}/fold_*/best*.ckpt")
+            for p in train_output_dir_path.glob(f"{exp_name}/fold_*/best*.ckpt")
         ],
         columns=["path", "i_fold", "version"],
     )

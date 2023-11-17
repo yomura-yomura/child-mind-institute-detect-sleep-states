@@ -90,31 +90,13 @@ class SegModel(LightningModule):
             size=[self.duration, logits.shape[2]],
             antialias=False,
         )
-        # resized_labels = resize(
-        #     batch["label"].detach().cpu(),
-        #     size=[self.duration, logits.shape[2]],
-        #     antialias=False,
-        # )
 
         masks = batch["mask"].detach().cpu()
-        # if masks.all():
-        #     resized_probs = resized_probs.numpy()
-        # else:
-        #     resized_probs = [
-        #         resized_prob[mask].reshape(-1, resized_prob.shape[1]).numpy()
-        #         for resized_prob, mask in zip(resized_probs, masks, strict=True)
-        #     ]
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
         resized_probs = resized_probs.numpy()
-        # resized_labels = resized_labels.numpy()
-        assert (
-            len(series_ids)
-            # == len(resized_labels)
-            == len(resized_probs)
-        ), (
+        assert len(series_ids) == len(resized_probs), (
             len(series_ids),
-            # len(resized_labels),
             len(resized_probs),
         )
 
@@ -122,7 +104,6 @@ class SegModel(LightningModule):
             step_outputs.append(
                 (
                     series_ids,
-                    # resized_labels,
                     resized_probs,
                 )
             )
@@ -133,22 +114,18 @@ class SegModel(LightningModule):
             for (
                 series_id,
                 resized_mask,
-                # resized_label,
                 resized_prob,
             ) in zip(
                 series_ids,
                 resized_masks,
-                # resized_labels,
                 resized_probs,
                 strict=True,
             ):
                 if not torch.all(resized_mask):
-                    # resized_label = resized_label[resized_mask].reshape(-1, 3)
                     resized_prob = resized_prob[resized_mask].reshape(-1, 3)
                 step_outputs.append(
                     (
                         [series_id],
-                        # [resized_label],
                         [resized_prob],
                     )
                 )
@@ -159,13 +136,11 @@ class SegModel(LightningModule):
         flatten_validation_step_outputs = [
             (
                 series_id,
-                # labels,
                 preds,
             )
             for args_in_batch in step_outputs
             for (
                 series_id,
-                # labels,
                 preds,
             ) in zip(*args_in_batch, strict=True)
         ]

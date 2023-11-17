@@ -12,10 +12,10 @@ project_root_path = pathlib.Path(__file__).parent.parent.parent
 
 exp_name = "exp041"
 
-# target_pred_dir_path = project_root_path / "run" / "predicted" / "train" / exp_name / "train"
-target_pred_dir_path = (
-    project_root_path / "run" / "tmp" / "predicted" / "ranchantan" / exp_name / "train"
-)
+target_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan" / exp_name / "train"
+# target_pred_dir_path = (
+#     project_root_path / "run" / "tmp" / "predicted" / "ranchantan" / exp_name / "train"
+# )
 assert target_pred_dir_path.exists()
 
 overrides_yaml_path = (
@@ -44,24 +44,20 @@ hydra.initialize(config_path="../conf", version_base="1.2")
 
 cfg: TrainConfig = hydra.compose("train", overrides=omegaconf.OmegaConf.load(overrides_yaml_path))
 #
-cfg.prev_margin_steps = 6 * 12 * 60
-cfg.next_margin_steps = 6 * 12 * 60
+# cfg.prev_margin_steps = 6 * 12 * 60
+# cfg.next_margin_steps = 6 * 12 * 60
 
 datamodule = cmi_dss_lib.datamodule.seg.SegDataModule(cfg)
 datamodule.setup("valid")
 val_dataset = datamodule.val_dataloader().dataset
 
-i = 10
-# i = 43
-# i = 44
-# i = 45
-
 
 def plot(i):
     feat_record = val_dataset[i]
 
-    series_id = feat_record["key"].split("_")[0]
-    assert int(feat_record["key"].split("_")[1]) == i
+    series_id, i = feat_record["key"].split("_")
+    i = int(i)
+    # assert int(feat_record["key"].split("_")[1]) == i
 
     preds = np.load(target_pred_dir_path / cfg.split.name / f"{series_id}.npz")["arr_0"]
     indexer = Indexer(preds.shape[0], cfg.duration, cfg.prev_margin_steps, cfg.next_margin_steps)
@@ -113,15 +109,25 @@ def plot(i):
             line=dict(dash="dash", color="green"),
         )
 
-    interest_start = np.argmax(feat_record["mask"])
-    interest_end = interest_start + np.argmin(feat_record["mask"][interest_start:])
-    assert np.any(feat_record["mask"][interest_end:]) == np.False_
+    if cfg.prev_margin_steps + cfg.next_margin_steps > 0:
+        interest_start = np.argmax(feat_record["mask"])
+        interest_end = interest_start + np.argmin(feat_record["mask"][interest_start:])
+        assert np.any(feat_record["mask"][interest_end:]) == np.False_
 
-    fig.add_vrect(x0=interest_start, x1=interest_end)
+        fig.add_vrect(x0=interest_start, x1=interest_end)
 
     fig.update_xaxes(range=(0, cfg.duration))
+    fig.update_layout(title=f"{series_id}, chunk_id = {i}")
     fig.show()
 
 
 plot(0)
 plot(1)
+
+plot(22)
+plot(23)
+
+plot(43)
+plot(44)
+plot(45)
+plot(46)
