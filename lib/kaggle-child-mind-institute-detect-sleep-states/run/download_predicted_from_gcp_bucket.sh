@@ -1,3 +1,3 @@
 #!/bin/sh
 
-gsutil rsync -r -d -u -i gs://omura-1/predicted/ predicted/
+gsutil -m rsync -r -d -u gs://omura-1/predicted/ predicted/

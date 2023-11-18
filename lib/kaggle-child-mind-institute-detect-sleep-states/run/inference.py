@@ -33,8 +33,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
-        # "../cmi-dss-ensemble-models/ranchantan/exp041",
+        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
+        "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
         # "../cmi-dss-ensemble-models/jumtras/exp043",
         # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
@@ -204,49 +204,7 @@ def main(cfg: TrainConfig):
 
     score = calc_score(pred_dir_path)
     print(f"{score:.4f}")
-
-    # pred_dir_path = pathlib.Path(
-    #     cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
-    # )
-    # pred_dir_path.mkdir(parents=True, exist_ok=True)
-    # if cfg.phase in ["train", "valid"]:
-    #     labels = np.concatenate([batch["label"] for batch in dataloader], axis=0)
-    #     np.savez(
-    #         pred_dir_path / f"predicted-{cfg.split.name}.npz",
-    #         key=keys,
-    #         pred=preds,
-    #         label=labels,
-    #     )
-    # else:
-    #     np.savez(
-    #         pred_dir_path / f"predicted-{cfg.split.name}.npz",
-    #         key=keys,
-    #         pred=preds,
-    #     )
-    #
-
-    # with trace("make submission"):
-    #     sub_df = make_submission(
-    #         keys,
-    #         preds,
-    #         downsample_rate=cfg.downsample_rate,
-    #         score_th=cfg.post_process.score_th,
-    #         distance=cfg.post_process.distance,
-    #     )
-    #
-    # if cfg.phase in ["train", "valid"]:
-    #     import cmi_dss_lib.utils.metrics
-    #     import pandas as pd
-    #
-    #     unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
-    #
-    #     event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")
-    #     event_df = event_df[event_df["series_id"].isin(unique_series_ids)].dropna()
-    #
-    #     score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
-    #     print(f"{cfg.split.name}: {score:.4f}")
-    #
-    # sub_df.to_csv(pathlib.Path(cfg.dir.sub_dir) / "submission.csv", index=False)
+    scores.append(score)
 
 
 if __name__ == "__main__":
@@ -263,6 +221,7 @@ if __name__ == "__main__":
 
     print(f"{folds = }")
 
+    scores = []
     for i_fold in folds:
         overrides_dict = {}
 
@@ -288,3 +247,5 @@ if __name__ == "__main__":
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
         sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
         main()
+    mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
+    print(f"{mean_score_str} ({', '.join(score_strs)})")

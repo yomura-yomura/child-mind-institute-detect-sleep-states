@@ -28,12 +28,12 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp008-3sigma"
 # exp_name = "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma"
 # exp_name = "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
-# exp_name = "exp041"
+exp_name = "exp041_retry"
 # exp_name = "exp045-lstm-feature-extractor"
 # exp_name = "exp044-transformer-decoder"
 
 # exp_name = "exp050-transformer-decoder"
-exp_name = "exp050-transformer-decoder_retry"
+# exp_name = "exp050-transformer-decoder_retry"
 
 upload = False
 # upload = True

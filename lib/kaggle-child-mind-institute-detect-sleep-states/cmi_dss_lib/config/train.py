@@ -86,6 +86,8 @@ class TrainConfig:
 
     early_stopping_patience: int
 
+    resume_from_checkpoint: str | None
+
 
 @dataclasses.dataclass
 class TrainSplit:

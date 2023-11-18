@@ -48,10 +48,26 @@ class SegModel(LightningModule):
         self.predict_step_outputs: list = []
         self.__best_loss = np.inf
 
+        # fit
+
+        self.save_top_k = 2
         self.model_save_dir_path = model_save_dir_path
 
         self.best_score_paths: list[tuple[float, pathlib.Path]] = []
-        self.last_path = None
+        self.last_model_path = None
+
+        if self.model_save_dir_path is not None:
+            self.best_ckpt_path = self.model_save_dir_path / "best.ckpt"
+            self.last_ckpt_path = self.model_save_dir_path / "last.ckpt"
+        else:
+            self.best_ckpt_path = self.last_ckpt_path = None
+
+    def setup(self, stage: str) -> None:
+        if stage == "fit":
+            if self.best_ckpt_path is not None and self.best_ckpt_path.exists():
+                raise FileExistsError(self.best_ckpt_path)
+            if self.last_ckpt_path is not None and self.last_ckpt_path.exists():
+                raise FileExistsError(self.last_ckpt_path)
 
     def forward(
         self, batch: dict[str : torch.Tensor], *, do_mixup=False, do_cutmix=False
@@ -218,49 +234,48 @@ class SegModel(LightningModule):
             + ".ckpt"
         )
 
-        self.last_path = current_model_path
+        self.last_model_path = current_model_path
 
         self.best_score_paths.append((score, current_model_path))
         best_score_paths_in_descending_order = sorted(
             self.best_score_paths, key=lambda pair: pair[0]
         )[::-1]
 
-        save_top_k = 3
         monitor = "EventDetectionAP"
 
         best_model_score, best_model_path = best_score_paths_in_descending_order[0]
 
         self.trainer.save_checkpoint(current_model_path)
 
-        if len(best_score_paths_in_descending_order) < save_top_k or current_model_path in (
-            path for _, path in best_score_paths_in_descending_order[:save_top_k]
+        if len(best_score_paths_in_descending_order) < self.save_top_k or current_model_path in (
+            path for _, path in best_score_paths_in_descending_order[: self.save_top_k]
         ):
             print(
                 f"Epoch {epoch:d}, global step {step:d}: {monitor!r} reached {score:0.5f}"
-                f" (best {best_model_score:0.5f}), saving model to {current_model_path} in top {save_top_k}"
+                f" (best {best_model_score:0.5f}), saving model to {current_model_path} in top {self.save_top_k}"
             )
-            best_ckpt_path = self.model_save_dir_path / "best.ckpt"
-            best_ckpt_path.unlink(missing_ok=True)
-            best_ckpt_path.symlink_to(best_model_path)
+            self.best_ckpt_path.unlink(missing_ok=True)
+            self.best_ckpt_path.symlink_to(best_model_path)
         else:
             print(
-                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {save_top_k}"
+                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {self.save_top_k}"
             )
 
         if len(best_score_paths_in_descending_order) > 0:
-            last_ckpt_path = self.model_save_dir_path / "last.ckpt"
-            last_ckpt_path.unlink(missing_ok=True)
-            last_ckpt_path.symlink_to(self.last_path)
+            self.last_ckpt_path.unlink(missing_ok=True)
+            self.last_ckpt_path.symlink_to(self.last_model_path)
 
         indices_to_remove = []
-        for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[save_top_k:]):
-            if model_path == self.last_path:
+        for i, (_, model_path) in enumerate(
+            best_score_paths_in_descending_order[self.save_top_k :]
+        ):
+            if model_path == self.last_model_path:
                 continue
             model_path.unlink(missing_ok=True)
-            indices_to_remove.append(save_top_k + i)
+            indices_to_remove.append(self.save_top_k + i)
 
         for i in indices_to_remove[::-1]:
-            print(best_score_paths_in_descending_order.pop(i))
+            best_score_paths_in_descending_order.pop(i)
         self.best_score_paths = best_score_paths_in_descending_order
 
     def predict_step(

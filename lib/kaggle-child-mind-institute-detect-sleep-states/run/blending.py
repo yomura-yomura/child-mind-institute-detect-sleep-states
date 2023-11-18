@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 import pathlib
+from typing import Callable, Sequence
 
 import cmi_dss_lib.utils.common
 import cmi_dss_lib.utils.metrics
@@ -44,13 +45,14 @@ all_model_dir_path_dict = {
     7: ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",  # 7
     19: ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
     27: jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
-    36: ranchantan_pred_dir_path
-    / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-    41: ranchantan_pred_dir_path / "exp041",
+    # 36: ranchantan_pred_dir_path
+    # / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+    41: ranchantan_pred_dir_path / "exp041_retry",
     # 43: jumtras_pred_dir_path / "exp043",
-    44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
-    45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
-    47: ranchantan_pred_dir_path / "exp047",
+    # 44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
+    # 45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
+    # 47: ranchantan_pred_dir_path / "exp047",
+    50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry",
 }
 
 # weight_dict = {7: 0.2, 19: 0.3, 27: 0.3, 41: 0.2}  # 12
@@ -59,17 +61,12 @@ all_model_dir_path_dict = {
 # weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0}
 # weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 47: 0}
 # weight_dict = {3: 1, 19: 0, 27: 0, 41: 0, 44: 0, 45: 0, 47: 0}
-weight_dict = {3: 1, 7: 0, 19: 0, 36: 0, 44: 0, 45: 0, 47: 0}
-
-assert sum(weight_dict.values()) == 1
-print(f"{len(weight_dict) = }")
-
-model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
+weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}
 
 
 def calc_score(
     i_fold: int,
-    weights: list[int],
+    weights: list[float],
     keys_dict,
     all_event_df,
     preds_dict,
@@ -163,48 +160,21 @@ def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
     return keys_dict, preds_dict
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
-    parser.add_argument("--n-cpus", "-n", default=8, type=int)
-    args = parser.parse_args(args)
+def optimize(
+    search_type: str,
+    models_dir_name: str,
+    calc_all_scores: Callable[[Sequence[float]], tuple[Sequence[float], Sequence[float]]]
+    | Callable[[Sequence[float], dict | None], tuple[Sequence[float], Sequence[float]]],
+    weight,
+    n_cpus=None,
+):
+    if n_cpus is None:
+        n_cpus = os.cpu_count()
 
-    keys_dict, preds_dict = get_keys_and_preds(model_dir_paths)
-    # keys_dict, preds_dict = get_keys_and_preds(list(model_dir_path_dict.values()))
+    print(f"{n_cpus = }")
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
-
-    # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, None)
-
-    def calc_all_scores(weights: list[int], post_process_modes=None):
-        scores = []
-        for i_fold in tqdm.trange(5):
-            scores.append(
-                calc_score(
-                    i_fold,
-                    weights,
-                    keys_dict,
-                    all_event_df,
-                    preds_dict,
-                    post_process_modes=post_process_modes,
-                )
-            )
-
-        mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
-        print(f"{mean_score_str} ({', '.join(score_strs)})")
-        return scores, weights
-
-    models_dir_name = "_".join(str(exp) for exp in weight_dict)
-
-    match args.search_type:
+    match search_type:
         case "grid_search":
-            # weight = get_grid(step=0.1)
-            # weight = get_grid(step=0.1, target_sum=1)
-            weight = get_grid(step=0.1, target_sum=1)
-            # weight = get_grid(step=0.02, target_sum=1)
-
             target_csv_path = (
                 pathlib.Path(__file__).parent / "grid_search" / models_dir_name / "grid_search.csv"
             )
@@ -218,6 +188,56 @@ if __name__ == "__main__":
                     lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
                 )
 
+                # df = pd.concat(
+                #     [
+                #         df,
+                #         pd.DataFrame(
+                #             [(score_th, distance) for score_th, distance in df["weights"]],
+                #             columns=["score_th", "distance"],
+                #         ),
+                #     ],
+                #     axis=1,
+                # ).sort_values(["score_th", "distance"])
+                #
+                # unique_score_ths = df["score_th"].unique()
+                # unique_distances = df["distance"].unique()
+                # grid = (
+                #     pd.merge(
+                #         pd.Series(unique_score_ths, name="score_th"),
+                #         pd.Series(unique_distances, name="distance"),
+                #         how="cross",
+                #     )
+                #     .to_numpy()
+                #     .reshape((len(unique_score_ths), len(unique_distances), 2))
+                # )
+                #
+                # indices = [
+                #     np.argmax(
+                #         np.isclose(score_th, grid[..., 0].flatten())
+                #         & np.isclose(distance, grid[..., 1].flatten())
+                #     )
+                #     for score_th, distance in df[["score_th", "distance"]].values
+                # ]
+                # grid_score = np.full(grid.shape[:-1], np.nan).reshape(-1)
+                # grid_score[indices] = df["CV"]
+                # grid_score = grid_score.reshape(grid.shape[:-1])
+                # import plotly.express as px
+                # import plotly_utility.offline
+                #
+                # fig = px.imshow(
+                #     grid_score,
+                #     y=unique_score_ths,
+                #     x=unique_distances,
+                #     aspect=unique_distances.max() / unique_score_ths.max(),
+                # )
+                # fig = px.imshow(
+                #     grid_score[:, :1],
+                #     y=unique_score_ths,
+                #     x=unique_distances[:1],
+                #     aspect=unique_distances[:1].max() / unique_score_ths.max(),
+                #     text_auto=".2f",
+                # )
+                # plotly_utility.offline.mpl_plot(fig)
                 # if True:
                 #     target_weight = df.iloc[df["CV"].argmax()]["weights"]
                 #     print(f"{target_weight = }")
@@ -237,7 +257,7 @@ if __name__ == "__main__":
                 records = []
 
             n_steps_to_save = 30
-            with multiprocessing.Pool(args.n_cpus) as p:
+            with multiprocessing.Pool(n_cpus) as p:
                 with tqdm.tqdm(total=len(weight), desc="grid search") as t:
                     for scores, weights in p.imap_unordered(calc_all_scores, weight.tolist()):
                         t.update(1)
@@ -298,6 +318,53 @@ weights = {dict(zip(weight_dict, record_at_max["weights"]))}
             )
             study.enqueue_trial({f"w{i}": w for i, w in enumerate(weight_dict.values())})
             study.optimize(objective, n_trials=100, n_jobs=args.n_cpus, show_progress_bar=True)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
+    parser.add_argument("--n-cpus", "-n", default=None, type=int)
+    args = parser.parse_args(args)
+
+    assert sum(weight_dict.values()) == 1
+    print(f"{len(weight_dict) = }")
+
+    model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
+    keys_dict, preds_dict = get_keys_and_preds(model_dir_paths)
+    # keys_dict, preds_dict = get_keys_and_preds(list(model_dir_path_dict.values()))
+
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
+
+    # calc_score(0, [1, 1, 1], keys_dict, all_event_df, preds_dict, None)
+
+    def calc_all_scores(weights: list[float], post_process_modes: dict = None):
+        scores = []
+        for i_fold in tqdm.trange(5):
+            scores.append(
+                calc_score(
+                    i_fold,
+                    weights,
+                    keys_dict,
+                    all_event_df,
+                    preds_dict,
+                    post_process_modes=post_process_modes,
+                )
+            )
+
+        mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
+        print(f"{mean_score_str} ({', '.join(score_strs)}) at {weights}")
+        return scores, weights
+
+    models_dir_name = "_".join(str(exp) for exp in weight_dict)
+
+    # weight = get_grid(step=0.1)
+    # weight = get_grid(step=0.1, target_sum=1)
+    weight = get_grid(step=0.1, target_sum=1)
+    # weight = get_grid(step=0.02, target_sum=1)
+
+    optimize(args.search_type, f"blending/{models_dir_name}", calc_all_scores, weight, args.n_cpus)
 
 
 # scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]

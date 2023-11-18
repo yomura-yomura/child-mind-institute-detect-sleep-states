@@ -39,6 +39,16 @@ project_root_path = pathlib.Path(__file__).parent.parent
 def main(cfg: TrainConfig):
     print(cfg)
 
+    if cfg.resume_from_checkpoint is None:
+        resume_from_checkpoint = None
+    else:
+        resume_from_checkpoint = os.path.join(
+            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
+        )
+        if not os.path.exists(resume_from_checkpoint):
+            raise FileNotFoundError(resume_from_checkpoint)
+        print(f"Info: Training resumes from {resume_from_checkpoint}")
+
     seed_everything(cfg.seed)
 
     # init lightning model
@@ -108,14 +118,15 @@ def main(cfg: TrainConfig):
         val_check_interval=cfg.val_check_interval,
     )
 
-    trainer.fit(model, datamodule=datamodule)
+    trainer.fit(model, datamodule=datamodule, ckpt_path=resume_from_checkpoint)
     wandb.finish()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_path", nargs="+")
+    parser.add_argument("config_path_or_hydra_arguments", nargs="+")
     parser.add_argument("--folds", type=str, default=None)
+    parser.add_argument("--force", action="store_true", default=False)
     args = parser.parse_args(args)
 
     if args.folds is None:
@@ -126,10 +137,18 @@ if __name__ == "__main__":
     print(f"{folds = }")
 
     for i_fold in folds:
-        overrides_args = []
-        for p in args.config_path:
-            overrides_args += OmegaConf.load(project_root_path / p)
-        overrides_args.append(f"split=fold_{i_fold}")
-        print(f"{overrides_args = }")
-        sys.argv = sys.argv[:1] + overrides_args
+        overrides_dict = {}
+        for p in args.config_path_or_hydra_arguments:
+            if os.path.exists(p):
+                for k, v in (item.split("=", maxsplit=1) for item in OmegaConf.load(p)):
+                    if k in overrides_dict.keys():
+                        print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
+                    overrides_dict[k] = v
+            else:
+                k, v = p.split("=", maxsplit=1)
+                if k in overrides_dict.keys():
+                    print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
+                overrides_dict[k] = v
+        overrides_dict["split"] = f"fold_{i_fold}"
+        sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
         main()
