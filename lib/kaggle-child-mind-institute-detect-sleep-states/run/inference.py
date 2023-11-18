@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
-from cmi_dss_lib.modelmodule.seg import SegModel
+from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from cmi_dss_lib.utils.common import trace
 from cmi_dss_lib.utils.post_process import (
     PostProcessModes,
@@ -33,17 +33,21 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
-        "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
+        # "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
         # "../cmi-dss-ensemble-models/jumtras/exp043",
         # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
         # "../cmi-dss-ensemble-models/ranchantan/exp044-transformer-decoder",
-        # "../cmi-dss-ensemble-models/ranchantan/exp047",
-        # "phase=dev",
-        "phase=train",
+        #
+        # "../cmi-dss-ensemble-models/ranchantan/exp047_retry",
+        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
+        #
+        "phase=dev",
+        # "phase=train",
         # "batch_size=32",
         "batch_size=16",
+        # "--folds",
+        # "4"
         #
         # "dir.sub_dir=tmp",
         # "prev_margin_steps=4320",
@@ -54,19 +58,7 @@ else:
 
 
 def load_model(cfg: TrainConfig) -> L.LightningModule:
-    # import cmi_dss_lib.datamodule.seg
-    # import cmi_dss_lib.models.common
-    #
-    # num_time_steps = cmi_dss_lib.datamodule.seg.nearest_valid_size(
-    #     int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate
-    # )
-    # model = cmi_dss_lib.models.common.get_model(
-    #     cfg,
-    #     feature_dim=len(cfg.features),
-    #     n_classes=len(cfg.labels),
-    #     num_time_steps=num_time_steps // cfg.downsample_rate,
-    # ).to("cuda")
-    module = SegModel(
+    module = SegChunkModule(
         cfg,
         val_event_df=None,
         feature_dim=len(cfg.features),
@@ -75,22 +67,11 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
     )
 
     # load weights
-    weight_path = (
-        # project_root_path
-        # / "output_dataset"
-        pathlib.Path(cfg.dir.model_dir)
-        # / cfg.weight["exp_name"]
-        # / cfg.weight["run_name"]
-        # / cfg.exp_name
-        # / cfg.split.name
-        / "best_model.pth"
-    )
+    weight_path = pathlib.Path(cfg.dir.model_dir) / "best_model.pth"
     module.model.load_state_dict(torch.load(weight_path))
-    # model.load_state_dict(torch.load(weight_path))
     print(f'load weight from "{weight_path}"')
 
     return module
-    # return model
 
 
 def inference(
@@ -103,11 +84,10 @@ def inference(
     predictions = trainer.predict(model, loader)
 
     series_id_preds_dict = dict(
-        SegModel._evaluation_epoch_end([pred for preds in predictions for pred in preds])
+        SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds])
     )
 
     for series_id, preds in series_id_preds_dict.items():
-        # np.save(pred_dir_path / f"{series_id}.npy", preds)
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
 
 
@@ -191,20 +171,18 @@ def main(cfg: TrainConfig):
         cfg.phase,
         f"{cfg.split.name}",
     )
-    # if pred_dir_path.exists():
-    #     warnings.warn(f"file already exists: {fold_dir_path}")
-    #     return
 
     pred_dir_path.mkdir(exist_ok=True, parents=True)
     with trace("inference"):
         # keys, preds = inference_(dataloader, model, use_amp=cfg.use_amp, duration=cfg.duration)
         inference(dataloader, model, use_amp=cfg.use_amp, pred_dir_path=pred_dir_path)
 
-    from calc_cv import calc_score
+    if cfg.phase == "train":
+        from calc_cv import calc_score
 
-    score = calc_score(pred_dir_path)
-    print(f"{score:.4f}")
-    scores.append(score)
+        score = calc_score(pred_dir_path)
+        print(f"{score:.4f}")
+        scores.append(score)
 
 
 if __name__ == "__main__":

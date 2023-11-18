@@ -8,7 +8,6 @@ import omegaconf
 import pandas as pd
 import polars as pl
 import torch
-import yaml
 from lightning import LightningDataModule
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
@@ -234,7 +233,7 @@ class TrainDataset(Dataset):
             .to_pandas()
         )
         self.features = features
-        self.num_features = len(cfg.features)
+        # self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
@@ -248,6 +247,8 @@ class TrainDataset(Dataset):
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
         # extract data matching series_id
         this_feature = self.features[series_id]  # (n_steps, num_features)
+        num_features = this_feature.shape[1]
+
         n_steps = this_feature.shape[0]
 
         if random.random() < self.cfg.bg_sampling_rate:
@@ -270,7 +271,7 @@ class TrainDataset(Dataset):
         feature = torch.FloatTensor(feature.T).unsqueeze(0)
         feature = resize(
             feature,
-            size=[self.num_features, self.upsampled_num_frames],
+            size=[num_features, self.upsampled_num_frames],
             antialias=False,
         ).squeeze(0)
 

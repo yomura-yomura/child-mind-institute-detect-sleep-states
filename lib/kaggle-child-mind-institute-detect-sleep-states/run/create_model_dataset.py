@@ -8,7 +8,7 @@ import hydra
 import pandas as pd
 import torch
 import tqdm
-from cmi_dss_lib.modelmodule.seg import SegModel
+from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from omegaconf import DictConfig, OmegaConf
 
 project_root_path = pathlib.Path(__file__).parent.parent
@@ -28,9 +28,11 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp008-3sigma"
 # exp_name = "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma"
 # exp_name = "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
-exp_name = "exp041_retry"
+# exp_name = "exp041_retry"
 # exp_name = "exp045-lstm-feature-extractor"
 # exp_name = "exp044-transformer-decoder"
+
+exp_name = "exp047_retry"
 
 # exp_name = "exp050-transformer-decoder"
 # exp_name = "exp050-transformer-decoder_retry"
@@ -43,7 +45,7 @@ upload = False
 def main(cfg: DictConfig):
     dataset_output_dir_path = project_root_path / "cmi-dss-ensemble-models" / "ranchantan"
 
-    module = SegModel.load_from_checkpoint(
+    module = SegChunkModule.load_from_checkpoint(
         f"{p}",
         cfg=cfg,
         val_event_df=None,

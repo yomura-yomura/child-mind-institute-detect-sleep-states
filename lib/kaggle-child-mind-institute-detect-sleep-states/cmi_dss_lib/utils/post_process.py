@@ -67,7 +67,7 @@ def post_process_for_seg(
                 {
                     "key": keys,
                     # "pred": preds,
-                    "pred": preds.astype("f4"),
+                    "pred": preds,
                     "series_id": series_ids,
                 }
             ),

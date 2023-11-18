@@ -2,24 +2,23 @@ import argparse
 import logging
 import os
 import pathlib
-import sys
 from pathlib import Path
 
 import hydra
 import wandb
 from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
-from cmi_dss_lib.modelmodule.seg import SegModel
+from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from lightning import Trainer, seed_everything
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
-from omegaconf import OmegaConf
+from lightning.pytorch.callbacks import LearningRateMonitor
+import cmi_dss_lib.utils.hydra
 
 from child_mind_institute_detect_sleep_states.model.callbacks import EarlyStopping
 from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "config/exp/41.yaml",
+        "../config/exp/50_resume.yaml",
         # "--folds", "1,2,3,4"
     ]
 else:
@@ -39,16 +38,6 @@ project_root_path = pathlib.Path(__file__).parent.parent
 def main(cfg: TrainConfig):
     print(cfg)
 
-    if cfg.resume_from_checkpoint is None:
-        resume_from_checkpoint = None
-    else:
-        resume_from_checkpoint = os.path.join(
-            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
-        )
-        if not os.path.exists(resume_from_checkpoint):
-            raise FileNotFoundError(resume_from_checkpoint)
-        print(f"Info: Training resumes from {resume_from_checkpoint}")
-
     seed_everything(cfg.seed)
 
     # init lightning model
@@ -59,7 +48,7 @@ def main(cfg: TrainConfig):
         project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
     )
 
-    model = SegModel(
+    model = SegChunkModule(
         cfg=cfg,
         val_event_df=datamodule.valid_event_df,
         feature_dim=len(cfg.features),
@@ -118,6 +107,25 @@ def main(cfg: TrainConfig):
         val_check_interval=cfg.val_check_interval,
     )
 
+    if cfg.resume_from_checkpoint is None:
+        resume_from_checkpoint = None
+    else:
+        resume_from_checkpoint = os.path.join(
+            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
+        )
+        if not os.path.exists(resume_from_checkpoint):
+            raise FileNotFoundError(resume_from_checkpoint)
+        # ckpt = torch.load(resume_from_checkpoint)
+        # early_stopping_key_in_callbacks = [
+        #     k for k, _ in ckpt["callbacks"].items() if k.startswith("EarlyStopping")
+        # ][0]
+        # ckpt["callbacks"][early_stopping_key_in_callbacks][
+        #     "patience"
+        # ] = cfg.early_stopping_patience
+        print(f"Info: Training resumes from {resume_from_checkpoint}")
+        # torch.save(ckpt, model_save_dir_path / "resume_from_checkpoint.ckpt")
+        # resume_from_checkpoint = model_save_dir_path / "resume_from_checkpoint.ckpt"
+
     trainer.fit(model, datamodule=datamodule, ckpt_path=resume_from_checkpoint)
     wandb.finish()
 
@@ -126,7 +134,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config_path_or_hydra_arguments", nargs="+")
     parser.add_argument("--folds", type=str, default=None)
-    parser.add_argument("--force", action="store_true", default=False)
     args = parser.parse_args(args)
 
     if args.folds is None:
@@ -137,18 +144,7 @@ if __name__ == "__main__":
     print(f"{folds = }")
 
     for i_fold in folds:
-        overrides_dict = {}
-        for p in args.config_path_or_hydra_arguments:
-            if os.path.exists(p):
-                for k, v in (item.split("=", maxsplit=1) for item in OmegaConf.load(p)):
-                    if k in overrides_dict.keys():
-                        print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
-                    overrides_dict[k] = v
-            else:
-                k, v = p.split("=", maxsplit=1)
-                if k in overrides_dict.keys():
-                    print(f"Info: {k}={overrides_dict[k]} is replaced with {k}={v}")
-                overrides_dict[k] = v
-        overrides_dict["split"] = f"fold_{i_fold}"
-        sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
+        cmi_dss_lib.utils.hydra.override_default_hydra_config(
+            args.config_path_or_hydra_arguments, {"split": f"fold_{i_fold}"}
+        )
         main()

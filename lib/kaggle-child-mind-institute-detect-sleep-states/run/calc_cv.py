@@ -7,6 +7,7 @@ import pandas as pd
 import tqdm
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
+import child_mind_institute_detect_sleep_states.score
 
 # np.seterr(all="raise")
 
@@ -26,14 +27,14 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-        watch_interval_hour=6, sleep_occupancy_th=0.3
-    ),
+    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #     watch_interval_hour=6, sleep_occupancy_th=0.3
+    # ),
 }
 
 # score_th = 0.005
 # distance = 96
-score_th = 0
+score_th = 1e-4
 distance = 88
 
 
@@ -61,6 +62,9 @@ def calc_score(predicted_fold_dir_path):
     score = cmi_dss_lib.utils.metrics.event_detection_ap(
         event_df[event_df["series_id"].isin(series_ids)], sub_df
     )
+    # score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
+    #     event_df[event_df["series_id"].isin(series_ids)], sub_df
+    # )
     return score
 
 
