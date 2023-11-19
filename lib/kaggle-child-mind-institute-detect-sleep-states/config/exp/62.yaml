@@ -24,7 +24,7 @@
 
 - features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos]
 
-- early_stopping_patience=20
+- early_stopping_patience=40
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
