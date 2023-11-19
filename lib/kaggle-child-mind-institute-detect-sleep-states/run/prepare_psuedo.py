@@ -28,6 +28,7 @@ def preprocess_for_psuedo_labels(pred:np.ndarray,th_sleep_prob:float,watch_inter
                 pred_copy[:,1][step] = 0
         else:
             pred_copy[:,1][step] = 0
+    
     np.savez(f"{result_path}/{s_id}.npz",pred_copy)
     return 
 

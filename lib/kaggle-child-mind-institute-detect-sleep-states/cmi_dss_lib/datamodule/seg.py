@@ -1,3 +1,4 @@
+import copy
 import pathlib
 import random
 from pathlib import Path
@@ -222,6 +223,7 @@ def get_labeling_interval(this_event_df:pd.DataFrame,max_steps:int,th_nan_label:
     return psuedo_interval
 
 
+
 ###################
 # Dataset
 ###################
@@ -260,6 +262,7 @@ class TrainDataset(Dataset):
         self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
         if self.use_psuedo_label:
             self.id_to_psuedo_label = load_predicted(self.cfg.psuedo_label.path_psuedo)
+            
             self.id_to_label_interval = {}
             for s_id,df in self.event_df.groupby("series_id"):
                 self.id_to_label_interval[s_id] =get_labeling_interval(this_event_df =df.reset_index(drop = True),max_steps = self.id_to_psuedo_label[s_id].shape[0])//self.cfg.downsample_rate
@@ -343,14 +346,19 @@ class TrainDataset(Dataset):
             ).squeeze(0).numpy()
             psuedo_label = psuedo_label[psuedo_idx]
 
+            # crop sleep
+            psuedo_label[:,0] = np.where(psuedo_label[:,0] <= th_sleep ,0 ,psuedo_label[:,0])
+
             # crop wakeup and onset prop
-            psuedo_label = np.where(psuedo_label <= th_prop,0,psuedo_label)
+            psuedo_label[:,1] = np.where(psuedo_label[:,1] <= th_prop,0,psuedo_label[:,1])
+            psuedo_label[:,2] = np.where(psuedo_label[:,2] <= th_prop,0,psuedo_label[:,2])
+            #ori_lab = copy.deepcopy(label)
 
             label[psuedo_idx]  = psuedo_label
 
-            # crop sleep prob
-            label[:,[0]] = np.where(label[:,[0]] >= th_sleep ,1 ,0)
-        
+            # save psuedo
+            # path = "../../../data/psuedo_label"
+            # np.savez(Path(path) / f"{series_id}.npz",label = ori_lab,psuedo = label)
         return label
 
 
@@ -539,6 +547,7 @@ class SegDataModule(LightningDataModule):
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
+
 
     def train_dataloader(self):
         train_dataset = TrainDataset(
