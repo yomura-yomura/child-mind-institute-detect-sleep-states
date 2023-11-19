@@ -4,8 +4,12 @@ import numpy as np
 import numpy_utility as npu
 import pandas as pd
 import polars as pl
-from numpy.typing import NDArray
+from nptyping import DataFrame, Float, NDArray, Shape, Structure
 from scipy.signal import find_peaks
+
+SubmissionDataFrame = DataFrame[
+    Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
+]
 
 
 class SleepingEdgesAsProbsSetting(TypedDict):
@@ -28,26 +32,27 @@ PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
 
 def post_process_for_seg(
     keys: Sequence[str],
-    preds: NDArray[np.float_],
+    preds: NDArray[Shape["*, 3"], Float],
     downsample_rate: int,
     score_th: float = 0.01,
     distance: int = 5000,
     post_process_modes: PostProcessModes = None,
     print_msg: bool = True,
-) -> pd.DataFrame:
+) -> SubmissionDataFrame:
     """make submission dataframe for segmentation task
 
     Args:
-        keys (list[str]): list of keys. key is "{series_id}_{chunk_id}"
-        preds (np.ndarray): (num_series * num_chunks, duration, 3)
+        keys: list of keys. key is "{series_id}_{chunk_id}"
+        preds: (num_series * num_chunks, duration, 3)
         downsample_rate: see conf
-        score_th (float, optional): threshold for score. Defaults to 0.5.
+        score_th: threshold for score. Defaults to 0.5.
         distance: minimum interval between detectable peaks
         post_process_modes: extra post process names can be given
         print_msg: print info
     Returns:
         pl.DataFrame: submission dataframe
     """
+
     if post_process_modes is None:
         post_process_modes = {}
 
@@ -105,7 +110,7 @@ def post_process_for_seg(
                         else:
                             sleep_score = np.nan
                     elif event_name == "wakeup":
-                        min_step = max(step - th_hour_step, step)
+                        min_step = max(step - th_hour_step, 0)
                         if min_step < step:
                             sleep_score = np.median(sleep_preds[min_step:step])
                         else:

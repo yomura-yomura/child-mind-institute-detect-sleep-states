@@ -92,6 +92,8 @@ def main(cfg: DictConfig):
                 pl.col("enmo"),
                 pl.col("anglez").diff(n=1).over("series_id").alias("anglez_lag_diff"),
                 pl.col("enmo").diff(n=1).over("series_id").alias("enmo_lag_diff"),
+                pl.col("anglez").diff(n=1).abs().over("series_id").alias("anglez_lag_diff_abs"),
+                pl.col("enmo").diff(n=1).abs().over("series_id").alias("enmo_lag_diff_abs"),
             )
             .select(
                 [
@@ -100,6 +102,8 @@ def main(cfg: DictConfig):
                     pl.col("enmo"),
                     pl.col("anglez_lag_diff"),
                     pl.col("enmo_lag_diff"),
+                    pl.col("anglez_lag_diff_abs"),
+                    pl.col("enmo_lag_diff_abs"),
                     pl.col("timestamp"),
                 ]
             )
@@ -115,7 +119,7 @@ def main(cfg: DictConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff"]
+            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff", "anglez_lag_diff_abs", "enmo_lag_diff_abs"]
 
             scaler = sklearn.preprocessing.RobustScaler()
             series_df[feature_names_to_preprocess] = scaler.fit_transform(

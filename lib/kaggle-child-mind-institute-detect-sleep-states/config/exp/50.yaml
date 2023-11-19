@@ -1,5 +1,5 @@
-#- exp_name=exp041
-- exp_name=exp041_retry
+#- exp_name=exp050-transformer-decoder
+- exp_name=exp050-transformer-decoder_retry
 
 - split_type=base
 
@@ -8,6 +8,10 @@
 - feature_extractor=StackedGRUFeatureExtractor
 - feature_extractor.num_layers=4
 
+- decoder=TransformerDecoder
+
+- use_amp=true
+
 - duration=17280  # 24h
 
 - batch_size=4
@@ -15,7 +19,7 @@
 
 - sigma=108
 
-- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos]
+- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos,week_sin,week_cos]
 
 - early_stopping_patience=20
 

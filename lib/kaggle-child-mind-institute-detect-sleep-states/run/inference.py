@@ -6,14 +6,18 @@ import sys
 import hydra
 import lightning as L
 import numpy as np
-import pandas as pd
 import torch
 from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegModel
 from cmi_dss_lib.utils.common import trace
-from cmi_dss_lib.utils.post_process import PostProcessModes, post_process_for_seg
+from cmi_dss_lib.utils.post_process import (
+    PostProcessModes,
+    SubmissionDataFrame,
+    post_process_for_seg,
+)
 from lightning import seed_everything
+from nptyping import Float, NDArray, Shape
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 
@@ -24,18 +28,22 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
-        # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34"
+        # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34",  # 1
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
         # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
+        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp041",
+        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
+        # "../cmi-dss-ensemble-models/jumtras/exp043",
         # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
-        "../output_dataset/train/exp044-transformer-decoder",
+        # "../cmi-dss-ensemble-models/ranchantan/exp044-transformer-decoder",
+        # "../cmi-dss-ensemble-models/ranchantan/exp047",
         # "phase=dev",
         "phase=train",
-        "batch_size=32",
-        # "batch_size=16",
+        # "batch_size=32",
+        "batch_size=16",
         #
         # "dir.sub_dir=tmp",
         # "prev_margin_steps=4320",
@@ -46,14 +54,18 @@ else:
 
 
 def load_model(cfg: TrainConfig) -> L.LightningModule:
-    # num_time_steps = nearest_valid_size(int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate)
-    # model = get_model(
+    # import cmi_dss_lib.datamodule.seg
+    # import cmi_dss_lib.models.common
+    #
+    # num_time_steps = cmi_dss_lib.datamodule.seg.nearest_valid_size(
+    #     int(cfg.duration * cfg.upsample_rate), cfg.downsample_rate
+    # )
+    # model = cmi_dss_lib.models.common.get_model(
     #     cfg,
     #     feature_dim=len(cfg.features),
     #     n_classes=len(cfg.labels),
     #     num_time_steps=num_time_steps // cfg.downsample_rate,
-    # )
-
+    # ).to("cuda")
     module = SegModel(
         cfg,
         val_event_df=None,
@@ -74,21 +86,16 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
         / "best_model.pth"
     )
     module.model.load_state_dict(torch.load(weight_path))
+    # model.load_state_dict(torch.load(weight_path))
     print(f'load weight from "{weight_path}"')
 
     return module
+    # return model
 
 
 def inference(
     loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path
 ):
-    # ) -> tuple[list[str], np.ndarray]:
-    # model = model.to(device)
-    # model.eval()
-
-    # preds = []
-    # keys = []
-
     trainer = L.Trainer(
         devices=1,
         precision=16 if use_amp else 32,
@@ -103,45 +110,45 @@ def inference(
         # np.save(pred_dir_path / f"{series_id}.npy", preds)
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
 
-    # for batch in tqdm(loader, desc="inference"):
-    #     with torch.no_grad():
-    #         with torch.cuda.amp.autocast(enabled=use_amp):
-    #             x = batch["feature"].to(device)
-    #             pred = model(x)["logits"].sigmoid()
-    #             pred = resize(
-    #                 pred.detach().cpu(),
-    #                 size=[duration, pred.shape[2]],
-    #                 antialias=False,
-    #             )
-    #
-    #         if "key" in batch.keys():
-    #             key = batch["key"]
-    #         else:
-    #             key = batch["series_id"]
-    #         preds.append(pred.detach().cpu().numpy())
-    #         keys.extend(key)
-    # keys = np.array(
-    #     [
-    #         key
-    #         for keys_batch, _, preds_batch in predictions
-    #         for key in keys_batch
-    #         for _ in np.reshape(preds_batch, (-1, 3))
-    #     ]
-    # )
-    # preds = np.concatenate(
-    #     [preds for _, _, preds_batch in predictions for preds in preds_batch], axis=0
-    # )
-    # return keys, preds  # type: ignore
+
+def inference_(loader: DataLoader, model: L.LightningModule, use_amp: bool, duration):
+    from torchvision.transforms.functional import resize
+    from tqdm import tqdm
+
+    device = "cuda"
+
+    preds = []
+    keys = []
+    for batch in tqdm(loader, desc="inference"):
+        with torch.no_grad():
+            with torch.cuda.amp.autocast(enabled=use_amp):
+                x = batch["feature"].to(device)
+                pred = model(x)["logits"].sigmoid()
+                pred = resize(
+                    pred.detach().cpu(),
+                    size=[duration, pred.shape[2]],
+                    antialias=False,
+                )
+
+            if "key" in batch.keys():
+                key = batch["key"]
+            else:
+                key = batch["series_id"]
+            preds.append(pred.detach().cpu().numpy())
+            keys.extend(key)
+    preds = np.concatenate(preds, axis=0)
+
+    return keys, preds  # type: ignore
 
 
 def make_submission(
     keys: list[str],
-    preds: np.ndarray,
+    preds: NDArray[Shape["*, 3"], Float],
     downsample_rate: int,
     score_th: float,
     distance: int,
     post_process_modes: PostProcessModes = None,
-) -> pd.DataFrame:
+) -> SubmissionDataFrame:
     sub_df = post_process_for_seg(
         keys,
         preds,
@@ -156,6 +163,7 @@ def make_submission(
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
 def main(cfg: TrainConfig):
+    print(cfg)
     seed_everything(cfg.seed)
 
     with trace("load test dataloader"):
@@ -183,10 +191,19 @@ def main(cfg: TrainConfig):
         cfg.phase,
         f"{cfg.split.name}",
     )
-    pred_dir_path.mkdir(exist_ok=False, parents=True)
+    # if pred_dir_path.exists():
+    #     warnings.warn(f"file already exists: {fold_dir_path}")
+    #     return
+
+    pred_dir_path.mkdir(exist_ok=True, parents=True)
     with trace("inference"):
-        # keys, preds = inference(dataloader, model, use_amp=cfg.use_amp)
+        # keys, preds = inference_(dataloader, model, use_amp=cfg.use_amp, duration=cfg.duration)
         inference(dataloader, model, use_amp=cfg.use_amp, pred_dir_path=pred_dir_path)
+
+    from calc_cv import calc_score
+
+    score = calc_score(pred_dir_path)
+    print(f"{score:.4f}")
 
     # pred_dir_path = pathlib.Path(
     #     cfg.dir.sub_dir, "predicted", *pathlib.Path(cfg.dir.model_dir).parts[-3:-1]
@@ -207,6 +224,7 @@ def main(cfg: TrainConfig):
     #         pred=preds,
     #     )
     #
+
     # with trace("make submission"):
     #     sub_df = make_submission(
     #         keys,
@@ -217,6 +235,9 @@ def main(cfg: TrainConfig):
     #     )
     #
     # if cfg.phase in ["train", "valid"]:
+    #     import cmi_dss_lib.utils.metrics
+    #     import pandas as pd
+    #
     #     unique_series_ids = np.unique([str(k).split("_")[0] for k in keys])
     #
     #     event_df = pd.read_csv(pathlib.Path(cfg.dir.data_dir) / "train_events.csv")

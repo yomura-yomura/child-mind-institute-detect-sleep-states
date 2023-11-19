@@ -1,5 +1,5 @@
-#- exp_name=exp041
-- exp_name=exp041_retry
+#- exp_name=exp047
+- exp_name=exp058
 
 - split_type=base
 
@@ -15,7 +15,7 @@
 
 - sigma=108
 
-- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos]
+- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos]
 
 - early_stopping_patience=20
 

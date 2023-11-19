@@ -1,4 +1,5 @@
 import itertools
+import pathlib
 from typing import Any, Optional
 
 import cmi_dss_lib.datamodule.seg
@@ -28,6 +29,7 @@ class SegModel(LightningModule):
         feature_dim: int,
         num_classes: int,
         duration: int,
+        model_save_dir_path: pathlib.Path | None = None,
     ):
         super().__init__()
         self.cfg = cfg
@@ -45,6 +47,11 @@ class SegModel(LightningModule):
         self.validation_step_outputs: list = []
         self.predict_step_outputs: list = []
         self.__best_loss = np.inf
+
+        self.model_save_dir_path = model_save_dir_path
+
+        self.best_score_paths: list[tuple[float, pathlib.Path]] = []
+        self.last_path = None
 
     def forward(
         self, batch: dict[str : torch.Tensor], *, do_mixup=False, do_cutmix=False
@@ -90,31 +97,13 @@ class SegModel(LightningModule):
             size=[self.duration, logits.shape[2]],
             antialias=False,
         )
-        # resized_labels = resize(
-        #     batch["label"].detach().cpu(),
-        #     size=[self.duration, logits.shape[2]],
-        #     antialias=False,
-        # )
 
         masks = batch["mask"].detach().cpu()
-        # if masks.all():
-        #     resized_probs = resized_probs.numpy()
-        # else:
-        #     resized_probs = [
-        #         resized_prob[mask].reshape(-1, resized_prob.shape[1]).numpy()
-        #         for resized_prob, mask in zip(resized_probs, masks, strict=True)
-        #     ]
 
         series_ids = [key.split("_")[0] for key in batch["key"]]
         resized_probs = resized_probs.numpy()
-        # resized_labels = resized_labels.numpy()
-        assert (
-            len(series_ids)
-            # == len(resized_labels)
-            == len(resized_probs)
-        ), (
+        assert len(series_ids) == len(resized_probs), (
             len(series_ids),
-            # len(resized_labels),
             len(resized_probs),
         )
 
@@ -122,7 +111,6 @@ class SegModel(LightningModule):
             step_outputs.append(
                 (
                     series_ids,
-                    # resized_labels,
                     resized_probs,
                 )
             )
@@ -133,22 +121,18 @@ class SegModel(LightningModule):
             for (
                 series_id,
                 resized_mask,
-                # resized_label,
                 resized_prob,
             ) in zip(
                 series_ids,
                 resized_masks,
-                # resized_labels,
                 resized_probs,
                 strict=True,
             ):
                 if not torch.all(resized_mask):
-                    # resized_label = resized_label[resized_mask].reshape(-1, 3)
                     resized_prob = resized_prob[resized_mask].reshape(-1, 3)
                 step_outputs.append(
                     (
                         [series_id],
-                        # [resized_label],
                         [resized_prob],
                     )
                 )
@@ -159,13 +143,11 @@ class SegModel(LightningModule):
         flatten_validation_step_outputs = [
             (
                 series_id,
-                # labels,
                 preds,
             )
             for args_in_batch in step_outputs
             for (
                 series_id,
-                # labels,
                 preds,
             ) in zip(*args_in_batch, strict=True)
         ]
@@ -218,6 +200,68 @@ class SegModel(LightningModule):
         self.log(
             "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
         )
+        if self.model_save_dir_path is not None:
+            self.save_checkpoint_top_k(score)
+
+    def save_checkpoint_top_k(self, score: float):
+        epoch = self.trainer.current_epoch
+        step = self.trainer.global_step
+
+        current_model_path = self.model_save_dir_path / (
+            "-".join(
+                [
+                    f"{epoch=}",
+                    f"{step=}",
+                    f"EventDetectionAP={score:.4f}",
+                ]
+            )
+            + ".ckpt"
+        )
+
+        self.last_path = current_model_path
+
+        self.best_score_paths.append((score, current_model_path))
+        best_score_paths_in_descending_order = sorted(
+            self.best_score_paths, key=lambda pair: pair[0]
+        )[::-1]
+
+        save_top_k = 3
+        monitor = "EventDetectionAP"
+
+        best_model_score, best_model_path = best_score_paths_in_descending_order[0]
+
+        self.trainer.save_checkpoint(current_model_path)
+
+        if len(best_score_paths_in_descending_order) < save_top_k or current_model_path in (
+            path for _, path in best_score_paths_in_descending_order[:save_top_k]
+        ):
+            print(
+                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} reached {score:0.5f}"
+                f" (best {best_model_score:0.5f}), saving model to {current_model_path} in top {save_top_k}"
+            )
+            best_ckpt_path = self.model_save_dir_path / "best.ckpt"
+            best_ckpt_path.unlink(missing_ok=True)
+            best_ckpt_path.symlink_to(best_model_path)
+        else:
+            print(
+                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {save_top_k}"
+            )
+
+        if len(best_score_paths_in_descending_order) > 0:
+            last_ckpt_path = self.model_save_dir_path / "last.ckpt"
+            last_ckpt_path.unlink(missing_ok=True)
+            last_ckpt_path.symlink_to(self.last_path)
+
+        indices_to_remove = []
+        for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[save_top_k:]):
+            if model_path == self.last_path:
+                continue
+            model_path.unlink(missing_ok=True)
+            indices_to_remove.append(save_top_k + i)
+
+        for i in indices_to_remove[::-1]:
+            print(best_score_paths_in_descending_order.pop(i))
+        self.best_score_paths = best_score_paths_in_descending_order
 
     def predict_step(
         self, batch: dict[str : torch.Tensor]
