@@ -30,6 +30,7 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 @hydra.main(config_path="conf", config_name="stacking", version_base="1.2")
 def main(cfg: StackingConfig):
+    cfg.dir.sub_dir = str(project_root_path / "run")
     print(cfg)
 
     L.seed_everything(cfg.seed)
@@ -38,9 +39,13 @@ def main(cfg: StackingConfig):
     datamodule.setup("fit")
     # x = next(iter(datamodule.train_dataloader()))
 
-    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train_stacking" / cfg.exp_name / cfg.split.name
+    model_save_dir_path = (
+        project_root_path / cfg.dir.output_dir / "train_stacking" / cfg.exp_name / cfg.split.name
+    )
 
-    module = StackingChunkModule(cfg, val_event_df=datamodule.valid_event_df, model_save_dir_path=model_save_dir_path)
+    module = StackingChunkModule(
+        cfg, val_event_df=datamodule.valid_event_df, model_save_dir_path=model_save_dir_path
+    )
     # preds = module.cuda()(
     #     {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in x.items()}
     # )
@@ -83,7 +88,9 @@ def main(cfg: StackingConfig):
     if cfg.resume_from_checkpoint is None:
         resume_from_checkpoint = None
     else:
-        resume_from_checkpoint = os.path.join(cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt")
+        resume_from_checkpoint = os.path.join(
+            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
+        )
         if not os.path.exists(resume_from_checkpoint):
             raise FileNotFoundError(resume_from_checkpoint)
         print(f"Info: Training resumes from {resume_from_checkpoint}")

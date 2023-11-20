@@ -42,19 +42,14 @@ all_model_dir_path_dict = {
     7: ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",
     19: ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
     27: jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
-    # 36: ranchantan_pred_dir_path
-    # / "exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
     41: ranchantan_pred_dir_path / "exp041_retry",
-    # 43: jumtras_pred_dir_path / "exp043",
-    # 44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
-    # 45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
     47: ranchantan_pred_dir_path / "exp047_retry",
-    # 50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry",
     50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry_resume",
     52: jumtras_pred_dir_path / "exp052",
     53: jumtras_pred_dir_path / "exp053",
     54: ranchantan_pred_dir_path / "exp054",
     55: ranchantan_pred_dir_path / "exp055",
+    58: jumtras_pred_dir_path / "exp058",
 }
 
 # weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
@@ -68,7 +63,11 @@ all_model_dir_path_dict = {
 #     "53": 0.3,
 # }  # 19
 # weight_dict = {7: 1, 19: 0, 27: 0, 47: 0, 50: 0, 52: 0, 53: 0}  # 20
-weight_dict = {"19": 0.1, "27": 0.1, "47": 0.1, "50": 0.2, "52": 0.2, "53": 0.3}  # 20
+# weight_dict = {"19": 0.1, "27": 0.1, "47": 0.1, "50": 0.2, "52": 0.2, "53": 0.3}  # 20
+# weight_dict = {47: 1, 50: 0, 52: 0, 53: 0}  # 21
+# weight_dict = {19: 0.1, 27: 0.1, 50: 0.2, 53: 0.3, 55: 0.1, 58: 0.2}  # 22
+weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
+
 
 # score_th = 0.005
 # distance = 96
@@ -100,8 +99,8 @@ if __name__ == "__main__":
     def calc_all_scores(
         weights: list[float],
         post_process_modes: dict = None,
-        score_th: float = 0.005,
-        distance: float = 96,
+        score_th: float = score_th,
+        distance: float = distance,
         n_records_per_series_id=None,
         print_msg: bool = False,
     ) -> tuple[list[float], list[float]]:
@@ -130,8 +129,8 @@ if __name__ == "__main__":
         print(f"calc score for {weight_dict}")
         calc_all_scores(
             list(weight_dict.values()),
-            score_th=score_th,
-            distance=distance,
+            score_th=1e-4,
+            distance=88,
             n_records_per_series_id=1000,
             post_process_modes=post_process_modes,
             print_msg=True,
@@ -161,4 +160,11 @@ if __name__ == "__main__":
         record_at_max = cmi_dss_lib.blending.optimize(
             args.search_type, models_dir_name, calc_all_scores, weight, weight_dict, args.n_cpus
         )
-        calc_all_scores(record_at_max["weights"], post_process_modes, print_msg=True)
+        calc_all_scores(
+            record_at_max["weights"],
+            post_process_modes,
+            print_msg=True,
+            score_th=1e-4,
+            distance=88,
+            n_records_per_series_id=1000,
+        )

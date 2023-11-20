@@ -182,6 +182,7 @@ def get_model(cfg: TrainConfig, feature_dim: int, n_classes: int, num_time_steps
 
         model = Spec2DCNN(
             feature_extractor=feature_extractor,
+            segmentation_model_name=cfg.model.segmentation_model_name,
             decoder=decoder,
             encoder_name=cfg.model.encoder_name,
             in_channels=feature_extractor.out_chans,

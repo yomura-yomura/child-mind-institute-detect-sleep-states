@@ -11,6 +11,7 @@ class Spec2DCNN(nn.Module):
     def __init__(
         self,
         feature_extractor: nn.Module,
+        segmentation_model_name: str,
         decoder: nn.Module,
         encoder_name: str,
         in_channels: int,
@@ -20,6 +21,7 @@ class Spec2DCNN(nn.Module):
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
+        assert segmentation_model_name == "unet"
         self.encoder = smp.Unet(
             encoder_name=encoder_name,
             encoder_weights=encoder_weights,
