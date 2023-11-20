@@ -12,7 +12,11 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from cmi_dss_lib.utils.common import trace
-from cmi_dss_lib.utils.post_process import PostProcessModes, SubmissionDataFrame, post_process_for_seg
+from cmi_dss_lib.utils.post_process import (
+    PostProcessModes,
+    SubmissionDataFrame,
+    post_process_for_seg,
+)
 from lightning import seed_everything
 from nptyping import Float, NDArray, Shape
 from omegaconf import OmegaConf
@@ -23,7 +27,7 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
+        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34",  # 1
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
@@ -41,6 +45,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
         # "../cmi-dss-ensemble-models/jumtras/exp052",
         # "../cmi-dss-ensemble-models/jumtras/exp053",
+        "../cmi-dss-ensemble-models/ranchantan/exp054",
+        # "../cmi-dss-ensemble-models/ranchantan/exp055",
         #
         "phase=dev",
         # "phase=train",
@@ -75,14 +81,18 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
     return module
 
 
-def inference(loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path):
+def inference(
+    loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path
+):
     trainer = L.Trainer(
         devices=1,
         precision=16 if use_amp else 32,
     )
     predictions = trainer.predict(model, loader)
 
-    series_id_preds_dict = dict(SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds]))
+    series_id_preds_dict = dict(
+        SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds])
+    )
 
     for series_id, preds in series_id_preds_dict.items():
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))

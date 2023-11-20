@@ -27,9 +27,9 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-        watch_interval_hour=6, sleep_occupancy_th=0.3
-    ),
+    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #     watch_interval_hour=6, sleep_occupancy_th=0.3
+    # ),
 }
 
 
@@ -53,6 +53,8 @@ all_model_dir_path_dict = {
     50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry_resume",
     52: jumtras_pred_dir_path / "exp052",
     53: jumtras_pred_dir_path / "exp053",
+    54: ranchantan_pred_dir_path / "exp054",
+    55: ranchantan_pred_dir_path / "exp055",
 }
 
 # weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
@@ -88,7 +90,9 @@ if __name__ == "__main__":
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
 
     folds = sorted(map(int, set(args.folds.split(","))))
     print(f"{folds = }")
@@ -99,6 +103,7 @@ if __name__ == "__main__":
         score_th: float = 0.005,
         distance: float = 96,
         n_records_per_series_id=None,
+        print_msg: bool = False,
     ) -> tuple[list[float], list[float]]:
         scores = []
         for i_fold in tqdm.tqdm(folds):
@@ -113,6 +118,7 @@ if __name__ == "__main__":
                     score_th=score_th,
                     distance=distance,
                     n_records_per_series_id=n_records_per_series_id,
+                    print_msg=print_msg,
                 )
             )
 
@@ -128,6 +134,7 @@ if __name__ == "__main__":
             distance=distance,
             n_records_per_series_id=1000,
             post_process_modes=post_process_modes,
+            print_msg=True,
         )
 
         # calc_all_scores([0.1, 0.1, 0.1, 0.2, 0.2, 0.3], score_th=score_th, distance=distance)
@@ -154,4 +161,4 @@ if __name__ == "__main__":
         record_at_max = cmi_dss_lib.blending.optimize(
             args.search_type, models_dir_name, calc_all_scores, weight, weight_dict, args.n_cpus
         )
-        calc_all_scores(record_at_max["weights"], post_process_modes)
+        calc_all_scores(record_at_max["weights"], post_process_modes, print_msg=True)
