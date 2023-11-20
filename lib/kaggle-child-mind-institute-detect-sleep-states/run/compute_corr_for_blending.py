@@ -6,7 +6,9 @@ exp_names, model_dir_paths = zip(*all_model_dir_path_dict.items())
 exp_names = list(map(str, exp_names))
 keys_dict, preds_dict = get_keys_and_preds(model_dir_paths)
 
-concat_preds = np.concatenate([np.concatenate(preds_dict[i_fold], axis=1) for i_fold in range(5)])
+concat_preds = np.concatenate(
+    [np.concatenate(preds_dict[i_fold], axis=1) for i_fold in range(5)], axis=1
+)
 
 
 assert concat_preds.ndim == 3  # (model, duration, pred_type)
