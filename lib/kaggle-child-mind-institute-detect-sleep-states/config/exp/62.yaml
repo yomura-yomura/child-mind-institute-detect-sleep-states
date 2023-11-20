@@ -1,4 +1,4 @@
-- exp_name=exp053-1
+- exp_name=exp062
 
 - split_type=base
 
@@ -22,10 +22,10 @@
 
 - use_amp=true
 
-- features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos,week_sin,week_cos]
+- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos]
 
 - early_stopping_patience=40
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=15000
+- val_after_steps=10000
