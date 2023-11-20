@@ -4,6 +4,7 @@ import polars as pl
 import segmentation_models_pytorch as smp
 import torch
 import torch.nn as nn
+from torchvision.transforms.functional import resize
 
 from ..datamodule.stacking import StackingConfig
 from .base_chunk import BaseChunkModule
@@ -17,24 +18,25 @@ class StackingChunkModule(BaseChunkModule):
         model_save_dir_path: pathlib.Path | None = None,
     ):
         super().__init__(cfg, val_event_df, cfg.duration, model_save_dir_path)
-        self.model_sleep = smp.Unet(
+        self.model = smp.MAnet(
             encoder_name=cfg.model.encoder_name,
+            encoder_depth=5,
             encoder_weights=cfg.model.encoder_weights,
-            in_channels=len(cfg.input_model_names),
-            classes=1,
+            decoder_use_batchnorm=True,
+            in_channels=3,
+            classes=3,
         )
-        self.model_onset = smp.Unet(
-            encoder_name=cfg.model.encoder_name,
-            encoder_weights=cfg.model.encoder_weights,
-            in_channels=len(cfg.input_model_names),
-            classes=1,
-        )
-        self.model_wakeup = smp.Unet(
-            encoder_name=cfg.model.encoder_name,
-            encoder_weights=cfg.model.encoder_weights,
-            in_channels=len(cfg.input_model_names),
-            classes=1,
-        )
+        # self.model = smp.Unet(
+        #     encoder_name=cfg.model.encoder_name,
+        #     encoder_depth=5,
+        #     encoder_weights=cfg.model.encoder_weights,
+        #     decoder_use_batchnorm=True,
+        #     in_channels=3,
+        #     classes=3,
+        # )
+        self.embedding_linear = nn.Linear(len(cfg.input_model_names), 32)
+
+        self.concat_linear = nn.Linear(32, 1)
         self.loss_fn = nn.BCEWithLogitsLoss()
 
     def forward(
@@ -42,21 +44,16 @@ class StackingChunkModule(BaseChunkModule):
     ) -> dict[str, torch.Tensor | None]:
         assert do_mixup is False and do_cutmix is False
 
-        print(batch["feature"].shape)
-        x = torch.concat(
-            [
-                self.model_sleep(batch["feature"][..., 0, :]),
-                self.model_onset(batch["feature"][..., 1, :]),
-                self.model_wakeup(batch["feature"][..., 2, :]),
-            ],
-            dim=-1,
-        )
+        assert batch["feature"].ndim == 4  # (batch_size, pred_type, model, duration)
+        x = batch["feature"].permute(0, 1, 3, 2)  # (batch_size, pred_type, duration, model)
 
-        print(x.shape)
+        x = self.embedding_linear(x)
+        x = self.model(x)  # (batch_size, pred_type, duration, model)
+        logits = self.concat_linear(x).squeeze(3).permute(0, 2, 1)  # (batch_size, duration, pred_type)
 
-        output = {"logits": x}
+        output = {"logits": logits}
 
         if "label" in batch.keys():
-            output["loss"] = self.loss_fn(x, batch["label"])
+            output["loss"] = self.loss_fn(logits, batch["label"])
 
         return output

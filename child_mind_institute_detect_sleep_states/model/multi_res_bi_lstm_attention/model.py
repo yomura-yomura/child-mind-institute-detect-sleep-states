@@ -35,6 +35,8 @@ from ..multi_res_bi_lstm.model import ResidualBiLSTM
 class FOGEncoder(nn.Module):
     def __init__(
         self,
+        duration: int,
+        height: int,
         n_features: int,
         n_encoder_layers: int,
         n_lstm_layers: int,
@@ -44,6 +46,7 @@ class FOGEncoder(nn.Module):
         mha_dropout: float,
     ):
         super().__init__()
+        self.duration_encoder = nn.Linear(duration, duration // 8)
         self.first_linear = nn.Linear(n_features, mha_embed_dim)
         self.first_dropout = nn.Dropout(dropout)
         self.enc_layers = nn.ModuleList(
@@ -59,11 +62,18 @@ class FOGEncoder(nn.Module):
                 for _ in range(n_lstm_layers)
             ]
         )
+        self.duration_decoder = nn.Linear(duration // 8, height)
+        # self.out_size = mha_embed_dim
+        # if self.out_size is not None:
+        #     self.pool = nn.AdaptiveAvgPool2d((None, self.out_size))
+
         # self.sequence_len = CFG["block_size"] // CFG["patch_size"]
         # self.pos_encoding = nn.Parameter(torch.randn(1, self.sequence_len, CFG["fog_model_dim"]) * 0.02)
 
     def forward(self, x):
         # x /= 25.0
+        x = self.duration_encoder(x)
+        x = x.permute(0, 2, 1)
         x = self.first_linear(x)
         # if training:  # augmentation by randomly roll of the position encoding tensor
         #     random_pos_encoding = torch.roll(
@@ -80,6 +90,11 @@ class FOGEncoder(nn.Module):
             x = layer(x)
         for layer in self.lstm_layers:
             x, _ = layer(x)
+
+        x = x.permute(0, 2, 1)
+        x = self.duration_decoder(x)
+        x = x.permute(0, 2, 1)
+
         return x
 
 
@@ -88,6 +103,8 @@ class FOGModel(nn.Module):
     def __init__(
         self,
         n_features: int,
+        duration: int,
+        height: int,
         n_encoder_layers: int = 5,
         n_lstm_layers: int = 2,
         out_size: int = 2,
@@ -98,6 +115,8 @@ class FOGModel(nn.Module):
     ):
         super().__init__()
         self.encoder = FOGEncoder(
+            duration=duration,
+            height=height,
             n_features=n_features,
             n_encoder_layers=n_encoder_layers,
             n_lstm_layers=n_lstm_layers,
@@ -106,10 +125,12 @@ class FOGModel(nn.Module):
             mha_n_heads=mha_n_heads,
             mha_dropout=mha_dropout,
         )
+        self.height = height
         self.last_linear = nn.Linear(mha_embed_dim, out_size)
 
     def forward(self, x):
         x = self.encoder(x)
         x = self.last_linear(x)
         # x = torch.sigmoid(x)
+        x = x.unsqueeze(1)
         return x

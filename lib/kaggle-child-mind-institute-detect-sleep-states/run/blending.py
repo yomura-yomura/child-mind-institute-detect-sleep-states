@@ -27,9 +27,9 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-    #     watch_interval_hour=6, sleep_occupancy_th=0.3
-    # ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=6, sleep_occupancy_th=0.3
+    ),
 }
 
 
@@ -49,34 +49,46 @@ all_model_dir_path_dict = {
     # 44: ranchantan_pred_dir_path / "exp044-transformer-decoder",
     # 45: ranchantan_pred_dir_path / "exp045-lstm-feature-extractor",
     47: ranchantan_pred_dir_path / "exp047_retry",
-    50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry",
+    # 50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry",
+    50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry_resume",
+    52: jumtras_pred_dir_path / "exp052",
+    53: jumtras_pred_dir_path / "exp053",
 }
 
-weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
+# weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
 # weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 47: 0, 50: 0}  # 18
+# weight_dict = {
+#     "27": 0.1,
+#     "41": 0.1,
+#     "47": 0.1,
+#     "50": 0.2,
+#     "52": 0.2,
+#     "53": 0.3,
+# }  # 19
+# weight_dict = {7: 1, 19: 0, 27: 0, 47: 0, 50: 0, 52: 0, 53: 0}  # 20
+weight_dict = {"19": 0.1, "27": 0.1, "47": 0.1, "50": 0.2, "52": 0.2, "53": 0.3}  # 20
 
 # score_th = 0.005
 # distance = 96
-score_th = 0
+score_th = 1e-4
 distance = 88
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], required=True)
+    parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], default=None)
     parser.add_argument("--n-cpus", "-n", default=None, type=int)
     parser.add_argument("--folds", type=str, default="0,1,2,3,4")
     args = parser.parse_args(args)
 
+    weight_dict = {int(k): v for k, v in weight_dict.items()}
     assert sum(weight_dict.values()) == 1
     print(f"{len(weight_dict) = }")
 
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     folds = sorted(map(int, set(args.folds.split(","))))
     print(f"{folds = }")
@@ -86,6 +98,7 @@ if __name__ == "__main__":
         post_process_modes: dict = None,
         score_th: float = 0.005,
         distance: float = 96,
+        n_records_per_series_id=None,
     ) -> tuple[list[float], list[float]]:
         scores = []
         for i_fold in tqdm.tqdm(folds):
@@ -99,6 +112,7 @@ if __name__ == "__main__":
                     post_process_modes=post_process_modes,
                     score_th=score_th,
                     distance=distance,
+                    n_records_per_series_id=n_records_per_series_id,
                 )
             )
 
@@ -106,45 +120,38 @@ if __name__ == "__main__":
         print(f"{mean_score_str} ({', '.join(score_strs)}) at {weights}")
         return scores, weights
 
-    # calc_all_scores([0.1, 0.1, 0.1, 0.1, 0.1, 0.3, 0.2], score_th=score_th, distance=distance)
-    # fdas
+    if args.search_type is None:
+        print(f"calc score for {weight_dict}")
+        calc_all_scores(
+            list(weight_dict.values()),
+            score_th=score_th,
+            distance=distance,
+            n_records_per_series_id=1000,
+            post_process_modes=post_process_modes,
+        )
 
-    models_dir_name = "_".join(str(exp) for exp in weight_dict)
-
-    # weight = get_grid(step=0.1)
-    # weight = get_grid(step=0.1, target_sum=1)
-    weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
-    # weight = get_grid(step=0.02, target_sum=1)
-
-    if folds == [0, 1, 2, 3, 4]:
-        models_dir_name = f"blending/{models_dir_name}"
+        # calc_all_scores([0.1, 0.1, 0.1, 0.2, 0.2, 0.3], score_th=score_th, distance=distance)
+        # calc_all_scores([0.1, 0.1, 0.1, 0.2, 0.2, 0.3], score_th=0.005, distance=96)
+        # calc_all_scores(
+        #     [0.1, 0.1, 0.1, 0.2, 0.2, 0.3],
+        #     score_th=score_th,
+        #     distance=distance,
+        #     n_records_per_series_id=1000,
+        # )
     else:
-        models_dir_name = f"blending/{models_dir_name}/{'_'.join(map(str, folds))}"
+        models_dir_name = "_".join(str(exp) for exp in weight_dict)
 
-    record_at_max = cmi_dss_lib.blending.optimize(
-        args.search_type, models_dir_name, calc_all_scores, weight, weight_dict, args.n_cpus
-    )
-    calc_all_scores(record_at_max["weights"], post_process_modes)
+        # weight = get_grid(step=0.1)
+        # weight = get_grid(step=0.1, target_sum=1)
+        weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
+        # weight = get_grid(step=0.02, target_sum=1)
 
-# scores = [calc_all_scores(weights=w) for w in tqdm.tqdm(weight, desc="grid search")]
+        if folds == [0, 1, 2, 3, 4]:
+            models_dir_name = f"blending/{models_dir_name}"
+        else:
+            models_dir_name = f"blending/{models_dir_name}/{'_'.join(map(str, folds))}"
 
-
-# mean_scores = np.mean(scores, axis=1)
-# order = np.argsort(mean_scores)[::-1]
-# mean_scores[order]
-# weight_list[order]
-
-# #
-#
-# scores = np.array(
-#     [
-#         [
-#             calc_score(i_fold, weights=[w, 1 - w])
-#             for w in tqdm.tqdm(weight_list, desc="grid search")
-#         ]
-#         for i_fold in range(5)
-#     ]
-# )  # (fold, weight)
-#
-# weights = weight_list[np.argmax(scores, axis=1)]
-# np.mean(np.max(scores, axis=1))
+        record_at_max = cmi_dss_lib.blending.optimize(
+            args.search_type, models_dir_name, calc_all_scores, weight, weight_dict, args.n_cpus
+        )
+        calc_all_scores(record_at_max["weights"], post_process_modes)

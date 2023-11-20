@@ -1,6 +1,8 @@
 import dataclasses
 from typing import Literal
 
+from omegaconf import DictConfig
+
 from .decoder import Decoder
 from .dir import DirConfig
 from .feature_extractor import FeatureExtractor
@@ -16,7 +18,7 @@ __all__ = [
 
 
 @dataclasses.dataclass
-class TrainConfig:
+class TrainConfig(DictConfig):
     dir: DirConfig
 
     model_dim: Literal[1, 2]
@@ -90,17 +92,17 @@ class TrainConfig:
 
 
 @dataclasses.dataclass
-class TrainSplit:
+class TrainSplit(DictConfig):
     name: Literal["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]
 
 
 @dataclasses.dataclass
-class TrainSplitType:
+class TrainSplitType(DictConfig):
     name: Literal["08_nan", "08_nan_06_repeat_rate"]
 
 
 @dataclasses.dataclass
-class TrainAugmentationConfig:
+class TrainAugmentationConfig(DictConfig):
     mixup_prob: float
     mixup_alpha: float
     cutmix_prob: float
@@ -108,16 +110,16 @@ class TrainAugmentationConfig:
 
 
 @dataclasses.dataclass
-class TrainPostProcessAugmentationConfig:
+class TrainPostProcessAugmentationConfig(DictConfig):
     score_th: float
     distance: int
 
 
 @dataclasses.dataclass
-class TrainOptimizerConfig:
+class TrainOptimizerConfig(DictConfig):
     lr: float
 
 
 @dataclasses.dataclass
-class TrainSchedulerConfig:
+class TrainSchedulerConfig(DictConfig):
     num_warmup_steps: int

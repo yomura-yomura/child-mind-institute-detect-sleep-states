@@ -7,9 +7,7 @@ import polars as pl
 from nptyping import DataFrame, Float, NDArray, Shape, Structure
 from scipy.signal import find_peaks
 
-SubmissionDataFrame = DataFrame[
-    Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
-]
+SubmissionDataFrame = DataFrame[Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]]
 
 
 class SleepingEdgesAsProbsSetting(TypedDict):

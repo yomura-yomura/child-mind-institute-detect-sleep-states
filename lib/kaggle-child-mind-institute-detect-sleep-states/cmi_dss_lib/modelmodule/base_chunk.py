@@ -33,9 +33,7 @@ class BaseChunkModule(LightningModule):
         self.cfg = cfg
         self.val_event_df = val_event_df
         self.num_time_steps = (
-            cmi_dss_lib.datamodule.seg.nearest_valid_size(
-                int(duration * cfg.upsample_rate), cfg.downsample_rate
-            )
+            cmi_dss_lib.datamodule.seg.nearest_valid_size(int(duration * cfg.upsample_rate), cfg.downsample_rate)
             // cfg.downsample_rate
         )
         self.duration = duration
@@ -107,9 +105,7 @@ class BaseChunkModule(LightningModule):
             self.trainer.limit_val_batches = 1.0
             print(f"enabled validation")
 
-    def _evaluation_step(
-        self, batch: dict[str : torch.Tensor], step_outputs: list
-    ) -> float | None:
+    def _evaluation_step(self, batch: dict[str : torch.Tensor], step_outputs: list) -> float | None:
         output = self.forward(batch)
         loss = output["loss"].detach().item() if "loss" in output.keys() else None
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
@@ -183,9 +179,7 @@ class BaseChunkModule(LightningModule):
                     key=lambda output: output[0],
                 ),
                 desc="calc val sub_df",
-                total=np.unique(
-                    [series_id for series_id, *_ in flatten_validation_step_outputs]
-                ).size,
+                total=np.unique([series_id for series_id, *_ in flatten_validation_step_outputs]).size,
             )
         ]
 
@@ -219,9 +213,7 @@ class BaseChunkModule(LightningModule):
         sub_df = pd.concat(sub_df_list)
 
         score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), sub_df)
-        self.log(
-            "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
-        )
+        self.log("EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True)
         if self.model_save_dir_path is not None:
             self.save_checkpoint_top_k(score)
 
@@ -243,9 +235,7 @@ class BaseChunkModule(LightningModule):
         self.last_model_path = current_model_path
 
         self.best_score_paths.append((score, current_model_path))
-        best_score_paths_in_descending_order = sorted(
-            self.best_score_paths, key=lambda pair: pair[0]
-        )[::-1]
+        best_score_paths_in_descending_order = sorted(self.best_score_paths, key=lambda pair: pair[0])[::-1]
 
         monitor = "EventDetectionAP"
 
@@ -263,18 +253,14 @@ class BaseChunkModule(LightningModule):
             self.best_ckpt_path.unlink(missing_ok=True)
             self.best_ckpt_path.symlink_to(best_model_path)
         else:
-            print(
-                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {self.save_top_k}"
-            )
+            print(f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {self.save_top_k}")
 
         if len(best_score_paths_in_descending_order) > 0:
             self.last_ckpt_path.unlink(missing_ok=True)
             self.last_ckpt_path.symlink_to(self.last_model_path)
 
         indices_to_remove = []
-        for i, (_, model_path) in enumerate(
-            best_score_paths_in_descending_order[self.save_top_k :]
-        ):
+        for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[self.save_top_k :]):
             if model_path == self.last_model_path:
                 continue
             model_path.unlink(missing_ok=True)
@@ -284,9 +270,7 @@ class BaseChunkModule(LightningModule):
             best_score_paths_in_descending_order.pop(i)
         self.best_score_paths = best_score_paths_in_descending_order
 
-    def predict_step(
-        self, batch: dict[str : torch.Tensor]
-    ) -> list[tuple[str, NDArray[np.float_]]]:
+    def predict_step(self, batch: dict[str : torch.Tensor]) -> list[tuple[str, NDArray[np.float_]]]:
         step_outputs = []
         self._evaluation_step(batch, step_outputs)
         return step_outputs

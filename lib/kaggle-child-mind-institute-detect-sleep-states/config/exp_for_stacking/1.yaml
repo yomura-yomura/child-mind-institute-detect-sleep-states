@@ -1,1 +1,10 @@
-- input_model_names=[ranchantan/exp047_retry]
+- exp_name=dummy3
+- input_model_names=[ranchantan/exp047_retry,ranchantan/exp050-transformer-decoder_retry]
+
+- model.encoder_name=resnet18
+- duration=17280  # 24h
+#- duration=8640  # 12h
+#- duration=1024  # 12h
+- batch_size=4
+
+- val_after_steps=200

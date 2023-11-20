@@ -43,9 +43,7 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
     return series_df
 
 
-def save_each_series(
-    this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool
-):
+def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -58,9 +56,7 @@ def save_each_series(
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: DictConfig):
-    processed_dir = (
-        Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
-    )
+    processed_dir = Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -111,9 +107,9 @@ def main(cfg: DictConfig):
             feature_names_to_preprocess = ["anglez", "enmo"]
 
             for feature_name in feature_names_to_preprocess:
-                series_df[[feature_name]] = (
-                    series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
-                ) / STD_DICT[feature_name]
+                series_df[[feature_name]] = (series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]) / STD_DICT[
+                    feature_name
+                ]
         elif cfg.scale_type == "robust_scaler":
             feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff"]
 

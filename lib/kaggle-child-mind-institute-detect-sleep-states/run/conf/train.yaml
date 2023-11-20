@@ -23,6 +23,8 @@ model_dim: 2
 seed: 42
 exp_name: dummy
 
+use_amp: false
+
 phase: train
 scale_type: constant
 
@@ -41,7 +43,6 @@ batch_size: 32  # 0.0005
 num_workers: 8
 accelerator: auto
 #use_amp: true
-use_amp: false
 debug: false
 gradient_clip_val: 1.0
 accumulate_grad_batches: 1

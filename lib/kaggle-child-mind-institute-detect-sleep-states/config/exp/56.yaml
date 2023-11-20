@@ -1,4 +1,4 @@
-- exp_name=exp055
+- exp_name=exp056
 
 - split_type=base
 
@@ -6,14 +6,14 @@
 
 - model.encoder_name=efficientnet-b3
 
-- duration=20160  # 28h
+- duration=17280  # 24h
 
 - use_amp=true
 
 - batch_size=4
 - optimizer.lr=0.00005
 
-- sigma=108
+- sigma=10
 
 - features=[anglez,enmo,anglez_lag_diff,enmo_lag_diff,hour_sin,hour_cos,week_sin,week_cos]
 
@@ -21,4 +21,4 @@
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=10000
+- val_after_steps=5000

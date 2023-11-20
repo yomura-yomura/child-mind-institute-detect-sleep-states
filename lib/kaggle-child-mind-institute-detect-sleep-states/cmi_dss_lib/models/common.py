@@ -15,6 +15,8 @@ from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtract
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 
+from child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm_attention.model import FOGModel
+
 from ..config import TrainConfig
 
 FEATURE_EXTRACTORS = Union[
@@ -25,6 +27,7 @@ FEATURE_EXTRACTORS = Union[
     StackedGRUFeatureExtractor,
     StackedLSTMFeatureExtractor,
     TimesNetFeatureExtractor,
+    FOGModel,
 ]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
@@ -111,6 +114,20 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
             is_fc=cfg.feature_extractor.is_fc,
             out_size=num_time_steps,
         )
+    elif cfg.feature_extractor.name == "StackedAttentionLSTMFeatureExtractor":
+        feature_extractor = FOGModel(
+            duration=cfg.duration,
+            height=cfg.feature_extractor.height,
+            n_features=feature_dim,
+            n_encoder_layers=cfg.feature_extractor.n_encoder_layers,
+            n_lstm_layers=cfg.feature_extractor.n_lstm_layers,
+            out_size=num_time_steps,
+            dropout=cfg.feature_extractor.dropout,
+            mha_embed_dim=cfg.feature_extractor.mha_embed_dim,
+            mha_n_heads=cfg.feature_extractor.mha_n_heads,
+            mha_dropout=cfg.feature_extractor.mha_dropout,
+        )
+        feature_extractor.out_chans = 1
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
 

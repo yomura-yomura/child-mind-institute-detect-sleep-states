@@ -3,6 +3,7 @@ import os
 import pathlib
 import sys
 
+import cmi_dss_lib.utils.common
 import hydra
 import lightning as L
 import numpy as np
@@ -11,11 +12,7 @@ from cmi_dss_lib.config import TrainConfig
 from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from cmi_dss_lib.utils.common import trace
-from cmi_dss_lib.utils.post_process import (
-    PostProcessModes,
-    SubmissionDataFrame,
-    post_process_for_seg,
-)
+from cmi_dss_lib.utils.post_process import PostProcessModes, SubmissionDataFrame, post_process_for_seg
 from lightning import seed_everything
 from nptyping import Float, NDArray, Shape
 from omegaconf import OmegaConf
@@ -26,28 +23,32 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+        "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34",  # 1
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
         # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
         # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
-        # "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
         # "../cmi-dss-ensemble-models/jumtras/exp043",
         # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
         # "../cmi-dss-ensemble-models/ranchantan/exp044-transformer-decoder",
         #
+        # "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp047_retry",
-        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
+        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
+        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
+        # "../cmi-dss-ensemble-models/jumtras/exp052",
+        # "../cmi-dss-ensemble-models/jumtras/exp053",
         #
         "phase=dev",
         # "phase=train",
         # "batch_size=32",
-        "batch_size=16",
+        # "batch_size=16",
+        "batch_size=8",
         # "--folds",
-        # "4"
+        # "3,4",
         #
         # "dir.sub_dir=tmp",
         # "prev_margin_steps=4320",
@@ -74,51 +75,17 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
     return module
 
 
-def inference(
-    loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path
-):
+def inference(loader: DataLoader, model: L.LightningModule, use_amp: bool, pred_dir_path: pathlib.Path):
     trainer = L.Trainer(
         devices=1,
         precision=16 if use_amp else 32,
     )
     predictions = trainer.predict(model, loader)
 
-    series_id_preds_dict = dict(
-        SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds])
-    )
+    series_id_preds_dict = dict(SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds]))
 
     for series_id, preds in series_id_preds_dict.items():
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
-
-
-def inference_(loader: DataLoader, model: L.LightningModule, use_amp: bool, duration):
-    from torchvision.transforms.functional import resize
-    from tqdm import tqdm
-
-    device = "cuda"
-
-    preds = []
-    keys = []
-    for batch in tqdm(loader, desc="inference"):
-        with torch.no_grad():
-            with torch.cuda.amp.autocast(enabled=use_amp):
-                x = batch["feature"].to(device)
-                pred = model(x)["logits"].sigmoid()
-                pred = resize(
-                    pred.detach().cpu(),
-                    size=[duration, pred.shape[2]],
-                    antialias=False,
-                )
-
-            if "key" in batch.keys():
-                key = batch["key"]
-            else:
-                key = batch["series_id"]
-            preds.append(pred.detach().cpu().numpy())
-            keys.extend(key)
-    preds = np.concatenate(preds, axis=0)
-
-    return keys, preds  # type: ignore
 
 
 def make_submission(
@@ -225,5 +192,7 @@ if __name__ == "__main__":
         overrides_dict["dir.model_dir"] = f"{args.model_path / f'fold_{i_fold}'}"
         sys.argv = sys.argv[:1] + [f"{k}={v}" for k, v in overrides_dict.items()]
         main()
+        cmi_dss_lib.utils.common.clean_memory()
+
     mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
     print(f"{mean_score_str} ({', '.join(score_strs)})")

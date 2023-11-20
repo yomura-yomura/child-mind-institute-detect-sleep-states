@@ -31,9 +31,7 @@ if __name__ == "__main__":
     # fig = px.imshow(preds[..., 2], aspect=preds.shape[0] / preds.shape[1])
     # fig.show()
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     # score_th = 0.005
     # distance = 96
@@ -67,6 +65,4 @@ if __name__ == "__main__":
         print(f"{mean_score_str} ({', '.join(score_strs)}) at {grid_parameter}")
         return scores, grid_parameter
 
-    optimize(
-        "grid_search", f"post_process/{model_dir_path.name}", calc_all_scores, grid_parameters
-    )
+    optimize("grid_search", f"post_process/{model_dir_path.name}", calc_all_scores, grid_parameters)

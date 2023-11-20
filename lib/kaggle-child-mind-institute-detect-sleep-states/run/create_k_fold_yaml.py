@@ -15,9 +15,7 @@ df = df.collect()
 split_type_dict = {
     "base": dict(lower_nan_fraction_to_exclude=None, lower_repeat_rate_to_exclude=None),
     "0.8-nan": dict(lower_nan_fraction_to_exclude=0.8, lower_repeat_rate_to_exclude=None),
-    "0.8-nan_0.6-repeat-rate": dict(
-        lower_nan_fraction_to_exclude=0.8, lower_repeat_rate_to_exclude=0.6
-    ),
+    "0.8-nan_0.6-repeat-rate": dict(lower_nan_fraction_to_exclude=0.8, lower_repeat_rate_to_exclude=0.6),
 }
 
 for name, train_config in split_type_dict.items():
@@ -32,9 +30,7 @@ for name, train_config in split_type_dict.items():
             df,
             Config(
                 train=TrainConfig(fold_type="group", **train_config),
-                dataset=DatasetConfig(
-                    train_dataset_type="base", agg_interval=12, features=[], in_memory=False
-                ),
+                dataset=DatasetConfig(train_dataset_type="base", agg_interval=12, features=[], in_memory=False),
             ),
             i_fold,
         )
