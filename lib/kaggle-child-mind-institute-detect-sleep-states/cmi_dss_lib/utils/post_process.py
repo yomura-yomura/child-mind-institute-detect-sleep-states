@@ -7,9 +7,7 @@ import polars as pl
 from nptyping import DataFrame, Float, NDArray, Shape, Structure
 from scipy.signal import find_peaks
 
-SubmissionDataFrame = DataFrame[
-    Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
-]
+SubmissionDataFrame = DataFrame[Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]]
 
 
 class SleepingEdgesAsProbsSetting(TypedDict):
@@ -37,7 +35,7 @@ def post_process_for_seg(
     score_th: float = 0.01,
     distance: int = 5000,
     post_process_modes: PostProcessModes = None,
-    print_msg: bool = True,
+    print_msg: bool = False,
 ) -> SubmissionDataFrame:
     """make submission dataframe for segmentation task
 
@@ -66,6 +64,7 @@ def post_process_for_seg(
             npu.from_dict(
                 {
                     "key": keys,
+                    # "pred": preds,
                     "pred": preds,
                     "series_id": series_ids,
                 }
@@ -150,7 +149,7 @@ def post_process_for_seg(
 def adapt_sleeping_edges_as_probs(
     data: NDArray, downsample_rate: int, sleep_prob_th: float, min_sleeping_hours: int
 ) -> NDArray:
-    duration = data["pred"].shape[1]
+    # duration = data["pred"].shape[-2]
 
     corrected_data_list = []
     for series_id, grouped_data in npu.groupby(data, "series_id"):
@@ -190,7 +189,7 @@ def adapt_sleeping_edges_as_probs(
                     ]
                 )
         corrected_data = grouped_data.copy()
-        corrected_data["pred"] = concat_pred.reshape(n, duration, 3)
+        corrected_data["pred"] = concat_pred.reshape(n, 3)
         corrected_data_list.append(corrected_data)
 
     return np.concatenate(corrected_data_list)

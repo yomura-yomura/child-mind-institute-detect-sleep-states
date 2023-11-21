@@ -1,11 +1,15 @@
 import pathlib
+from typing import cast
 
 import cmi_dss_lib.datamodule.seg
+import hydra
 import numpy as np
 import numpy_utility as npu
+import omegaconf
 import pandas as pd
 import plotly.express as px
 from cmi_dss_lib.config import TrainConfig
+from cmi_dss_lib.datamodule.seg import Indexer
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent
 
@@ -23,29 +27,16 @@ overrides_yaml_path = (
 )
 assert overrides_yaml_path.exists()
 
-# def get_pred_data(i_fold):
-#     all_keys, all_preds, all_labels = np.load(
-#         target_pred_dir_path / f"predicted-fold_{i_fold}.npz"
-#     ).values()
-#     all_series_ids = np.array([str(k).split("_")[0] for k in all_keys])
-#     all_data = npu.from_dict(
-#         {"key": all_keys, "pred": all_preds, "label": all_labels, "series_id": all_series_ids}
-#     )
-#     return all_data
-#
-#
-# data = get_pred_data(i_fold=0)
-
-import hydra
-import omegaconf
-from cmi_dss_lib.datamodule.seg import Indexer
-
 hydra.initialize(config_path="../conf", version_base="1.2")
 
-cfg: TrainConfig = hydra.compose("train", overrides=omegaconf.OmegaConf.load(overrides_yaml_path))
-#
+cfg = cast(
+    TrainConfig,
+    hydra.compose("train", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))),
+)
+
 # cfg.prev_margin_steps = 6 * 12 * 60
 # cfg.next_margin_steps = 6 * 12 * 60
+
 
 datamodule = cmi_dss_lib.datamodule.seg.SegDataModule(cfg)
 datamodule.setup("valid")

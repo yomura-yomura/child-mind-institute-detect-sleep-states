@@ -78,9 +78,7 @@ def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[st
     return this_series_df
 
 
-def save_each_series(
-    this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool
-):
+def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -93,9 +91,7 @@ def save_each_series(
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: DictConfig):
-    processed_dir = (
-        Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
-    )
+    processed_dir = Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除

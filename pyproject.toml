@@ -12,7 +12,9 @@ dependencies = [
     "lightning~=2.1.0",
     "numexpr==2.8.4",  # due to bug: https://github.com/pandas-dev/pandas/issues/54449
     "hydra-core",
-    "segmentation_models_pytorch==0.3.3"
+    "segmentation_models_pytorch==0.3.3",
+
+    "nptyping~=2.5.0"
 #    "numpy_utility@git+https://github.com/yomura-yomura/numpy_utility#egg=88e5bea"
 ]
 
@@ -30,8 +32,6 @@ dev = [
     "wandb~=0.15.12",
     "toml~=0.10.2",
     "polars~=0.19.8",
-
-    "nptyping~=2.5.0"
 ]
 dev2 = [
     "omegaconf==2.3.0",

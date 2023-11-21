@@ -1,0 +1,68 @@
+defaults:
+  - _self_
+  - dir: local
+  - model: Spec2DCNN
+  - split: fold_0
+  - split_type: 08_nan
+
+seed: 42
+exp_name: dummy
+
+
+input_model_names:
+
+use_amp: false
+
+duration: 5760 # duration * 5 = 秒数
+prev_margin_steps: 0
+next_margin_steps: 0
+
+downsample_rate: 1
+upsample_rate: 1
+
+# Dataset
+offset: 10  # how long gaussian sigma spreads at most on half side
+sigma: 10
+
+bg_sampling_rate: 0.5
+
+# Training
+epoch: 70
+batch_size: 32
+num_workers: 8
+accelerator: auto
+
+debug: false
+gradient_clip_val: 1.0
+accumulate_grad_batches: 1
+
+monitor: EventDetectionAP
+monitor_mode: max
+check_val_every_n_epoch: 1
+val_check_interval: 200
+val_after_steps: 0
+
+resume_from_checkpoint: null
+
+early_stopping_patience: 20
+
+# post_process
+post_process:
+  score_th: 0.005
+  distance: 96
+
+# optimizer
+optimizer:
+#  lr: 0.0005
+  lr: 0.00025
+
+# scheduler
+scheduler:
+  num_warmup_steps: 0
+
+# augmentation
+augmentation:
+  mixup_prob: 0.0
+  mixup_alpha: 0.4
+  cutmix_prob: 0.0
+  cutmix_alpha: 0.4

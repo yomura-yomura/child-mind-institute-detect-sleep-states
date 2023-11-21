@@ -23,6 +23,8 @@ model_dim: 2
 seed: 42
 exp_name: dummy
 
+use_amp: false
+
 phase: train
 scale_type: constant
 
@@ -41,7 +43,6 @@ batch_size: 32  # 0.0005
 num_workers: 8
 accelerator: auto
 #use_amp: true
-use_amp: false
 debug: false
 gradient_clip_val: 1.0
 accumulate_grad_batches: 1
@@ -53,6 +54,8 @@ monitor_mode: max
 check_val_every_n_epoch: 1
 val_check_interval: 1
 val_after_steps: 0
+
+resume_from_checkpoint: null
 
 # Dataset
 offset: 10  # how long gaussian sigma spreads at most on half side

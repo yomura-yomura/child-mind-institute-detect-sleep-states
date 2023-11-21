@@ -1,0 +1,8 @@
+name: StackedAttentionLSTMFeatureExtractor
+height: 1024
+n_encoder_layers: 5
+n_lstm_layers: 5
+dropout: 0.1
+mha_embed_dim: 320
+mha_n_heads: 5
+mha_dropout: 0

@@ -1,9 +1,11 @@
 import dataclasses
 from typing import Literal
 
+from omegaconf import DictConfig
+
 
 @dataclasses.dataclass
-class PANNsFeatureExtractorConfig:
+class PANNsFeatureExtractorConfig(DictConfig):
     name: Literal["PANNsFeatureExtractor"]
     base_filters: int
     kernel_sizes: list[int]
