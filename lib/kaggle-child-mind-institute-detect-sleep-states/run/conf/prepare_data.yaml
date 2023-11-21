@@ -22,7 +22,6 @@ save_as_npz: false
 just_load_scaler: true
 
 
-
 rolling_features:
 #  - n_unique_anglez_5min
 #  - n_unique_enmo_5min

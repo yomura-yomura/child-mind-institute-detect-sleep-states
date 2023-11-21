@@ -6,8 +6,8 @@ import hydra
 import numpy as np
 import polars as pl
 import sklearn.preprocessing
+from cmi_dss_lib.config import PrepareDataConfig
 from cmi_dss_lib.utils.common import trace
-from omegaconf import DictConfig
 from tqdm import tqdm
 
 SERIES_SCHEMA = {
@@ -48,7 +48,9 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
     return series_df
 
 
-def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[str]) -> pl.DataFrame:
+def add_rolling_features(
+    this_series_df: pl.DataFrame, rolling_features: list[str]
+) -> pl.DataFrame:
     """add rolling feature"""
     this_series_df = this_series_df.join(
         this_series_df.sort(by="index")
@@ -86,12 +88,16 @@ def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[st
 
     # scalering
     scaler = sklearn.preprocessing.RobustScaler()
-    this_series_df[rolling_features] = scaler.fit_transform(this_series_df[rolling_features].to_numpy())
+    this_series_df[rolling_features] = scaler.fit_transform(
+        this_series_df[rolling_features].to_numpy()
+    )
 
     return this_series_df
 
 
-def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool):
+def save_each_series(
+    this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
+):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -103,8 +109,10 @@ def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_di
 
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
-def main(cfg: DictConfig):
-    processed_dir = pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+def main(cfg: PrepareDataConfig):
+    processed_dir = (
+        pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    )
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -169,9 +177,9 @@ def main(cfg: DictConfig):
             feature_names_to_preprocess = ["anglez", "enmo"]
 
             for feature_name in feature_names_to_preprocess:
-                series_df[[feature_name]] = (series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]) / STD_DICT[
-                    feature_name
-                ]
+                series_df[[feature_name]] = (
+                    series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
+                ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
             feature_names_to_preprocess = [
                 "anglez",
@@ -205,8 +213,6 @@ def main(cfg: DictConfig):
 
     feature_names = [
         *feature_names_to_preprocess,
-        "anglez_int",
-        "enmo_int",
         "hour_sin",
         "hour_cos",
         # "month_sin",
@@ -215,6 +221,8 @@ def main(cfg: DictConfig):
         "week_cos",
         # "minute_sin",
         # "minute_cos",
+        # "anglez_int",
+        # "enmo_int",
     ]
     rolling_features = cfg.rolling_features or []
     # rolling_features = [
@@ -224,9 +232,11 @@ def main(cfg: DictConfig):
     #     "rolling_unique_enmo_sum",
     # ]
     if len(rolling_features) > 0:
-        feature_names.append(
-            "index",
-        )  # for rolling features
+        feature_names.append("index")
+        if "anglez_int" not in feature_names:
+            feature_names.append("anglez_int")
+        if "enmo_int" not in feature_names:
+            feature_names.append("enmo_int")
 
     print(f"{feature_names+rolling_features = }")
 
@@ -242,7 +252,9 @@ def main(cfg: DictConfig):
             # 特徴量をそれぞれnpy/npzで保存
 
             series_dir = processed_dir / series_id
-            save_each_series(this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz)
+            save_each_series(
+                this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
+            )
 
 
 if __name__ == "__main__":
