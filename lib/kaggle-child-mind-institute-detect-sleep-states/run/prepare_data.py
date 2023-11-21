@@ -7,6 +7,7 @@ import polars as pl
 import sklearn.preprocessing
 from cmi_dss_lib.utils.common import trace
 from omegaconf import DictConfig
+from scipy.signal import savgol_filter
 from tqdm import tqdm
 
 SERIES_SCHEMA = {
@@ -69,12 +70,19 @@ def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[st
                                     pl.col(f"n_unique_{col}_5min")
                                     ).alias(f"rolling_unique_{col}_sum"))
 
+    feature_savgol = ["anglez_lag_diff_abs", "enmo_lag_diff_abs"]
+    ## savgol filter
+    for feature in feature_savgol:
+        this_series_df = this_series_df.with_columns(pl.Series(np.nan_to_num(savgol_filter(this_series_df[feature].clone().to_numpy(),720*5,3))).alias(feature + "_savgol"))
+    
+    scaler_featuers = rolling_features+feature_savgol
     # scalering
     scaler = sklearn.preprocessing.RobustScaler()
-    this_series_df[rolling_features] = scaler.fit_transform(
-        this_series_df[rolling_features].to_numpy()
+    this_series_df[scaler_featuers] = scaler.fit_transform(
+        this_series_df[scaler_featuers].to_numpy()
     )
 
+    this_series_df[scaler_featuers] = this_series_df[scaler_featuers].fill_nan(0)
     return this_series_df
 
 
@@ -159,7 +167,8 @@ def main(cfg: DictConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff", "anglez_lag_diff_abs", "enmo_lag_diff_abs"]
+            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff"]
+
 
             scaler = sklearn.preprocessing.RobustScaler()
             series_df[feature_names_to_preprocess] = scaler.fit_transform(
@@ -182,6 +191,8 @@ def main(cfg: DictConfig):
         "week_sin",
         "week_cos",
         "index", #for rolling features
+        "anglez_lag_diff_abs",
+        "enmo_lag_diff_abs",
         # "minute_sin",
         # "minute_cos",
     ]
@@ -190,6 +201,8 @@ def main(cfg: DictConfig):
         "n_unique_enmo_5min",
         "rolling_unique_anglez_sum",
         "rolling_unique_enmo_sum",
+        "anglez_lag_diff_abs_savgol",
+        "enmo_lag_diff_abs_savgol",
         ]
 
     print(f"{feature_names+rolling_features = }")
@@ -203,6 +216,7 @@ def main(cfg: DictConfig):
                 this_series_df = add_rolling_features(this_series_df,rolling_features)
 
                 # 特徴量をそれぞれnpy/npzで保存
+                
                 
                 series_dir = processed_dir / series_id
                 save_each_series(this_series_df, feature_names+rolling_features, series_dir, cfg.save_as_npz)
