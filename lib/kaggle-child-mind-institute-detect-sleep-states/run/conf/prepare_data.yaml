@@ -16,5 +16,6 @@ defaults:
 phase: train
 
 scale_type: robust_scaler
+#scale_type: constant
 
 save_as_npz: false
