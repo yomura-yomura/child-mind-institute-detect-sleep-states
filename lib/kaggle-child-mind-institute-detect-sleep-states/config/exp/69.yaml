@@ -15,7 +15,8 @@
 
 - sigma=108
 
-- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos,n_unique_anglez_5min,n_unique_enmo_5min,rolling_unique_anglez_sum,rolling_unique_enmo_sum,anglez_lag_diff_abs_savgol,enmo_lag_diff_abs_savgol]
+
+- features=[anglez,enmo,enmo_lag_diff_abs_savgol,anglez_lag_diff_abs_savgol,hour_sin,hour_cos,week_sin,week_cos]
 
 - early_stopping_patience=20
 
