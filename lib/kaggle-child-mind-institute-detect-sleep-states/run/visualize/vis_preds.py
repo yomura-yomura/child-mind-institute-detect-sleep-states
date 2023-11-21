@@ -22,9 +22,7 @@ target_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan" / 
 # )
 assert target_pred_dir_path.exists()
 
-overrides_yaml_path = (
-    project_root_path / "output" / "train" / exp_name / "fold_0" / ".hydra" / "overrides.yaml"
-)
+overrides_yaml_path = project_root_path / "output" / "train" / exp_name / "fold_0" / ".hydra" / "overrides.yaml"
 assert overrides_yaml_path.exists()
 
 hydra.initialize(config_path="../conf", version_base="1.2")
@@ -57,9 +55,7 @@ def plot(i):
 
     # pred
 
-    pred_df = pd.DataFrame(preds, columns=["sleep", "onset", "wakeup"]).assign(
-        step=np.arange(preds.shape[0])
-    )
+    pred_df = pd.DataFrame(preds, columns=["sleep", "onset", "wakeup"]).assign(step=np.arange(preds.shape[0]))
 
     label_df = pd.DataFrame(feat_record["label"], columns=["sleep", "onset", "wakeup"]).assign(
         step=2 * np.arange(feat_record["label"].shape[0])

@@ -20,3 +20,11 @@ scale_type: constant
 save_as_npz: false
 
 just_load_scaler: true
+
+
+
+rolling_features:
+#  - n_unique_anglez_5min
+#  - n_unique_enmo_5min
+#  - rolling_unique_anglez_sum
+#  - rolling_unique_enmo_sum

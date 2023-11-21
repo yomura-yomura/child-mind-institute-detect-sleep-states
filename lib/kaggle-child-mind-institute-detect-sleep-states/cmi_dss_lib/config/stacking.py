@@ -3,9 +3,9 @@ import dataclasses
 from omegaconf import DictConfig
 
 from .dir import DirConfig
+from .feature_extractor import FeatureExtractor
 from .model import Model
 from .train import TrainOptimizerConfig, TrainSchedulerConfig, TrainSplit, TrainSplitType
-from .feature_extractor import FeatureExtractor
 
 
 @dataclasses.dataclass

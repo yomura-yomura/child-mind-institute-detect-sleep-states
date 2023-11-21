@@ -89,9 +89,7 @@ if __name__ == "__main__":
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     folds = sorted(map(int, set(args.folds.split(","))))
     print(f"{folds = }")

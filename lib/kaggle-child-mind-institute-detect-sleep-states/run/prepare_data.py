@@ -33,8 +33,10 @@ def to_coord(x: pl.Expr, max_: int, name: str) -> list[pl.Expr]:
 
     return [x_sin.alias(f"{name}_sin"), x_cos.alias(f"{name}_cos")]
 
+
 def count_unique(ser) -> int:
     return len(np.unique(ser))
+
 
 def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFrame:
     series_df = series_df.with_columns(
@@ -45,43 +47,51 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
     ).select("series_id", *feature_names)
     return series_df
 
+
 def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[str]) -> pl.DataFrame:
     """add rolling feature"""
     this_series_df = this_series_df.join(
-        this_series_df.sort(by="index").set_sorted(column="index").rolling(index_column = "index",period="60i").agg(
+        this_series_df.sort(by="index")
+        .set_sorted(column="index")
+        .rolling(index_column="index", period="60i")
+        .agg(
             [
                 pl.col("anglez_int").n_unique().cast(pl.Int16).alias("n_unique_anglez_5min"),
                 pl.col("enmo_int").n_unique().cast(pl.Int16).alias("n_unique_enmo_5min"),
             ]
-            ),
-        on = "index")
+        ),
+        on="index",
+    )
 
-    for col in ["anglez","enmo"]:
-        for shift_min in [5,10,15,20,25,30]:
-            this_series_df = this_series_df.with_columns(this_series_df[f"n_unique_{col}_5min"].shift(12*shift_min).fill_null(0).alias(f"n_unique_{col}_5min_{shift_min}minEarlier"))
+    for col in ["anglez", "enmo"]:
+        for shift_min in [5, 10, 15, 20, 25, 30]:
+            this_series_df = this_series_df.with_columns(
+                this_series_df[f"n_unique_{col}_5min"]
+                .shift(12 * shift_min)
+                .fill_null(0)
+                .alias(f"n_unique_{col}_5min_{shift_min}minEarlier")
+            )
 
-        this_series_df = this_series_df.with_columns((
-                                    pl.col(f"n_unique_{col}_5min_5minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_10minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_15minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_20minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_25minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_30minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min")
-                                    ).alias(f"rolling_unique_{col}_sum"))
+        this_series_df = this_series_df.with_columns(
+            (
+                pl.col(f"n_unique_{col}_5min_5minEarlier")
+                + pl.col(f"n_unique_{col}_5min_10minEarlier")
+                + pl.col(f"n_unique_{col}_5min_15minEarlier")
+                + pl.col(f"n_unique_{col}_5min_20minEarlier")
+                + pl.col(f"n_unique_{col}_5min_25minEarlier")
+                + pl.col(f"n_unique_{col}_5min_30minEarlier")
+                + pl.col(f"n_unique_{col}_5min")
+            ).alias(f"rolling_unique_{col}_sum")
+        )
 
     # scalering
     scaler = sklearn.preprocessing.RobustScaler()
-    this_series_df[rolling_features] = scaler.fit_transform(
-        this_series_df[rolling_features].to_numpy()
-    )
+    this_series_df[rolling_features] = scaler.fit_transform(this_series_df[rolling_features].to_numpy())
 
     return this_series_df
 
 
-def save_each_series(
-    this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
-):
+def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -94,9 +104,7 @@ def save_each_series(
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: DictConfig):
-    processed_dir = (
-        pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
-    )
+    processed_dir = pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -151,18 +159,19 @@ def main(cfg: DictConfig):
             .sort(by=["series_id", "timestamp"])
         )
 
-
         # add index col for rolling
-        series_df = series_df.with_columns(series_df.select("series_id").with_row_count("index")["index"].cast(pl.Int32))
-        #temp = series_df.rolling(index_column = "index",by="series_id",period="300i").agg([pl.col("anglez_int").n_unique().alias("n_unique_anglez_5min")])
+        series_df = series_df.with_columns(
+            series_df.select("series_id").with_row_count("index")["index"].cast(pl.Int32)
+        )
+        # temp = series_df.rolling(index_column = "index",by="series_id",period="300i").agg([pl.col("anglez_int").n_unique().alias("n_unique_anglez_5min")])
 
         if cfg.scale_type == "constant":
             feature_names_to_preprocess = ["anglez", "enmo"]
 
             for feature_name in feature_names_to_preprocess:
-                series_df[[feature_name]] = (
-                    series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
-                ) / STD_DICT[feature_name]
+                series_df[[feature_name]] = (series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]) / STD_DICT[
+                    feature_name
+                ]
         elif cfg.scale_type == "robust_scaler":
             feature_names_to_preprocess = [
                 "anglez",
@@ -204,31 +213,36 @@ def main(cfg: DictConfig):
         # "month_cos",
         "week_sin",
         "week_cos",
-        "index", #for rolling features
         # "minute_sin",
         # "minute_cos",
     ]
-    rolling_features = [
-        "n_unique_anglez_5min",
-        "n_unique_enmo_5min",
-        "rolling_unique_anglez_sum",
-        "rolling_unique_enmo_sum",
-        ]
+    rolling_features = cfg.rolling_features or []
+    # rolling_features = [
+    #     "n_unique_anglez_5min",
+    #     "n_unique_enmo_5min",
+    #     "rolling_unique_anglez_sum",
+    #     "rolling_unique_enmo_sum",
+    # ]
+    if len(rolling_features) > 0:
+        feature_names.append(
+            "index",
+        )  # for rolling features
 
     print(f"{feature_names+rolling_features = }")
 
     with trace("Save features"):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
-                # 特徴量を追加
-                this_series_df = add_feature(this_series_df, feature_names)
-                
-                # NOTE: メモリーエラーを避けるためにここでrolling
-                this_series_df = add_rolling_features(this_series_df,rolling_features)
+            # 特徴量を追加
+            this_series_df = add_feature(this_series_df, feature_names)
 
-                # 特徴量をそれぞれnpy/npzで保存
-                
-                series_dir = processed_dir / series_id
-                save_each_series(this_series_df, feature_names+rolling_features, series_dir, cfg.save_as_npz)
+            # NOTE: メモリーエラーを避けるためにここでrolling
+            if len(rolling_features) > 0:
+                this_series_df = add_rolling_features(this_series_df, rolling_features)
+
+            # 特徴量をそれぞれnpy/npzで保存
+
+            series_dir = processed_dir / series_id
+            save_each_series(this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz)
 
 
 if __name__ == "__main__":

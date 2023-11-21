@@ -61,9 +61,7 @@ def main(cfg: DictConfig):
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
     (output_dir_path / ".hydra").mkdir(exist_ok=True)
-    shutil.copy(
-        p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml"
-    )
+    shutil.copy(p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml")
 
     torch.save(
         module.model.state_dict(),
@@ -86,11 +84,7 @@ if __name__ == "__main__":
         ],
         columns=["path", "i_fold", "version"],
     )
-    path_df = (
-        path_df.sort_values(["i_fold", "version"], ascending=[True, False])
-        .groupby(["i_fold"])
-        .head(1)
-    )
+    path_df = path_df.sort_values(["i_fold", "version"], ascending=[True, False]).groupby(["i_fold"]).head(1)
     print(path_df)
 
     scores = []

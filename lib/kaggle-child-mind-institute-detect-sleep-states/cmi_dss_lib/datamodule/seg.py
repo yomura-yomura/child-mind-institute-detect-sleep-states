@@ -104,9 +104,7 @@ def load_chunk_features(
 
 
 class Indexer:
-    def __init__(
-        self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int
-    ):
+    def __init__(self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int):
         self.total_duration = total_duration
         self.interest_duration = duration - prev_margin_steps - next_margin_steps
         self.duration = duration
@@ -147,9 +145,7 @@ def random_crop(pos: int, duration: int, max_end) -> tuple[int, int]:
 ###################
 # Label
 ###################
-def get_label(
-    this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int
-) -> np.ndarray:
+def get_label(this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int) -> np.ndarray:
     assert start <= end
     # # (start, end)の範囲と(onset, wakeup)の範囲が重なるものを取得
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
@@ -229,9 +225,7 @@ class TrainDataset(Dataset):
     ):
         self.cfg = cfg
         self.event_df: pd.DataFrame = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
-            .drop_nulls()
-            .to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
         )
         self.features = features
         # self.num_features = len(cfg.features)
@@ -279,9 +273,7 @@ class TrainDataset(Dataset):
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(this_event_df, num_frames, self.cfg.duration, start, end)
-        label[:, [1, 2]] = gaussian_label(
-            label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma
-        )
+        label[:, [1, 2]] = gaussian_label(label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma)
 
         return {
             "series_id": series_id,
@@ -302,9 +294,7 @@ class ValidDataset(Dataset):
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.event_df = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
-            .drop_nulls()
-            .to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
         )
         self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
@@ -317,9 +307,7 @@ class ValidDataset(Dataset):
     def __getitem__(self, idx):
         key = self.keys[idx]
         feature = self.chunk_features[key]
-        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(
-            0
-        )  # (1, ..., num_features, duration)
+        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(0)  # (1, ..., num_features, duration)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -331,9 +319,7 @@ class ValidDataset(Dataset):
         # start = chunk_id * self.cfg.duration
         # end = start + self.cfg.duration
         total_duration = sum(
-            feature.shape[-1]
-            for key, features in self.chunk_features.items()
-            if key.startswith(series_id)
+            feature.shape[-1] for key, features in self.chunk_features.items() if key.startswith(series_id)
         )
         start, end = Indexer(
             total_duration,
@@ -405,22 +391,13 @@ class SegDataModule(LightningDataModule):
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
 
         with open(
-            project_root_path
-            / "run"
-            / "conf"
-            / "split"
-            / self.cfg.split_type.name
-            / f"{self.cfg.split.name}.yaml"
+            project_root_path / "run" / "conf" / "split" / self.cfg.split_type.name / f"{self.cfg.split.name}.yaml"
         ) as f:
             series_ids_dict = omegaconf.OmegaConf.load(f)
         self.train_series_ids = series_ids_dict["train_series_ids"]
         self.valid_series_ids = series_ids_dict["valid_series_ids"]
-        self.train_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.train_series_ids)
-        )
-        self.valid_event_df = self.event_df.filter(
-            pl.col("series_id").is_in(self.valid_series_ids)
-        )
+        self.train_event_df = self.event_df.filter(pl.col("series_id").is_in(self.train_series_ids))
+        self.valid_event_df = self.event_df.filter(pl.col("series_id").is_in(self.valid_series_ids))
 
         self.train_features = None
         self.valid_chunk_features = None
@@ -447,10 +424,7 @@ class SegDataModule(LightningDataModule):
                 next_margin_steps=self.cfg.next_margin_steps,
             )
         if stage == "test":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
+            series_ids = [x.name for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -463,10 +437,7 @@ class SegDataModule(LightningDataModule):
             )
 
         if stage == "dev":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
+            series_ids = [x.name for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,

@@ -77,10 +77,7 @@ class StackingChunkModule(BaseChunkModule):
 
         if self.feature_extractors is not None:
             x = torch.stack(
-                [
-                    feature_extractor(x[:, i])[:, 0]
-                    for i, feature_extractor in enumerate(self.feature_extractors)
-                ],
+                [feature_extractor(x[:, i])[:, 0] for i, feature_extractor in enumerate(self.feature_extractors)],
                 dim=1,
             )  # (batch_size, pred_type, hidden_size * num_directions, duration)
 
@@ -91,9 +88,7 @@ class StackingChunkModule(BaseChunkModule):
 
         x = self.model(x)  # (batch_size, pred_type, duration, model)
 
-        logits = (
-            self.concat_linear(x).squeeze(3).permute(0, 2, 1)
-        )  # (batch_size, duration, pred_type)
+        logits = self.concat_linear(x).squeeze(3).permute(0, 2, 1)  # (batch_size, duration, pred_type)
 
         output = {"logits": logits}
 
