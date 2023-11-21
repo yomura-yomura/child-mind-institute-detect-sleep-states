@@ -247,7 +247,7 @@ def main(cfg: PrepareDataConfig):
 
             # NOTE: メモリーエラーを避けるためにここでrolling
             if len(rolling_features) > 0:
-                this_series_df = add_rolling_features(this_series_df, rolling_features)
+                this_series_df = add_rolling_features(this_series_df, list(rolling_features))
 
             # 特徴量をそれぞれnpy/npzで保存
 

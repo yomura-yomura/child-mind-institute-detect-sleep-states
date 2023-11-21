@@ -1,5 +1,3 @@
-#!/bin/sh
-
 python3 -m build
 rm dist/*.tar.gz
 kaggle datasets version -p dist/ -m "" --dir-mode skip
