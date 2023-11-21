@@ -1,3 +1,6 @@
+"""
+Forked from https://www.kaggle.com/code/chauyh/kagglechildsleep-fast-ap-metric-computation/notebook
+"""
 from typing import Literal
 
 import numpy as np
