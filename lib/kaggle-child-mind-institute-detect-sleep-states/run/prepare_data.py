@@ -1,5 +1,6 @@
+import pathlib
+import pickle
 import shutil
-from pathlib import Path
 
 import hydra
 import numpy as np
@@ -43,7 +44,9 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
     return series_df
 
 
-def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool):
+def save_each_series(
+    this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
+):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -56,7 +59,9 @@ def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_di
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: DictConfig):
-    processed_dir = Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    processed_dir = (
+        pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    )
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -72,7 +77,7 @@ def main(cfg: DictConfig):
             else:
                 dataset_type = "test"
             series_lf = pl.scan_parquet(
-                Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
+                pathlib.Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
                 low_memory=True,
             )
         else:
@@ -115,12 +120,30 @@ def main(cfg: DictConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff", "anglez_lag_diff_abs", "enmo_lag_diff_abs"]
+            feature_names_to_preprocess = [
+                "anglez",
+                "enmo",
+                "anglez_lag_diff",
+                "enmo_lag_diff",
+                "anglez_lag_diff_abs",
+                "enmo_lag_diff_abs",
+            ]
+            features = series_df[feature_names_to_preprocess].to_numpy()
 
-            scaler = sklearn.preprocessing.RobustScaler()
-            series_df[feature_names_to_preprocess] = scaler.fit_transform(
-                series_df[feature_names_to_preprocess].to_numpy()
-            )
+            preprocessing_scaler_dir = pathlib.Path(cfg.dir.preprocessing_scaler_dir)
+            scaler_save_path = preprocessing_scaler_dir / "robust_scaler.pkl"
+            if cfg.just_load_scaler:
+                with open(scaler_save_path, "rb") as f:
+                    scaler = pickle.load(f)
+                print(f"[Info] RobustScaler has been loaded from {scaler_save_path}")
+            else:
+                scaler = sklearn.preprocessing.RobustScaler()
+                scaler.fit(features)
+                preprocessing_scaler_dir.mkdir(exist_ok=True)
+                with open(scaler_save_path, "wb") as f:
+                    pickle.dump(scaler, f)
+                print(f"[Info] RobustScaler has been saved as {scaler_save_path}")
+            series_df[feature_names_to_preprocess] = scaler.transform(features)
         else:
             raise ValueError(f"unexpected {cfg.scale_type}")
         series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
@@ -131,8 +154,8 @@ def main(cfg: DictConfig):
         *feature_names_to_preprocess,
         "hour_sin",
         "hour_cos",
-        "month_sin",
-        "month_cos",
+        # "month_sin",
+        # "month_cos",
         "week_sin",
         "week_cos",
         # "minute_sin",

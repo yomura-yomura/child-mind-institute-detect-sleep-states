@@ -18,3 +18,5 @@ phase: train
 scale_type: constant
 
 save_as_npz: false
+
+just_load_scaler: true

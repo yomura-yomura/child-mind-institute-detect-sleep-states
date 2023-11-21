@@ -23,13 +23,22 @@ class StackingDataModule(L.LightningDataModule):
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
 
         with open(
-            project_root_path / "run" / "conf" / "split" / self.cfg.split_type.name / f"{self.cfg.split.name}.yaml"
+            project_root_path
+            / "run"
+            / "conf"
+            / "split"
+            / self.cfg.split_type.name
+            / f"{self.cfg.split.name}.yaml"
         ) as f:
             series_ids_dict = omegaconf.OmegaConf.load(f)
         self.train_series_ids = series_ids_dict["train_series_ids"]
         self.valid_series_ids = series_ids_dict["valid_series_ids"]
-        self.train_event_df = self.event_df.filter(pl.col("series_id").is_in(self.train_series_ids))
-        self.valid_event_df = self.event_df.filter(pl.col("series_id").is_in(self.valid_series_ids))
+        self.train_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.train_series_ids)
+        )
+        self.valid_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.valid_series_ids)
+        )
 
         self.train_features = None
         self.valid_chunk_features = None
@@ -47,7 +56,9 @@ class StackingDataModule(L.LightningDataModule):
                 )
                 for input_model_name in self.cfg.input_model_names
             ]
-            self.train_features = load_features(train_predicted_paths, series_ids=self.train_series_ids)
+            self.train_features = load_features(
+                train_predicted_paths, series_ids=self.train_series_ids
+            )
 
         if stage in ("fit", "valid"):
             valid_predicted_paths = [
@@ -106,7 +117,10 @@ def load_features(
 ) -> dict[str, NDArray[Shape["3, *, *"], Float]]:
     return {
         series_id: np.stack(
-            [np.load(predicted_path / f"{series_id}.npz")["arr_0"].T for predicted_path in predicted_paths],
+            [
+                np.load(predicted_path / f"{series_id}.npz")["arr_0"].T
+                for predicted_path in predicted_paths
+            ],
             axis=-1,
         )  # (pred_type, duration, model)
         for series_id in series_ids
@@ -124,7 +138,10 @@ def load_chunk_features(
 
     for series_id in series_ids:
         this_feature = np.stack(
-            [np.load(predicted_path / f"{series_id}.npz")["arr_0"].T for predicted_path in predicted_paths],
+            [
+                np.load(predicted_path / f"{series_id}.npz")["arr_0"].T
+                for predicted_path in predicted_paths
+            ],
             axis=-1,
         )  # (pred_type, duration, model)
 
@@ -143,6 +160,8 @@ def load_chunk_features(
             start, end = indexer.get_cropping_range(i)
 
             chunk_features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
-            chunk_features[key] = pad_if_needed(this_feature[..., start:end, :], duration, pad_value=0, axis=-2)
+            chunk_features[key] = pad_if_needed(
+                this_feature[..., start:end, :], duration, pad_value=0, axis=-2
+            )
 
     return chunk_features

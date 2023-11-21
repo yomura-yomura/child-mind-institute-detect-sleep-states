@@ -5,11 +5,14 @@ from omegaconf import DictConfig
 from .dir import DirConfig
 from .model import Model
 from .train import TrainOptimizerConfig, TrainSchedulerConfig, TrainSplit, TrainSplitType
+from .feature_extractor import FeatureExtractor
 
 
 @dataclasses.dataclass
 class StackingConfig(DictConfig):
     dir: DirConfig
+
+    feature_extractor: FeatureExtractor | None
 
     split: "TrainSplit"
     split_type: "TrainSplitType"
