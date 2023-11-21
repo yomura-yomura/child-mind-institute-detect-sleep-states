@@ -33,6 +33,8 @@ def to_coord(x: pl.Expr, max_: int, name: str) -> list[pl.Expr]:
 
     return [x_sin.alias(f"{name}_sin"), x_cos.alias(f"{name}_cos")]
 
+def count_unique(ser) -> int:
+    return len(np.unique(ser))
 
 def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFrame:
     series_df = series_df.with_columns(
@@ -42,6 +44,39 @@ def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFra
         *to_coord(pl.col("timestamp").dt.day(), 7, "week"),
     ).select("series_id", *feature_names)
     return series_df
+
+def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[str]) -> pl.DataFrame:
+    """add rolling feature"""
+    this_series_df = this_series_df.join(
+        this_series_df.sort(by="index").set_sorted(column="index").rolling(index_column = "index",period="60i").agg(
+            [
+                pl.col("anglez_int").n_unique().cast(pl.Int16).alias("n_unique_anglez_5min"),
+                pl.col("enmo_int").n_unique().cast(pl.Int16).alias("n_unique_enmo_5min"),
+            ]
+            ),
+        on = "index")
+
+    for col in ["anglez","enmo"]:
+        for shift_min in [5,10,15,20,25,30]:
+            this_series_df = this_series_df.with_columns(this_series_df[f"n_unique_{col}_5min"].shift(12*shift_min).fill_null(0).alias(f"n_unique_{col}_5min_{shift_min}minEarlier"))
+
+        this_series_df = this_series_df.with_columns((
+                                    pl.col(f"n_unique_{col}_5min_5minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min_10minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min_15minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min_20minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min_25minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min_30minEarlier") +
+                                    pl.col(f"n_unique_{col}_5min")
+                                    ).alias(f"rolling_unique_{col}_sum"))
+
+    # scalering
+    scaler = sklearn.preprocessing.RobustScaler()
+    this_series_df[rolling_features] = scaler.fit_transform(
+        this_series_df[rolling_features].to_numpy()
+    )
+
+    return this_series_df
 
 
 def save_each_series(
@@ -86,11 +121,13 @@ def main(cfg: DictConfig):
         # preprocess
         series_df = (
             series_lf.with_columns(
+                pl.col("anglez"),
+                pl.col("enmo"),
                 pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
                 # (pl.col("anglez") - ANGLEZ_MEAN) / ANGLEZ_STD,
                 # (pl.col("enmo") - ENMO_MEAN) / ENMO_STD,
-                pl.col("anglez"),
-                pl.col("enmo"),
+                pl.col("anglez").cast(pl.Int16).alias("anglez_int"),
+                pl.col("enmo").cast(pl.Int16).alias("enmo_int"),
                 pl.col("anglez").diff(n=1).over("series_id").alias("anglez_lag_diff"),
                 pl.col("enmo").diff(n=1).over("series_id").alias("enmo_lag_diff"),
                 pl.col("anglez").diff(n=1).abs().over("series_id").alias("anglez_lag_diff_abs"),
@@ -101,6 +138,8 @@ def main(cfg: DictConfig):
                     pl.col("series_id"),
                     pl.col("anglez"),
                     pl.col("enmo"),
+                    pl.col("anglez_int"),
+                    pl.col("enmo_int"),
                     pl.col("anglez_lag_diff"),
                     pl.col("enmo_lag_diff"),
                     pl.col("anglez_lag_diff_abs"),
@@ -111,6 +150,11 @@ def main(cfg: DictConfig):
             .collect(streaming=True)
             .sort(by=["series_id", "timestamp"])
         )
+
+
+        # add index col for rolling
+        series_df = series_df.with_columns(series_df.select("series_id").with_row_count("index")["index"].cast(pl.Int32))
+        #temp = series_df.rolling(index_column = "index",by="series_id",period="300i").agg([pl.col("anglez_int").n_unique().alias("n_unique_anglez_5min")])
 
         if cfg.scale_type == "constant":
             feature_names_to_preprocess = ["anglez", "enmo"]
@@ -152,25 +196,39 @@ def main(cfg: DictConfig):
 
     feature_names = [
         *feature_names_to_preprocess,
+        "anglez_int",
+        "enmo_int",
         "hour_sin",
         "hour_cos",
         # "month_sin",
         # "month_cos",
         "week_sin",
         "week_cos",
+        "index", #for rolling features
         # "minute_sin",
         # "minute_cos",
     ]
-    print(f"{feature_names = }")
+    rolling_features = [
+        "n_unique_anglez_5min",
+        "n_unique_enmo_5min",
+        "rolling_unique_anglez_sum",
+        "rolling_unique_enmo_sum",
+        ]
+
+    print(f"{feature_names+rolling_features = }")
 
     with trace("Save features"):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
-            # 特徴量を追加
-            this_series_df = add_feature(this_series_df, feature_names)
+                # 特徴量を追加
+                this_series_df = add_feature(this_series_df, feature_names)
+                
+                # NOTE: メモリーエラーを避けるためにここでrolling
+                this_series_df = add_rolling_features(this_series_df,rolling_features)
 
-            # 特徴量をそれぞれnpy/npzで保存
-            series_dir = processed_dir / series_id
-            save_each_series(this_series_df, feature_names, series_dir, cfg.save_as_npz)
+                # 特徴量をそれぞれnpy/npzで保存
+                
+                series_dir = processed_dir / series_id
+                save_each_series(this_series_df, feature_names+rolling_features, series_dir, cfg.save_as_npz)
 
 
 if __name__ == "__main__":
