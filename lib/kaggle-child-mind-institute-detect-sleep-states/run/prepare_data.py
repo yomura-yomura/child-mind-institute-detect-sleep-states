@@ -56,19 +56,45 @@ def add_rolling_features(this_series_df: pl.DataFrame, rolling_features: list[st
             ),
         on = "index")
 
+    this_series_df = this_series_df.join(
+        this_series_df.sort(by="index").set_sorted(column="index").rolling(index_column = "index",period="12i").agg(
+            [
+                pl.col("anglez_int").n_unique().cast(pl.Int16).alias("n_unique_anglez_1min"),
+                pl.col("enmo_int").n_unique().cast(pl.Int16).alias("n_unique_enmo_1min"),
+            ]
+            ),
+        on = "index")
+
     for col in ["anglez","enmo"]:
+        # feature pct_change
+        this_series_df = this_series_df.sort(by="index").with_columns((pl.col(col).diff()/pl.col(col).add(1e-6).shift(1)).abs().fill_null(0).alias(f"pct_change_{col}"))
+        this_series_df = this_series_df.with_columns(pl.when(pl.col(f"pct_change_{col}") > 1.0).then(0).otherwise(pl.col(f"pct_change_{col}")).alias(f"pct_change_{col}"))
+
         for shift_min in [5,10,15,20,25,30]:
             this_series_df = this_series_df.with_columns(this_series_df[f"n_unique_{col}_5min"].shift(12*shift_min).fill_null(0).alias(f"n_unique_{col}_5min_{shift_min}minEarlier"))
+        for shift_min in [3,6,9,12,15,18]:
+            this_series_df = this_series_df.with_columns(this_series_df[f"n_unique_{col}_1min"].shift(12*shift_min).fill_null(0).alias(f"n_unique_{col}_1min_{shift_min}minEarlier"))
 
-        this_series_df = this_series_df.with_columns((
-                                    pl.col(f"n_unique_{col}_5min_5minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_10minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_15minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_20minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_25minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min_30minEarlier") +
-                                    pl.col(f"n_unique_{col}_5min")
-                                    ).alias(f"rolling_unique_{col}_sum"))
+        this_series_df = this_series_df.with_columns(
+                                    (
+                                        pl.col(f"n_unique_{col}_5min_5minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min_10minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min_15minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min_20minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min_25minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min_30minEarlier") +
+                                        pl.col(f"n_unique_{col}_5min")
+                                    ).alias(f"rolling_unique_{col}_5min_sum"),
+                                    (
+                                        pl.col(f"n_unique_{col}_1min_3minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min_6minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min_9minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min_12minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min_15minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min_18minEarlier") +
+                                        pl.col(f"n_unique_{col}_1min")
+                                    ).alias(f"rolling_unique_{col}_1min_sum")
+                                    )
 
     feature_savgol = ["anglez_lag_diff_abs", "enmo_lag_diff_abs"]
     ## savgol filter
@@ -135,6 +161,8 @@ def main(cfg: DictConfig):
                 pl.col("enmo").diff(n=1).over("series_id").alias("enmo_lag_diff"),
                 pl.col("anglez").diff(n=1).abs().over("series_id").alias("anglez_lag_diff_abs"),
                 pl.col("enmo").diff(n=1).abs().over("series_id").alias("enmo_lag_diff_abs"),
+                pl.col("anglez").diff(n=1).abs().cumsum().over("series_id").alias("anglez_lag_diff_abs_cumsum"),
+                pl.col("enmo").diff(n=1).abs().cumsum().over("series_id").alias("enmo_lag_diff_abs_cumsum"),
             )
             .select(
                 [
@@ -199,13 +227,21 @@ def main(cfg: DictConfig):
     rolling_features = [
         "n_unique_anglez_5min",
         "n_unique_enmo_5min",
-        "rolling_unique_anglez_sum",
-        "rolling_unique_enmo_sum",
+        "rolling_unique_anglez_5min_sum",
+        "rolling_unique_enmo_5min_sum",
+        "n_unique_anglez_1min",
+        "n_unique_enmo_1min",
+        "rolling_unique_anglez_1min_sum",
+        "rolling_unique_enmo_1min_sum",
         "anglez_lag_diff_abs_savgol",
         "enmo_lag_diff_abs_savgol",
         ]
+    pctchange_features = [
+        "pct_change_anglez",
+        "pct_change_enmo"
+    ]
 
-    print(f"{feature_names+rolling_features = }")
+    print(f"{feature_names+rolling_features+pctchange_features = }")
 
     with trace("Save features"):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
@@ -219,7 +255,7 @@ def main(cfg: DictConfig):
                 
                 
                 series_dir = processed_dir / series_id
-                save_each_series(this_series_df, feature_names+rolling_features, series_dir, cfg.save_as_npz)
+                save_each_series(this_series_df, feature_names+rolling_features+pctchange_features, series_dir, cfg.save_as_npz)
 
 
 if __name__ == "__main__":
