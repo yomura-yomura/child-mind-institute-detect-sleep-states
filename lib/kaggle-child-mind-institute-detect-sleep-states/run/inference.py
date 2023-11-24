@@ -41,7 +41,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         #
         # "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp047_retry",
-        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
+        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
         # "../cmi-dss-ensemble-models/jumtras/exp052",
         # "../cmi-dss-ensemble-models/jumtras/exp053",
@@ -49,8 +49,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp055",
         # "../cmi-dss-ensemble-models/ranchantan/exp060",
         # "../cmi-dss-ensemble-models/ranchantan/exp073_resume",
-        # "../cmi-dss-ensemble-models/ranchantan/exp075-onset_2",
-        "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
+        # "../cmi-dss-ensemble-models/ranchantan/exp075-onset",
+        # "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
         #
         # "phase=dev",
         "phase=train",

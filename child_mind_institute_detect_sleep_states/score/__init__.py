@@ -11,6 +11,7 @@ def calc_event_detection_ap(
     calc_type: Literal["normal", "fast"] = "fast",
     n_jobs: int = -1,
     show_progress: bool = True,
+    print_score: bool = True,
 ):
     if len(submission_df) == 0:
         return
@@ -26,4 +27,6 @@ def calc_event_detection_ap(
             score_column_name="score",
         )
     elif calc_type == "fast":
-        return fast_event_detection_ap.score(event_df, submission_df, n_jobs=n_jobs, show_progress=show_progress)
+        return fast_event_detection_ap.score(
+            event_df, submission_df, n_jobs=n_jobs, show_progress=show_progress, print_score=print_score
+        )

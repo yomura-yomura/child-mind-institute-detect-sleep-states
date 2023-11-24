@@ -27,9 +27,9 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-    #     watch_interval_hour=6, sleep_occupancy_th=0.3
-    # ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=7.5, sleep_occupancy_th=0.03
+    ),
 }
 
 
@@ -70,7 +70,8 @@ all_model_dir_path_dict = {
 # weight_dict = {47: 1, 50: 0, 52: 0, 53: 0}  # 21
 # weight_dict = {19: 0.1, 27: 0.1, 50: 0.2, 53: 0.3, 55: 0.1, 58: 0.2}  # 22
 # weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
-weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
+# weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
+weight_dict = {"19": 0.1, "27": 0.1, "50": 0.2, "53": 0.3, "55": 0.1, "58": 0.2}  # 23
 
 
 score_th = 0.005
@@ -105,6 +106,7 @@ if __name__ == "__main__":
         post_process_modes: dict = None,
         score_th: float = score_th,
         distance: float = distance,
+        calc_type: str = "fast",
         n_records_per_series_id=None,
         print_msg: bool = False,
     ) -> tuple[list[float], list[float]]:
@@ -120,6 +122,7 @@ if __name__ == "__main__":
                     post_process_modes=post_process_modes,
                     score_th=score_th,
                     distance=distance,
+                    calc_type=calc_type,
                     n_records_per_series_id=n_records_per_series_id,
                     print_msg=print_msg,
                 )
@@ -138,6 +141,7 @@ if __name__ == "__main__":
             n_records_per_series_id=1000,
             post_process_modes=post_process_modes,
             print_msg=True,
+            calc_type="normal",
         )
 
         # calc_all_scores([0.1, 0.1, 0.1, 0.2, 0.2, 0.3], score_th=score_th, distance=distance)
@@ -171,4 +175,5 @@ if __name__ == "__main__":
             score_th=1e-4,
             distance=88,
             n_records_per_series_id=1000,
+            calc_type="normal",
         )

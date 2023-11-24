@@ -18,6 +18,7 @@ import child_mind_institute_detect_sleep_states.score
 # exp_name = "jumtras/exp043"
 exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
 # exp_name = "combined/exp050_exp75-wakeup"
+# exp_name = "ranchantan/exp075-wakeup_6"
 
 # predicted_fold_dir_path = pathlib.Path("tmp/predicted/ranchantan/exp041/train/fold_0/")
 # predicted_dir_path = pathlib.Path("predicted/ranchantan/exp047/train/")
@@ -90,11 +91,11 @@ if __name__ == "__main__":
         # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
         #     sleep_prob_th=0.2, min_sleeping_hours=6
         # ),
-        # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-        #     # watch_interval_hour=6, sleep_occupancy_th=0.3
-        #     watch_interval_hour=6,
-        #     sleep_occupancy_th=0.5,
-        # ),
+        "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+            # watch_interval_hour=6, sleep_occupancy_th=0.3
+            watch_interval_hour=6,
+            sleep_occupancy_th=0.2,
+        ),
     }
 
     scores = []

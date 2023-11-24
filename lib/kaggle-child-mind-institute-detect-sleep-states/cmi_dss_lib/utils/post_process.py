@@ -19,7 +19,7 @@ class SleepingEdgesAsProbsSetting(TypedDict):
 
 
 class CuttingProbsBySleepProbSetting(TypedDict):
-    watch_interval_hour: int
+    watch_interval_hour: float
     sleep_occupancy_th: float
 
 
@@ -85,22 +85,22 @@ def post_process_for_seg(
     if "cutting_probs_by_sleep_prob" in post_process_modes:
         if print_msg:
             print("enable 'cutting_probs_by_sleep_prob'")
-        data = adapt_cutting_probs_by_sleep_prob(
-            keys,
-            preds,
-            downsample_rate=downsample_rate,
-            **post_process_modes["cutting_probs_by_sleep_prob"],
-        )
-        keys = data["key"]
-        preds = data["pred"]
+        # data = adapt_cutting_probs_by_sleep_prob(
+        #     keys,
+        #     preds,
+        #     downsample_rate=downsample_rate,
+        #     **post_process_modes["cutting_probs_by_sleep_prob"],
+        # )
+        # keys = data["key"]
+        # preds = data["pred"]
+        #
+        # series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
 
-        series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-
-        # setting = post_process_modes["cutting_probs_by_sleep_prob"]
-        # sleep_occupancy_th = setting["sleep_occupancy_th"]
-        # watch_interval_hour = setting["watch_interval_hour"] * 60 * 12 // downsample_rate
-    # else:
-    #     sleep_occupancy_th = watch_interval_hour = None
+        setting = post_process_modes["cutting_probs_by_sleep_prob"]
+        sleep_occupancy_th = setting["sleep_occupancy_th"]
+        watch_interval_hour = int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
+    else:
+        sleep_occupancy_th = watch_interval_hour = None
 
     records = []
     for series_id in unique_series_ids:
@@ -113,28 +113,28 @@ def post_process_for_seg(
             scores = this_event_preds[steps]
 
             for step, score in zip(steps, scores, strict=True):
-                # if "cutting_probs_by_sleep_prob" in post_process_modes:
-                #     max_len_step = this_series_preds.shape[0]
-                #     sleep_preds = this_series_preds[:, labels.index("sleep")]
-                #
-                #     if event_name == "onset":
-                #         max_step = min(step + watch_interval_hour, max_len_step - 1)
-                #         if step < max_step:
-                #             sleep_score = np.median(sleep_preds[step:max_step])
-                #         else:
-                #             sleep_score = np.nan
-                #     elif event_name == "wakeup":
-                #         min_step = max(step - watch_interval_hour, 0)
-                #         if min_step < step:
-                #             sleep_score = np.median(sleep_preds[min_step:step])
-                #         else:
-                #             sleep_score = np.nan
-                #     else:
-                #         assert False
-                #
-                #     # skip
-                #     if sleep_score < sleep_occupancy_th:
-                #         continue
+                if "cutting_probs_by_sleep_prob" in post_process_modes:
+                    max_len_step = this_series_preds.shape[0]
+                    sleep_preds = this_series_preds[:, labels.index("sleep")]
+
+                    if event_name == "onset":
+                        max_step = min(step + watch_interval_hour, max_len_step - 1)
+                        if step < max_step:
+                            sleep_score = np.median(sleep_preds[step:max_step])
+                        else:
+                            sleep_score = np.nan
+                    elif event_name == "wakeup":
+                        min_step = max(step - watch_interval_hour, 0)
+                        if min_step < step:
+                            sleep_score = np.median(sleep_preds[min_step:step])
+                        else:
+                            sleep_score = np.nan
+                    else:
+                        assert False
+
+                    # skip
+                    if sleep_score < sleep_occupancy_th:
+                        continue
 
                 records.append(
                     {
@@ -231,8 +231,8 @@ def adapt_cutting_probs_by_sleep_prob(
 
         # onset
         is_over_th = np.r_[median_sleep_probs > sleep_occupancy_th, [False] * n_invalid_steps]
-        concat_pred[~is_over_th, 1] = 0
 
+        concat_pred[~is_over_th, 1] = 0
         # wakeup
         is_over_th = np.r_[[False] * n_invalid_steps, median_sleep_probs > sleep_occupancy_th]
         concat_pred[~is_over_th, 2] = 0

@@ -1,15 +1,21 @@
-- exp_name=s_exp002_9
+- exp_name=s_exp002
 - input_model_names=[ranchantan/exp047_retry,ranchantan/exp050-transformer-decoder_retry,jumtras/exp052,jumtras/exp053]
 
-- model.segmentation_model_name=manet
+#- model.segmentation_model_name=manet
 - model.encoder_name=resnet18
 - duration=17280  # 24h
 #- duration=8640  # 12h
 #- duration=1024  # 12h
 - batch_size=4
-#- optimizer.lr=0.00005
-
-- val_after_steps=8000
+- optimizer.lr=0.00005
 
 #- sigma=108
-- offset=24
+#- offset=24
+
+- epoch=40
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=5000

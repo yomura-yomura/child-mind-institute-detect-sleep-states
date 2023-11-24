@@ -1,4 +1,4 @@
-- exp_name=exp075-onset_2
+- exp_name=exp075-onset
 
 - split_type=base
 
@@ -20,7 +20,7 @@
 
 - val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=8000
+- val_after_steps=5000
 
 - labels=[sleep,event_onset]
 
