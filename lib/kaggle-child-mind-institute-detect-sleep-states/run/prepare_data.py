@@ -167,36 +167,38 @@ def main(cfg: PrepareDataConfig):
         # preprocess
         series_df = (
             series_lf.with_columns(
-                pl.col("anglez"),
-                pl.col("enmo"),
+                pl.col("anglez").cast(pl.Float32),
+                pl.col("enmo").cast(pl.Float32),
                 pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
                 # (pl.col("anglez") - ANGLEZ_MEAN) / ANGLEZ_STD,
                 # (pl.col("enmo") - ENMO_MEAN) / ENMO_STD,
                 pl.col("anglez").cast(pl.Int16).alias("anglez_int"),
                 pl.col("enmo").cast(pl.Int16).alias("enmo_int"),
-                pl.col("anglez").diff(n=1).over("series_id").fill_null(0).alias("anglez_lag_diff"),
-                pl.col("enmo").diff(n=1).over("series_id").fill_null(0).alias("enmo_lag_diff"),
-                pl.col("anglez").diff(n=1).abs().over("series_id").fill_null(0).alias("anglez_lag_diff_abs"),
-                pl.col("enmo").diff(n=1).abs().over("series_id").fill_null(0).alias("enmo_lag_diff_abs"),
-                pl.col("anglez").diff(n=1).abs().cumsum().over("series_id").fill_null(0).alias("anglez_lag_diff_abs_cumsum"),
-                pl.col("enmo").diff(n=1).abs().cumsum().over("series_id").fill_null(0).alias("enmo_lag_diff_abs_cumsum"),
-                (pl.col("anglez").diff(n=1)/pl.col("anglez").add(1e-6)).abs().fill_null(0).over("series_id").alias("pct_change_anglez"),
-                (pl.col("enmo").diff(n=1)/pl.col("enmo").add(1e-6)).abs().fill_null(0).over("series_id").alias("pct_change_enmo"),
-                pl.col("anglez").rolling_std(window_size="12i",closed = "both").over("series_id").alias("rolling_std_1min_anglez"),
-                pl.col("enmo").rolling_std(window_size="12i",closed = "both").over("series_id").alias("rolling_std_1min_enmo"),
+                pl.col("anglez").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("anglez_lag_diff"),
+                pl.col("enmo").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("enmo_lag_diff"),
+                pl.col("anglez").rolling_std(window_size="12i",closed = "both").over("series_id").cast(pl.Float32).alias("rolling_std_1min_anglez"),
+                pl.col("enmo").rolling_std(window_size="12i",closed = "both").over("series_id").cast(pl.Float32).alias("rolling_std_1min_enmo"),
             ).with_columns(
-                pl.when(pl.col(f"pct_change_anglez") > 1.0).then(0).otherwise(pl.col(f"pct_change_anglez")).alias(f"pct_change_anglez"),
-                pl.when(pl.col(f"pct_change_enmo") > 1.0).then(0).otherwise(pl.col(f"pct_change_enmo")).alias(f"pct_change_enmo"),
+                pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
+                pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
+            ).with_columns(
+                pl.col("anglez_lag_diff_abs").cumsum().over("series_id").cast(pl.Float32).alias("anglez_lag_diff_abs_cumsum"),
+                pl.col("enmo_lag_diff_abs").cumsum().over("series_id").cast(pl.Float32).alias("enmo_lag_diff_abs_cumsum"),
+                (pl.col("anglez_lag_diff_abs")/pl.col("anglez").add(1e-6)).over("series_id").cast(pl.Float32).alias("pct_change_anglez"),
+                (pl.col("enmo_lag_diff_abs")/pl.col("enmo").add(1e-6)).over("series_id").cast(pl.Float32).alias("pct_change_enmo"),
+            ).with_columns(
+                pl.when(pl.col(f"pct_change_anglez") > 1.0).then(0).otherwise(pl.col(f"pct_change_anglez")).cast(pl.Float32).alias(f"pct_change_anglez"),
+                pl.when(pl.col(f"pct_change_enmo") > 1.0).then(0).otherwise(pl.col(f"pct_change_enmo")).cast(pl.Float32).alias(f"pct_change_enmo"),
             )
             .select(
                 [
                     pl.col("series_id"),
                     pl.col("anglez"),
                     pl.col("enmo"),
-                    pl.col("anglez_int"),
-                    pl.col("enmo_int"),
-                    pl.col("anglez_lag_diff"),
-                    pl.col("enmo_lag_diff"),
+                    #pl.col("anglez_int"),
+                    #pl.col("enmo_int"),
+                    #pl.col("anglez_lag_diff"),
+                    #pl.col("enmo_lag_diff"),
                     pl.col("anglez_lag_diff_abs"),
                     pl.col("enmo_lag_diff_abs"),
                     pl.col("anglez_lag_diff_abs_cumsum"),
@@ -211,11 +213,9 @@ def main(cfg: PrepareDataConfig):
             .collect(streaming=True)
             .sort(by=["series_id", "timestamp"])
         )
-
-
         n_unique = series_df.get_column("series_id").n_unique()
         # add index col for rolling
-        series_df = series_df.with_columns(series_df.select("series_id").with_row_count("index")["index"].cast(pl.Int32))
+        #series_df = series_df.with_columns(series_df.select("series_id").with_row_count("index")["index"].cast(pl.Int32))
 
 
         if cfg.scale_type == "constant":
@@ -229,8 +229,8 @@ def main(cfg: PrepareDataConfig):
             feature_names_to_preprocess_v1 = [
                 "anglez",
                 "enmo",
-                "anglez_lag_diff",
-                "enmo_lag_diff",
+                #"anglez_lag_diff",
+                #"enmo_lag_diff",
                 "anglez_lag_diff_abs",
                 "enmo_lag_diff_abs"]
             feature_names_to_preprocess_v2 = [
@@ -282,15 +282,15 @@ def main(cfg: PrepareDataConfig):
 
     feature_names = [
         *feature_names_to_preprocess,
-        "anglez_int",
-        "enmo_int",
+        #"anglez_int",
+        #"enmo_int",
         "hour_sin",
         "hour_cos",
         # "month_sin",
         # "month_cos",
         "week_sin",
         "week_cos",
-        "index", #for rolling features
+        #"index", #for rolling features
         # "minute_sin",
         # "minute_cos",
     ]
@@ -302,8 +302,8 @@ def main(cfg: PrepareDataConfig):
         #"std_enmo_5min",
         #"rolling_unique_anglez_5min_sum",
         #"rolling_unique_enmo_5min_sum",
-        "n_unique_anglez_1min",
-        "n_unique_enmo_1min",
+        #"n_unique_anglez_1min",
+        #"n_unique_enmo_1min",
         #"rolling_unique_anglez_1min_sum",
         #"rolling_unique_enmo_1min_sum",
         #"anglez_lag_diff_abs_savgol",
