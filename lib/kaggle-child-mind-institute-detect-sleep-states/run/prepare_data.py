@@ -126,53 +126,6 @@ def add_rolling_features(this_series_df: pl.DataFrame) -> pl.DataFrame:
     return this_series_df
 
 
-def add_rolling_features(
-    this_series_df: pl.DataFrame, rolling_features: list[str]
-) -> pl.DataFrame:
-    """add rolling feature"""
-    this_series_df = this_series_df.join(
-        this_series_df.sort(by="index")
-        .set_sorted(column="index")
-        .rolling(index_column="index", period="60i")
-        .agg(
-            [
-                pl.col("anglez_int").n_unique().cast(pl.Int16).alias("n_unique_anglez_5min"),
-                pl.col("enmo_int").n_unique().cast(pl.Int16).alias("n_unique_enmo_5min"),
-            ]
-        ),
-        on="index",
-    )
-
-    for col in ["anglez", "enmo"]:
-        for shift_min in [5, 10, 15, 20, 25, 30]:
-            this_series_df = this_series_df.with_columns(
-                this_series_df[f"n_unique_{col}_5min"]
-                .shift(12 * shift_min)
-                .fill_null(0)
-                .alias(f"n_unique_{col}_5min_{shift_min}minEarlier")
-            )
-
-        this_series_df = this_series_df.with_columns(
-            (
-                pl.col(f"n_unique_{col}_5min_5minEarlier")
-                + pl.col(f"n_unique_{col}_5min_10minEarlier")
-                + pl.col(f"n_unique_{col}_5min_15minEarlier")
-                + pl.col(f"n_unique_{col}_5min_20minEarlier")
-                + pl.col(f"n_unique_{col}_5min_25minEarlier")
-                + pl.col(f"n_unique_{col}_5min_30minEarlier")
-                + pl.col(f"n_unique_{col}_5min")
-            ).alias(f"rolling_unique_{col}_sum")
-        )
-
-    # scalering
-    scaler = sklearn.preprocessing.RobustScaler()
-    this_series_df[rolling_features] = scaler.fit_transform(
-        this_series_df[rolling_features].to_numpy()
-    )
-
-    return this_series_df
-
-
 def save_each_series(
     this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
 ):
@@ -216,8 +169,6 @@ def main(cfg: PrepareDataConfig):
             series_lf.with_columns(
                 pl.col("anglez"),
                 pl.col("enmo"),
-                pl.col("anglez"),
-                pl.col("enmo"),
                 pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
                 # (pl.col("anglez") - ANGLEZ_MEAN) / ANGLEZ_STD,
                 # (pl.col("enmo") - ENMO_MEAN) / ENMO_STD,
@@ -242,8 +193,6 @@ def main(cfg: PrepareDataConfig):
                     pl.col("series_id"),
                     pl.col("anglez"),
                     pl.col("enmo"),
-                    pl.col("anglez_int"),
-                    pl.col("enmo_int"),
                     pl.col("anglez_int"),
                     pl.col("enmo_int"),
                     pl.col("anglez_lag_diff"),
@@ -277,30 +226,55 @@ def main(cfg: PrepareDataConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess = [
+            feature_names_to_preprocess_v1 = [
                 "anglez",
                 "enmo",
                 "anglez_lag_diff",
                 "enmo_lag_diff",
                 "anglez_lag_diff_abs",
-                "enmo_lag_diff_abs",
+                "enmo_lag_diff_abs"]
+            feature_names_to_preprocess_v2 = [
+                "anglez_lag_diff_abs_cumsum",
+                "enmo_lag_diff_abs_cumsum",
+                "pct_change_anglez",
+                "pct_change_enmo",
+                "rolling_std_1min_anglez",
+                "rolling_std_1min_enmo",
             ]
-            features = series_df[feature_names_to_preprocess].to_numpy()
+
+            features1 = series_df[feature_names_to_preprocess_v1].to_numpy()
+            features2 = series_df[feature_names_to_preprocess_v2].to_numpy()
 
             preprocessing_scaler_dir = pathlib.Path(cfg.dir.preprocessing_scaler_dir)
-            scaler_save_path = preprocessing_scaler_dir / "robust_scaler.pkl"
+            scaler_save_path1 = preprocessing_scaler_dir / "robust_scaler_v1.pkl"
+            scaler_save_path2 = preprocessing_scaler_dir / "robust_scaler_v2.pkl"
             if cfg.just_load_scaler:
-                with open(scaler_save_path, "rb") as f:
-                    scaler = pickle.load(f)
-                print(f"[Info] RobustScaler has been loaded from {scaler_save_path}")
+                with open(scaler_save_path1, "rb") as f:
+                    scaler1 = pickle.load(f)
+                print(f"[Info] RobustScaler has been loaded from {scaler_save_path1}")
+                
+                with open(scaler_save_path2, "rb") as f:
+                    scaler2 = pickle.load(f)
+                print(f"[Info] RobustScaler has been loaded from {scaler_save_path2}")
             else:
-                scaler = sklearn.preprocessing.RobustScaler()
-                scaler.fit(features)
+                scaler1 = sklearn.preprocessing.RobustScaler()
+                scaler1.fit(features1)
                 preprocessing_scaler_dir.mkdir(exist_ok=True)
-                with open(scaler_save_path, "wb") as f:
-                    pickle.dump(scaler, f)
-                print(f"[Info] RobustScaler has been saved as {scaler_save_path}")
-            series_df[feature_names_to_preprocess] = scaler.transform(features)
+                with open(scaler_save_path1, "wb") as f:
+                    pickle.dump(scaler1, f)
+                print(f"[Info] RobustScaler has been saved as {scaler_save_path1}")
+                
+                scaler2 = sklearn.preprocessing.RobustScaler()
+                scaler2.fit(features2)
+                preprocessing_scaler_dir.mkdir(exist_ok=True)
+                with open(scaler_save_path2, "wb") as f:
+                    pickle.dump(scaler2, f)
+                print(f"[Info] RobustScaler has been saved as {scaler_save_path2}")
+            series_df[feature_names_to_preprocess_v1] = scaler1.transform(features1)
+            series_df[feature_names_to_preprocess_v2] = scaler2.transform(features2)
+
+            feature_names_to_preprocess = feature_names_to_preprocess_v1 + feature_names_to_preprocess_v2
+
         else:
             raise ValueError(f"unexpected {cfg.scale_type}")
         series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
@@ -337,7 +311,7 @@ def main(cfg: PrepareDataConfig):
         ]
 
     #print(f"{feature_names+rolling_features+pctchange_features = }")
-    print(f"{feature_names = }")
+    print(f"{feature_names+rolling_features = }")
 
     with trace("Save features"):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
@@ -345,18 +319,15 @@ def main(cfg: PrepareDataConfig):
                 this_series_df = add_feature(this_series_df, feature_names)
                 
                 # NOTE: メモリーエラーを避けるためにここでrolling
-                this_series_df = add_rolling_features(this_series_df)
+                if len(rolling_features) > 0:
+                    this_series_df = add_rolling_features(this_series_df)
 
-            # NOTE: メモリーエラーを避けるためにここでrolling
-            if len(rolling_features) > 0:
-                this_series_df = add_rolling_features(this_series_df, list(rolling_features))
+                # 特徴量をそれぞれnpy/npzで保存
 
-            # 特徴量をそれぞれnpy/npzで保存
-
-            series_dir = processed_dir / series_id
-            save_each_series(
-                this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
-            )
+                series_dir = processed_dir / series_id
+                save_each_series(
+                    this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
+                )
 
 
 if __name__ == "__main__":
