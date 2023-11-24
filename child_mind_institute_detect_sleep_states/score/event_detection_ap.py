@@ -10,6 +10,8 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
+TOLERANCES = [12, 36, 60, 90, 120, 150, 180, 240, 300, 360]
+
 
 class ParticipantVisibleError(Exception):
     pass

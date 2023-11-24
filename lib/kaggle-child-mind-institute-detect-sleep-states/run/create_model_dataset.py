@@ -37,7 +37,10 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp050-transformer-decoder_retry"
 # exp_name = "exp050-transformer-decoder_retry_resume"
 # exp_name = "exp054"
-exp_name = "exp055"
+# exp_name = "exp055"
+# exp_name = "exp060"
+# exp_name = "exp073_resume"
+exp_name = "exp075-onset_2"
 
 upload = False
 # upload = True

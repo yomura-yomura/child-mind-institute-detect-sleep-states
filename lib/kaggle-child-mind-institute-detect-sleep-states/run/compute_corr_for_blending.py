@@ -44,8 +44,9 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.decomposition import IncrementalPCA
 
 print("clustering")
-k_means = MiniBatchKMeans(n_clusters=7, batch_size=10)
-transformed = k_means.fit_transform(x)
+k_means = MiniBatchKMeans(n_clusters=8, batch_size=10)
+k_means.fit(x)
+transformed = k_means.transform(x)
 clusters = k_means.predict(x)
 
 print("pca")
@@ -75,6 +76,8 @@ score_dict = {
     54: 0.7544,
     55: 0.7471,
     58: 0.7732,
+    60: 0.7688,
+    73: 0.7712,
 }
 
 scores = [score_dict[k] for k in all_model_dir_path_dict.keys()]

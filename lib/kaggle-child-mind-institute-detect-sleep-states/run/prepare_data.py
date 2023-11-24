@@ -1,13 +1,13 @@
+import pathlib
+import pickle
 import shutil
-from pathlib import Path
 
 import hydra
 import numpy as np
 import polars as pl
 import sklearn.preprocessing
+from cmi_dss_lib.config import PrepareDataConfig
 from cmi_dss_lib.utils.common import trace
-from omegaconf import DictConfig
-from scipy.signal import savgol_filter
 from tqdm import tqdm
 
 SERIES_SCHEMA = {
@@ -33,8 +33,10 @@ def to_coord(x: pl.Expr, max_: int, name: str) -> list[pl.Expr]:
 
     return [x_sin.alias(f"{name}_sin"), x_cos.alias(f"{name}_cos")]
 
+
 def count_unique(ser) -> int:
     return len(np.unique(ser))
+
 
 def add_feature(series_df: pl.DataFrame, feature_names: list[str]) -> pl.DataFrame:
     series_df = series_df.with_columns(
@@ -124,7 +126,56 @@ def add_rolling_features(this_series_df: pl.DataFrame) -> pl.DataFrame:
     return this_series_df
 
 
-def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: Path, save_as_npz: bool):
+def add_rolling_features(
+    this_series_df: pl.DataFrame, rolling_features: list[str]
+) -> pl.DataFrame:
+    """add rolling feature"""
+    this_series_df = this_series_df.join(
+        this_series_df.sort(by="index")
+        .set_sorted(column="index")
+        .rolling(index_column="index", period="60i")
+        .agg(
+            [
+                pl.col("anglez_int").n_unique().cast(pl.Int16).alias("n_unique_anglez_5min"),
+                pl.col("enmo_int").n_unique().cast(pl.Int16).alias("n_unique_enmo_5min"),
+            ]
+        ),
+        on="index",
+    )
+
+    for col in ["anglez", "enmo"]:
+        for shift_min in [5, 10, 15, 20, 25, 30]:
+            this_series_df = this_series_df.with_columns(
+                this_series_df[f"n_unique_{col}_5min"]
+                .shift(12 * shift_min)
+                .fill_null(0)
+                .alias(f"n_unique_{col}_5min_{shift_min}minEarlier")
+            )
+
+        this_series_df = this_series_df.with_columns(
+            (
+                pl.col(f"n_unique_{col}_5min_5minEarlier")
+                + pl.col(f"n_unique_{col}_5min_10minEarlier")
+                + pl.col(f"n_unique_{col}_5min_15minEarlier")
+                + pl.col(f"n_unique_{col}_5min_20minEarlier")
+                + pl.col(f"n_unique_{col}_5min_25minEarlier")
+                + pl.col(f"n_unique_{col}_5min_30minEarlier")
+                + pl.col(f"n_unique_{col}_5min")
+            ).alias(f"rolling_unique_{col}_sum")
+        )
+
+    # scalering
+    scaler = sklearn.preprocessing.RobustScaler()
+    this_series_df[rolling_features] = scaler.fit_transform(
+        this_series_df[rolling_features].to_numpy()
+    )
+
+    return this_series_df
+
+
+def save_each_series(
+    this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
+):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -136,8 +187,10 @@ def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_di
 
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
-def main(cfg: DictConfig):
-    processed_dir = Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+def main(cfg: PrepareDataConfig):
+    processed_dir = (
+        pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
+    )
     print(f"{processed_dir = }")
 
     # ディレクトリが存在する場合は削除
@@ -152,7 +205,7 @@ def main(cfg: DictConfig):
             else:
                 dataset_type = "test"
             series_lf = pl.scan_parquet(
-                Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
+                pathlib.Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
                 low_memory=True,
             )
         else:
@@ -161,6 +214,8 @@ def main(cfg: DictConfig):
         # preprocess
         series_df = (
             series_lf.with_columns(
+                pl.col("anglez"),
+                pl.col("enmo"),
                 pl.col("anglez"),
                 pl.col("enmo"),
                 pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
@@ -187,6 +242,8 @@ def main(cfg: DictConfig):
                     pl.col("series_id"),
                     pl.col("anglez"),
                     pl.col("enmo"),
+                    pl.col("anglez_int"),
+                    pl.col("enmo_int"),
                     pl.col("anglez_int"),
                     pl.col("enmo_int"),
                     pl.col("anglez_lag_diff"),
@@ -220,22 +277,30 @@ def main(cfg: DictConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess = ["anglez", "enmo", "anglez_lag_diff", "enmo_lag_diff","anglez_lag_diff_abs", "enmo_lag_diff_abs","anglez_lag_diff_abs_cumsum","enmo_lag_diff_abs_cumsum"]
-            feature_names_to_preprocess2 = ["rolling_std_1min_anglez","rolling_std_1min_enmo","pct_change_anglez","pct_change_enmo"]
+            feature_names_to_preprocess = [
+                "anglez",
+                "enmo",
+                "anglez_lag_diff",
+                "enmo_lag_diff",
+                "anglez_lag_diff_abs",
+                "enmo_lag_diff_abs",
+            ]
+            features = series_df[feature_names_to_preprocess].to_numpy()
 
-            scaler = sklearn.preprocessing.RobustScaler()
-            series_df[feature_names_to_preprocess] = scaler.fit_transform(
-                series_df[feature_names_to_preprocess].to_numpy()
-            )
-            #series_df[preprocess2] = scaler.fit_transform(
-            #    series_df[preprocess2].to_numpy()
-            #)
-            scaler = sklearn.preprocessing.RobustScaler()
-            series_df[feature_names_to_preprocess2] = scaler.fit_transform(
-                series_df[feature_names_to_preprocess2].to_numpy()
-            )
-
-            feature_names_to_preprocess += feature_names_to_preprocess2
+            preprocessing_scaler_dir = pathlib.Path(cfg.dir.preprocessing_scaler_dir)
+            scaler_save_path = preprocessing_scaler_dir / "robust_scaler.pkl"
+            if cfg.just_load_scaler:
+                with open(scaler_save_path, "rb") as f:
+                    scaler = pickle.load(f)
+                print(f"[Info] RobustScaler has been loaded from {scaler_save_path}")
+            else:
+                scaler = sklearn.preprocessing.RobustScaler()
+                scaler.fit(features)
+                preprocessing_scaler_dir.mkdir(exist_ok=True)
+                with open(scaler_save_path, "wb") as f:
+                    pickle.dump(scaler, f)
+                print(f"[Info] RobustScaler has been saved as {scaler_save_path}")
+            series_df[feature_names_to_preprocess] = scaler.transform(features)
         else:
             raise ValueError(f"unexpected {cfg.scale_type}")
         series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
@@ -247,8 +312,8 @@ def main(cfg: DictConfig):
         "enmo_int",
         "hour_sin",
         "hour_cos",
-        "month_sin",
-        "month_cos",
+        # "month_sin",
+        # "month_cos",
         "week_sin",
         "week_cos",
         "index", #for rolling features
@@ -282,9 +347,16 @@ def main(cfg: DictConfig):
                 # NOTE: メモリーエラーを避けるためにここでrolling
                 this_series_df = add_rolling_features(this_series_df)
 
-                # 特徴量をそれぞれnpy/npzで保存
-                series_dir = processed_dir / series_id
-                save_each_series(this_series_df, feature_names+rolling_features, series_dir, cfg.save_as_npz)
+            # NOTE: メモリーエラーを避けるためにここでrolling
+            if len(rolling_features) > 0:
+                this_series_df = add_rolling_features(this_series_df, list(rolling_features))
+
+            # 特徴量をそれぞれnpy/npzで保存
+
+            series_dir = processed_dir / series_id
+            save_each_series(
+                this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
+            )
 
 
 if __name__ == "__main__":

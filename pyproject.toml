@@ -14,7 +14,9 @@ dependencies = [
     "hydra-core",
     "segmentation_models_pytorch==0.3.3",
 
-    "nptyping~=2.5.0"
+    "nptyping~=2.5.0",
+    "scikit-learn==1.3.1",
+    "polars~=0.19.15",
 #    "numpy_utility@git+https://github.com/yomura-yomura/numpy_utility#egg=88e5bea"
 ]
 
@@ -31,7 +33,6 @@ dev = [
     "scikit-learn~=1.3.1",
     "wandb~=0.15.12",
     "toml~=0.10.2",
-    "polars~=0.19.8",
 ]
 dev2 = [
     "omegaconf==2.3.0",
@@ -39,6 +40,11 @@ dev2 = [
     "transformers==4.33.3",
     "segmentation-models-pytorch==0.3.3",
     "rich==13.6.0"
+]
+dash = [
+    "dash[diskcache]~=2.12.1",
+    "dash_bootstrap_components~=1.4.1",
+    "dash_auth~=1.4.1"
 ]
 pycharm = [
     "plotly_utility@git+https://github.com/yomura-yomura/plotly_utility#egg=65afd14",

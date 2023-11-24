@@ -13,7 +13,7 @@ from cmi_dss_lib.datamodule.stacking import StackingDataModule
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent
 
-overrides_yaml_path = project_root_path / "config" / "exp_for_stacking" / "1.yaml"
+overrides_yaml_path = project_root_path / "config" / "exp_for_stacking" / "s1.yaml"
 assert overrides_yaml_path.exists()
 
 hydra.initialize(config_path="../conf", version_base="1.2")
@@ -27,7 +27,8 @@ cfg.bg_sampling_rate = 0
 datamodule = StackingDataModule(cfg)
 datamodule.setup("fit")
 
-i = 10
+# i = 10
+i = 20
 
 record = datamodule.val_dataloader().dataset[i]
 # record = datamodule.train_dataloader().dataset[0]
@@ -68,3 +69,8 @@ fig.update_layout(
     },
 )
 fig.show()
+
+import matplotlib.pyplot as plt
+
+plt.imshow(feature.swapaxes(0, 2).swapaxes(0, 1), aspect="auto")
+plt.show()

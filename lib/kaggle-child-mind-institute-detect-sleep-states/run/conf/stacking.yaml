@@ -1,13 +1,28 @@
+# ---------- Overriding hydra default configs ----------
+hydra:
+  job:
+    name: train_stacking
+    chdir: false
+  run:
+    dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}/${split.name}
+  sweep:
+    dir: ${dir.output_dir}/${hydra.job.name}/${exp_name}
+    subdir: run${hydra.job.num}
+
+
 defaults:
   - _self_
   - dir: local
   - model: Spec2DCNN
+  - feature_extractor: null
+  - decoder: null
   - split: fold_0
   - split_type: 08_nan
 
 seed: 42
 exp_name: dummy
 
+model_dim: 2
 
 input_model_names:
 
@@ -26,9 +41,12 @@ sigma: 10
 
 bg_sampling_rate: 0.5
 
+scale_type: null
+
 # Training
 epoch: 70
 batch_size: 32
+valid_batch_size: null
 num_workers: 8
 accelerator: auto
 
@@ -66,3 +84,8 @@ augmentation:
   mixup_alpha: 0.4
   cutmix_prob: 0.0
   cutmix_alpha: 0.4
+
+labels:
+  - "sleep"
+  - "event_onset"
+  - "event_wakeup"

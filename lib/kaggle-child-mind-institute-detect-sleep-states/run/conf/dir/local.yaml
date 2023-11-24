@@ -1,4 +1,5 @@
-data_dir: /home/jumpei.uchida/child-mind-institute-detect-sleep-states/data/train-series-with-partid
+data_dir: ~/child-mind-institute-detect-sleep-states/data/child-mind-institute-detect-sleep-states/
+preprocessing_scaler_dir: ./cmi-dss-preprocessing-scaler
 processed_dir: ./processed_data
 output_dir: ./output
 model_dir: ./train

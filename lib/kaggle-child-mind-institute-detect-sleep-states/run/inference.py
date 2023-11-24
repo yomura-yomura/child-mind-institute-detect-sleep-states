@@ -45,14 +45,17 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
         # "../cmi-dss-ensemble-models/jumtras/exp052",
         # "../cmi-dss-ensemble-models/jumtras/exp053",
-        "../cmi-dss-ensemble-models/ranchantan/exp054",
+        # "../cmi-dss-ensemble-models/ranchantan/exp054",
         # "../cmi-dss-ensemble-models/ranchantan/exp055",
+        # "../cmi-dss-ensemble-models/ranchantan/exp060",
+        # "../cmi-dss-ensemble-models/ranchantan/exp073_resume",
+        "../cmi-dss-ensemble-models/ranchantan/exp075-onset_2",
         #
-        "phase=dev",
-        # "phase=train",
+        # "phase=dev",
+        "phase=train",
         # "batch_size=32",
-        # "batch_size=16",
-        "batch_size=8",
+        "batch_size=16",
+        # "batch_size=8",
         # "--folds",
         # "3,4",
         #
@@ -90,32 +93,10 @@ def inference(
     )
     predictions = trainer.predict(model, loader)
 
-    series_id_preds_dict = dict(
-        SegChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds])
-    )
-
-    for series_id, preds in series_id_preds_dict.items():
+    for series_id, preds in SegChunkModule._evaluation_epoch_end(
+        [pred for preds in predictions for pred in preds]
+    ):
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
-
-
-def make_submission(
-    keys: list[str],
-    preds: NDArray[Shape["*, 3"], Float],
-    downsample_rate: int,
-    score_th: float,
-    distance: int,
-    post_process_modes: PostProcessModes = None,
-) -> SubmissionDataFrame:
-    sub_df = post_process_for_seg(
-        keys,
-        preds,
-        downsample_rate=downsample_rate,
-        score_th=score_th,
-        distance=distance,
-        post_process_modes=post_process_modes,
-    )
-
-    return sub_df
 
 
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
@@ -151,13 +132,12 @@ def main(cfg: TrainConfig):
 
     pred_dir_path.mkdir(exist_ok=True, parents=True)
     with trace("inference"):
-        # keys, preds = inference_(dataloader, model, use_amp=cfg.use_amp, duration=cfg.duration)
         inference(dataloader, model, use_amp=cfg.use_amp, pred_dir_path=pred_dir_path)
 
     if cfg.phase == "train":
         from calc_cv import calc_score
 
-        score = calc_score(pred_dir_path)
+        score = calc_score(pred_dir_path, cfg.labels, cfg.downsample_rate)
         print(f"{score:.4f}")
         scores.append(score)
 

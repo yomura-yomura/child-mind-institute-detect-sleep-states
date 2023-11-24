@@ -2,7 +2,6 @@ import pathlib
 
 import cmi_dss_lib.datamodule.seg
 import cmi_dss_lib.models.common
-import cmi_dss_lib.utils.metrics
 import cmi_dss_lib.utils.post_process
 import polars as pl
 import torch

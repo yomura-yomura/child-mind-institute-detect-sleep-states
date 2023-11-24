@@ -7,6 +7,7 @@ import cmi_dss_lib.datamodule.seg
 import cmi_dss_lib.models.common
 import cmi_dss_lib.utils.metrics
 import cmi_dss_lib.utils.post_process
+import joblib
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -20,6 +21,8 @@ from omegaconf import DictConfig
 from torchvision.transforms.functional import resize
 from transformers import get_cosine_schedule_with_warmup
 
+import child_mind_institute_detect_sleep_states.score
+
 
 class BaseChunkModule(LightningModule):
     def __init__(
@@ -31,9 +34,21 @@ class BaseChunkModule(LightningModule):
     ):
         super().__init__()
         self.cfg = cfg
-        self.val_event_df = val_event_df
+        if val_event_df is None:
+            self.val_event_df = None
+        else:
+            self.val_event_df = val_event_df.to_pandas()
+
+            if "event_onset" not in self.cfg.labels:
+                self.val_event_df = self.val_event_df[self.val_event_df["event"] != "onset"]
+            if "event_wakeup" not in self.cfg.labels:
+                self.val_event_df = self.val_event_df[self.val_event_df["event"] != "wakeup"]
+            print(self.val_event_df)
+
         self.num_time_steps = (
-            cmi_dss_lib.datamodule.seg.nearest_valid_size(int(duration * cfg.upsample_rate), cfg.downsample_rate)
+            cmi_dss_lib.datamodule.seg.nearest_valid_size(
+                int(duration * cfg.upsample_rate), cfg.downsample_rate
+            )
             // cfg.downsample_rate
         )
         self.duration = duration
@@ -105,7 +120,9 @@ class BaseChunkModule(LightningModule):
             self.trainer.limit_val_batches = 1.0
             print(f"enabled validation")
 
-    def _evaluation_step(self, batch: dict[str : torch.Tensor], step_outputs: list) -> float | None:
+    def _evaluation_step(
+        self, batch: dict[str : torch.Tensor], step_outputs: list
+    ) -> float | None:
         output = self.forward(batch)
         loss = output["loss"].detach().item() if "loss" in output.keys() else None
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
@@ -147,7 +164,7 @@ class BaseChunkModule(LightningModule):
                 strict=True,
             ):
                 if not torch.all(resized_mask):
-                    resized_prob = resized_prob[resized_mask].reshape(-1, 3)
+                    resized_prob = resized_prob[resized_mask].reshape(-1, resized_probs.shape[-1])
                 step_outputs.append(
                     (
                         [series_id],
@@ -157,7 +174,7 @@ class BaseChunkModule(LightningModule):
         return loss
 
     @staticmethod
-    def _evaluation_epoch_end(step_outputs: list) -> list[tuple[str, NDArray[np.float_]]]:
+    def _evaluation_epoch_end(step_outputs: list) -> tuple[str, NDArray[np.float_]]:
         flatten_validation_step_outputs = [
             (
                 series_id,
@@ -171,17 +188,18 @@ class BaseChunkModule(LightningModule):
         ]
         step_outputs.clear()
 
-        return [
-            (series_id, np.concatenate([preds.reshape(-1, 3) for _, preds in g], axis=0))
-            for series_id, g in tqdm.tqdm(
-                itertools.groupby(
-                    flatten_validation_step_outputs,
-                    key=lambda output: output[0],
-                ),
-                desc="calc val sub_df",
-                total=np.unique([series_id for series_id, *_ in flatten_validation_step_outputs]).size,
+        for series_id, g in tqdm.tqdm(
+            itertools.groupby(
+                flatten_validation_step_outputs,
+                key=lambda output: output[0],
+            ),
+            desc="calc val sub_df",
+            total=np.unique([series_id for series_id, *_ in flatten_validation_step_outputs]).size,
+        ):
+            yield (
+                series_id,
+                np.concatenate([preds.reshape(-1, preds.shape[-1]) for _, preds in g], axis=0),
             )
-        ]
 
     def validation_step(self, batch: dict[str : torch.Tensor]):
         loss = self._evaluation_step(batch, self.validation_step_outputs)
@@ -199,21 +217,41 @@ class BaseChunkModule(LightningModule):
         if len(self.validation_step_outputs) == 0:
             return
 
-        sub_df_list = []
-        for series_id, preds in self._evaluation_epoch_end(self.validation_step_outputs):
-            sub_df_list.append(
-                cmi_dss_lib.utils.post_process.post_process_for_seg(
+        # sub_df_list = []
+        sub_df = pd.concat(
+            joblib.Parallel(n_jobs=-1)(
+                joblib.delayed(cmi_dss_lib.utils.post_process.post_process_for_seg)(
                     keys=[series_id] * len(preds),
                     preds=preds,
+                    labels=list(self.cfg.labels),
                     downsample_rate=self.cfg.downsample_rate,
                     score_th=self.cfg.post_process.score_th,
                     distance=self.cfg.post_process.distance,
                 )
+                for series_id, preds in self._evaluation_epoch_end(self.validation_step_outputs)
             )
-        sub_df = pd.concat(sub_df_list)
+        )
+        # for series_id, preds in self._evaluation_epoch_end(self.validation_step_outputs):
+        #     sub_df_list.append(
+        #         cmi_dss_lib.utils.post_process.post_process_for_seg(
+        #             keys=[series_id] * len(preds),
+        #             preds=preds,
+        #             labels=list(self.cfg.labels),
+        #             downsample_rate=self.cfg.downsample_rate,
+        #             score_th=self.cfg.post_process.score_th,
+        #             distance=self.cfg.post_process.distance,
+        #         )
+        #     )
+        # sub_df = pd.concat(sub_df_list)
 
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df.to_pandas(), sub_df)
-        self.log("EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True)
+        # score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df, sub_df)
+        score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
+            self.val_event_df, sub_df
+        )
+
+        self.log(
+            "EventDetectionAP", score, on_step=False, on_epoch=True, logger=True, prog_bar=True
+        )
         if self.model_save_dir_path is not None:
             self.save_checkpoint_top_k(score)
 
@@ -235,7 +273,9 @@ class BaseChunkModule(LightningModule):
         self.last_model_path = current_model_path
 
         self.best_score_paths.append((score, current_model_path))
-        best_score_paths_in_descending_order = sorted(self.best_score_paths, key=lambda pair: pair[0])[::-1]
+        best_score_paths_in_descending_order = sorted(
+            self.best_score_paths, key=lambda pair: pair[0]
+        )[::-1]
 
         monitor = "EventDetectionAP"
 
@@ -253,14 +293,18 @@ class BaseChunkModule(LightningModule):
             self.best_ckpt_path.unlink(missing_ok=True)
             self.best_ckpt_path.symlink_to(best_model_path)
         else:
-            print(f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {self.save_top_k}")
+            print(
+                f"Epoch {epoch:d}, global step {step:d}: {monitor!r} was not in top {self.save_top_k}"
+            )
 
         if len(best_score_paths_in_descending_order) > 0:
             self.last_ckpt_path.unlink(missing_ok=True)
             self.last_ckpt_path.symlink_to(self.last_model_path)
 
         indices_to_remove = []
-        for i, (_, model_path) in enumerate(best_score_paths_in_descending_order[self.save_top_k :]):
+        for i, (_, model_path) in enumerate(
+            best_score_paths_in_descending_order[self.save_top_k :]
+        ):
             if model_path == self.last_model_path:
                 continue
             model_path.unlink(missing_ok=True)
@@ -270,7 +314,9 @@ class BaseChunkModule(LightningModule):
             best_score_paths_in_descending_order.pop(i)
         self.best_score_paths = best_score_paths_in_descending_order
 
-    def predict_step(self, batch: dict[str : torch.Tensor]) -> list[tuple[str, NDArray[np.float_]]]:
+    def predict_step(
+        self, batch: dict[str : torch.Tensor]
+    ) -> list[tuple[str, NDArray[np.float_]]]:
         step_outputs = []
         self._evaluation_step(batch, step_outputs)
         return step_outputs

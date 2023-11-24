@@ -71,7 +71,7 @@ class TrainConfig(DictConfig):
 
     post_process: "TrainPostProcessAugmentationConfig"
 
-    labels: list[Literal["awake", "event_onset", "event_wakeup"]]
+    labels: list[Literal["sleep", "event_onset", "event_wakeup"]]
 
     features: list[
         Literal[
