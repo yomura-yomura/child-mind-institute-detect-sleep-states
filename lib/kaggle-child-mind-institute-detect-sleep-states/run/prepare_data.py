@@ -181,13 +181,12 @@ def main(cfg: PrepareDataConfig):
             ).with_columns(
                 pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
                 pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
+                (pl.col("anglez_lag_diff")/pl.col("anglez").add(1e-6)).abs().over("series_id").cast(pl.Float32).alias("pct_change_anglez"),
+                (pl.col("enmo_lag_diff")/pl.col("enmo").add(1e-6)).abs().over("series_id").cast(pl.Float32).alias("pct_change_enmo"),
             ).with_columns(
                 pl.col("anglez_lag_diff_abs").cumsum().over("series_id").cast(pl.Float32).alias("anglez_lag_diff_abs_cumsum"),
                 pl.col("enmo_lag_diff_abs").cumsum().over("series_id").cast(pl.Float32).alias("enmo_lag_diff_abs_cumsum"),
-                (pl.col("anglez_lag_diff_abs")/pl.col("anglez").add(1e-6)).over("series_id").cast(pl.Float32).alias("pct_change_anglez"),
-                (pl.col("enmo_lag_diff_abs")/pl.col("enmo").add(1e-6)).over("series_id").cast(pl.Float32).alias("pct_change_enmo"),
-            ).with_columns(
-                pl.when(pl.col(f"pct_change_anglez") > 1.0).then(0).otherwise(pl.col(f"pct_change_anglez")).cast(pl.Float32).alias(f"pct_change_anglez"),
+                pl.when(pl.col(f"pct_change_anglez") > 1.0).then(0).otherwise(pl.col(f"pct_change_anglez")).alias(f"pct_change_anglez"),
                 pl.when(pl.col(f"pct_change_enmo") > 1.0).then(0).otherwise(pl.col(f"pct_change_enmo")).cast(pl.Float32).alias(f"pct_change_enmo"),
             )
             .select(
@@ -270,11 +269,8 @@ def main(cfg: PrepareDataConfig):
                 with open(scaler_save_path2, "wb") as f:
                     pickle.dump(scaler2, f)
                 print(f"[Info] RobustScaler has been saved as {scaler_save_path2}")
-            print(f"[Info] RobustScaler transformed {scaler_save_path1}")
             series_df[feature_names_to_preprocess_v1] = scaler1.transform(features1)
-            print(f"[Info] RobustScaler transformed {scaler_save_path2}")
             series_df[feature_names_to_preprocess_v2] = scaler2.transform(features2)
-            print(f"Done")
 
             feature_names_to_preprocess = feature_names_to_preprocess_v1 + feature_names_to_preprocess_v2
 
