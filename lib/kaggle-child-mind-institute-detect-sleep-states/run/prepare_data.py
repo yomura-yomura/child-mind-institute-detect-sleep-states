@@ -172,8 +172,8 @@ def main(cfg: PrepareDataConfig):
                 pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
                 # (pl.col("anglez") - ANGLEZ_MEAN) / ANGLEZ_STD,
                 # (pl.col("enmo") - ENMO_MEAN) / ENMO_STD,
-                pl.col("anglez").cast(pl.Int16).alias("anglez_int"),
-                pl.col("enmo").cast(pl.Int16).alias("enmo_int"),
+                #pl.col("anglez").cast(pl.Int16).alias("anglez_int"),
+                #pl.col("enmo").cast(pl.Int16).alias("enmo_int"),
                 pl.col("anglez").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("anglez_lag_diff"),
                 pl.col("enmo").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("enmo_lag_diff"),
                 pl.col("anglez").rolling_std(window_size="12i",closed = "both").over("series_id").cast(pl.Float32).alias("rolling_std_1min_anglez"),
@@ -270,14 +270,17 @@ def main(cfg: PrepareDataConfig):
                 with open(scaler_save_path2, "wb") as f:
                     pickle.dump(scaler2, f)
                 print(f"[Info] RobustScaler has been saved as {scaler_save_path2}")
+            print(f"[Info] RobustScaler transformed {scaler_save_path1}")
             series_df[feature_names_to_preprocess_v1] = scaler1.transform(features1)
+            print(f"[Info] RobustScaler transformed {scaler_save_path2}")
             series_df[feature_names_to_preprocess_v2] = scaler2.transform(features2)
+            print(f"Done")
 
             feature_names_to_preprocess = feature_names_to_preprocess_v1 + feature_names_to_preprocess_v2
 
         else:
             raise ValueError(f"unexpected {cfg.scale_type}")
-        series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
+        #series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
 
 
     feature_names = [
@@ -319,8 +322,8 @@ def main(cfg: PrepareDataConfig):
                 this_series_df = add_feature(this_series_df, feature_names)
                 
                 # NOTE: メモリーエラーを避けるためにここでrolling
-                if len(rolling_features) > 0:
-                    this_series_df = add_rolling_features(this_series_df)
+                #if len(rolling_features) > 0:
+                #    this_series_df = add_rolling_features(this_series_df)
 
                 # 特徴量をそれぞれnpy/npzで保存
 
