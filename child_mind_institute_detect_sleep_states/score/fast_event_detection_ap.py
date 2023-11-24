@@ -17,9 +17,9 @@ def score(
     sub_df: DataFrame[S["series_id: Str, step: Int, event: Str"]],
     n_jobs: int = -1,
     show_progress=True,
+    print_score=True,
 ) -> float:
-    ap_list_dict = get_score_dict(event_df, sub_df, print_score=False, n_jobs=n_jobs, show_progress=show_progress)
-    print(ap_list_dict)
+    ap_list_dict = get_score_dict(event_df, sub_df, print_score=print_score, n_jobs=n_jobs, show_progress=show_progress)
     return np.mean([np.mean(ap_list) for ap_list in ap_list_dict.values()])
 
 
@@ -30,9 +30,9 @@ def get_score_dict(
     n_jobs: int = -1,
     show_progress: bool = True,
 ) -> dict[Literal["onset", "wakeup"], list[float]]:
-    metrics_dict = {event: [EventMetrics(tol) for tol in TOLERANCES] for event in event_df["event"].unique()}
-
     def calc_metric(series_id: str) -> list[list[tuple]]:
+        metrics_dict = {event: [EventMetrics(tol) for tol in TOLERANCES] for event in event_df["event"].unique()}
+
         for event, metrics_list in metrics_dict.items():
             for metrics in metrics_list:
                 target_sub_df = sub_df.query(f"series_id == '{series_id}' & event == '{event}'")
@@ -46,6 +46,8 @@ def get_score_dict(
             for metrics_list in metrics_dict.values()
         ]
 
+    metrics_dict = {event: [EventMetrics(tol) for tol in TOLERANCES] for event in event_df["event"].unique()}
+
     unique_series_ids_iter = event_df["series_id"].unique()
     if show_progress:
         unique_series_ids_iter = tqdm.tqdm(unique_series_ids_iter, desc="calc score")
@@ -55,9 +57,9 @@ def get_score_dict(
     ):
         for metrics_list, result_list in zip(metrics_dict.values(), result_list_list, strict=True):
             for metrics, (matches, probs, num_positive) in zip(metrics_list, result_list, strict=True):
-                metrics.matches = matches
-                metrics.probs = probs
-                metrics.num_positive = num_positive
+                metrics.matches += matches
+                metrics.probs += probs
+                metrics.num_positive += num_positive
 
     ap_list_dict = {
         event: [metrics.get_metrics()["average_precision"] for metrics in metrics_list]
