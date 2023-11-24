@@ -40,6 +40,7 @@ epoch: 70
 #batch_size: 64
 batch_size: 32  # 0.0005
 #batch_size: 16
+valid_batch_size: null
 num_workers: 8
 accelerator: auto
 #use_amp: true
@@ -81,7 +82,7 @@ post_process:
 
 # label
 labels:
-  - "awake"
+  - "sleep"
   - "event_onset"
   - "event_wakeup"
 

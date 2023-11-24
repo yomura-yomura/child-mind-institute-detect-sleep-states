@@ -1,13 +1,22 @@
+from typing import Literal
+
 import pandas as pd
 
-from . import event_detection_ap
+from . import event_detection_ap, fast_event_detection_ap
 
 
-def calc_event_detection_ap(event_df: pd.DataFrame, submission_df: pd.DataFrame):
+def calc_event_detection_ap(
+    event_df: pd.DataFrame,
+    submission_df: pd.DataFrame,
+    calc_type: Literal["normal", "fast"] = "fast",
+    n_jobs: int = -1,
+    show_progress: bool = True,
+):
     if len(submission_df) == 0:
-        ed_ap_score = 0
-    else:
-        ed_ap_score = event_detection_ap.score(
+        return
+
+    if calc_type == "normal":
+        return event_detection_ap.score(
             event_df,
             submission_df,
             tolerances={k: event_detection_ap.TOLERANCES for k in ["wakeup", "onset"]},
@@ -16,4 +25,5 @@ def calc_event_detection_ap(event_df: pd.DataFrame, submission_df: pd.DataFrame)
             event_column_name="event",
             score_column_name="score",
         )
-    return ed_ap_score
+    elif calc_type == "fast":
+        return fast_event_detection_ap.score(event_df, submission_df, n_jobs=n_jobs, show_progress=show_progress)

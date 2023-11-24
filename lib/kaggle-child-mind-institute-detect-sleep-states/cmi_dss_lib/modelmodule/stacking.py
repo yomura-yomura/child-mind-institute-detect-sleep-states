@@ -39,33 +39,43 @@ class StackingChunkModule(BaseChunkModule):
         else:
             raise ValueError(f"unexpected {cfg.model.segmentation_model_name=}")
 
-        hidden_size = 32
-
         self.loss_fn = nn.BCEWithLogitsLoss()
 
-        from ..models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
+        from ..models.common import get_decoder, get_feature_extractor
 
         if cfg.get("feature_extractor", None) is None:
+            hidden_size = 32
             self.embedding_linear = nn.Linear(len(cfg.input_model_names), hidden_size)
             self.feature_extractors = None
-            self.concat_linear = nn.Linear(hidden_size, 1)
-        elif cfg.feature_extractor.name == "StackedGRUFeatureExtractor":
+        else:
+            hidden_size = cfg.feature_extractor.hidden_size
             self.embedding_linear = None
+
             self.feature_extractors = nn.ModuleList(
                 [
-                    StackedGRUFeatureExtractor(
-                        in_channels=len(cfg.input_model_names),
-                        out_size=cfg.duration,
-                        num_layers=2,
-                        hidden_size=hidden_size,
-                        bidirectional=True,
+                    get_feature_extractor(
+                        cfg, feature_dim=len(cfg.input_model_names), num_time_steps=cfg.duration
                     )
                     for _ in range(3)
                 ]
             )
-            self.concat_linear = nn.Linear(hidden_size * 2, 1)
+
+        if cfg.get("decoder", None) is None:
+            self.concat_linear = nn.Linear(hidden_size, 1)
+            self.decoders = None
         else:
-            raise ValueError(f"unexpected {cfg.feature_extractor=}")
+            self.decoders = nn.ModuleList(
+                [
+                    get_decoder(
+                        cfg,
+                        n_channels=hidden_size,
+                        n_classes=1,
+                        num_time_steps=cfg.duration,
+                    )
+                    for _ in range(3)
+                ]
+            )
+            self.concat_linear = None
 
     def forward(
         self, batch: dict[str : torch.Tensor], *, do_mixup=False, do_cutmix=False
@@ -77,7 +87,10 @@ class StackingChunkModule(BaseChunkModule):
 
         if self.feature_extractors is not None:
             x = torch.stack(
-                [feature_extractor(x[:, i])[:, 0] for i, feature_extractor in enumerate(self.feature_extractors)],
+                [
+                    feature_extractor(x[:, i])[:, 0]
+                    for i, feature_extractor in enumerate(self.feature_extractors)
+                ],
                 dim=1,
             )  # (batch_size, pred_type, hidden_size * num_directions, duration)
 
@@ -88,7 +101,20 @@ class StackingChunkModule(BaseChunkModule):
 
         x = self.model(x)  # (batch_size, pred_type, duration, model)
 
-        logits = self.concat_linear(x).squeeze(3).permute(0, 2, 1)  # (batch_size, duration, pred_type)
+        if self.decoders is None:
+            x = self.concat_linear(x).squeeze(3)
+        else:
+            x = torch.stack(
+                [
+                    feature_extractor(x[:, i].permute(0, 2, 1))
+                    for i, feature_extractor in enumerate(self.decoders)
+                ],
+                dim=1,
+            ).squeeze(
+                3
+            )  # (batch_size, pred_type, duration)
+
+        logits = x.permute(0, 2, 1)  # (batch_size, duration, pred_type)
 
         output = {"logits": logits}
 

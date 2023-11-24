@@ -1,16 +1,15 @@
-- exp_name=s_exp002_4
+- exp_name=s_exp002_9
 - input_model_names=[ranchantan/exp047_retry,ranchantan/exp050-transformer-decoder_retry,jumtras/exp052,jumtras/exp053]
 
-- model.segmentation_model_name=unet
+- model.segmentation_model_name=manet
 - model.encoder_name=resnet18
-#- feature_extractor=StackedGRUFeatureExtractor
 - duration=17280  # 24h
 #- duration=8640  # 12h
 #- duration=1024  # 12h
 - batch_size=4
-- optimizer.lr=0.00005
+#- optimizer.lr=0.00005
 
-- val_after_steps=0
+- val_after_steps=8000
 
-- sigma=108
-- offset=10
+#- sigma=108
+- offset=24

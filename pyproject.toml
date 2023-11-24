@@ -41,6 +41,11 @@ dev2 = [
     "segmentation-models-pytorch==0.3.3",
     "rich==13.6.0"
 ]
+dash = [
+    "dash[diskcache]~=2.12.1",
+    "dash_bootstrap_components~=1.4.1",
+    "dash_auth~=1.4.1"
+]
 pycharm = [
     "plotly_utility@git+https://github.com/yomura-yomura/plotly_utility#egg=65afd14",
     "kaleido ~= 0.2.1"

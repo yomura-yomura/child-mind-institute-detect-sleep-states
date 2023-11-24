@@ -13,7 +13,8 @@ predicted_dir_path = (
     project_root_path
     / "run"
     / "predicted"
-    / "ranchantan/exp050-transformer-decoder_retry_resume/train/"
+    # / "ranchantan/exp050-transformer-decoder_retry_resume/train/"
+    / "jumtras/exp058/train/"
 )
 
 
@@ -34,9 +35,10 @@ for i in range(5):
             cmi_dss_lib.utils.post_process.post_process_for_seg(
                 keys=[series_id] * len(preds),
                 preds=preds,
+                labels=["sleep", "event_onset", "event_wakeup"],
                 downsample_rate=2,
-                score_th=1e-4,
-                distance=88,
+                score_th=0.005,
+                distance=96,
                 post_process_modes=None,
             )
         )
@@ -47,3 +49,16 @@ for i in range(5):
     )
     print(d)
     print()
+
+    import plotly.express as px
+
+    fig = px.imshow(
+        np.stack([d["onset"], d["wakeup"]], axis=0),
+        title=f"fold {i + 1}",
+        x=list(
+            map(str, child_mind_institute_detect_sleep_states.score.event_detection_ap.TOLERANCES)
+        ),
+        y=["onset", "wakeup"],
+        text_auto=".2f",
+    )
+    fig.show()

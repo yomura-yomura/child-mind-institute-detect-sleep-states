@@ -37,7 +37,10 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp050-transformer-decoder_retry"
 # exp_name = "exp050-transformer-decoder_retry_resume"
 # exp_name = "exp054"
-exp_name = "exp055"
+# exp_name = "exp055"
+# exp_name = "exp060"
+# exp_name = "exp073_resume"
+exp_name = "exp075-onset_2"
 
 upload = False
 # upload = True
@@ -61,7 +64,9 @@ def main(cfg: DictConfig):
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
     (output_dir_path / ".hydra").mkdir(exist_ok=True)
-    shutil.copy(p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml")
+    shutil.copy(
+        p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml"
+    )
 
     torch.save(
         module.model.state_dict(),
@@ -84,7 +89,11 @@ if __name__ == "__main__":
         ],
         columns=["path", "i_fold", "version"],
     )
-    path_df = path_df.sort_values(["i_fold", "version"], ascending=[True, False]).groupby(["i_fold"]).head(1)
+    path_df = (
+        path_df.sort_values(["i_fold", "version"], ascending=[True, False])
+        .groupby(["i_fold"])
+        .head(1)
+    )
     print(path_df)
 
     scores = []

@@ -104,7 +104,9 @@ def load_chunk_features(
 
 
 class Indexer:
-    def __init__(self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int):
+    def __init__(
+        self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int
+    ):
         self.total_duration = total_duration
         self.interest_duration = duration - prev_margin_steps - next_margin_steps
         self.duration = duration
@@ -145,24 +147,36 @@ def random_crop(pos: int, duration: int, max_end) -> tuple[int, int]:
 ###################
 # Label
 ###################
-def get_label(this_event_df: pd.DataFrame, num_frames: int, duration: int, start: int, end: int) -> np.ndarray:
+def get_label(
+    this_event_df: pd.DataFrame,
+    labels: list[str],
+    num_frames: int,
+    duration: int,
+    start: int,
+    end: int,
+) -> np.ndarray:
     assert start <= end
     # # (start, end)の範囲と(onset, wakeup)の範囲が重なるものを取得
+    # if "event_onset" in labels:
+    #     this_event_df = this_event_df[start <= this_event_df["wakeup"]]
+    # if "event_wakeup" in labels:
+    #     this_event_df = this_event_df[this_event_df["onset"] <= end]
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
-    label = np.zeros((num_frames, 3))
+    label = np.zeros((num_frames, len(labels)))
     # onset, wakeup, sleepのラベルを作成
     for onset, wakeup in this_event_df[["onset", "wakeup"]].to_numpy():
         onset = int((onset - start) / duration * num_frames)
         wakeup = int((wakeup - start) / duration * num_frames)
-        if 0 <= onset < num_frames:
-            label[onset, 1] = 1
-        if num_frames > wakeup >= 0:
-            label[wakeup, 2] = 1
+        if "event_onset" in labels and 0 <= onset < num_frames:
+            label[onset, labels.index("event_onset")] = 1
+        if "event_wakeup" in labels and num_frames > wakeup >= 0:
+            label[wakeup, labels.index("event_wakeup")] = 1
 
-        onset = max(0, onset)
-        wakeup = min(num_frames, wakeup)
-        label[onset:wakeup, 0] = 1  # sleep
+        if "sleep" in labels:
+            onset = max(0, onset)
+            wakeup = min(num_frames, wakeup)
+            label[onset:wakeup, labels.index("sleep")] = 1  # sleep
 
     return label
 
@@ -183,7 +197,10 @@ def gaussian_label(label: np.ndarray, offset: int, sigma: int) -> np.ndarray:
     return label
 
 
-def negative_sampling(this_event_df: pd.DataFrame, num_steps: int) -> int:
+mapping = {"event_onset": "onset", "event_wakeup": "wakeup"}
+
+
+def negative_sampling(this_event_df: pd.DataFrame, labels: list[str], num_steps: int) -> int:
     """negative sampling
 
     Args:
@@ -193,8 +210,9 @@ def negative_sampling(this_event_df: pd.DataFrame, num_steps: int) -> int:
     Returns:
         int: negative sample position
     """
-    # onsetとwakeupを除いた範囲からランダムにサンプリング
-    positive_positions = set(this_event_df[["onset", "wakeup"]].to_numpy().flatten().tolist())
+    labels = [mapping[label] for label in labels if label in mapping]
+    # onset/wakeupを除いた範囲からランダムにサンプリング
+    positive_positions = set(this_event_df[labels].to_numpy().flatten().tolist())
     negative_positions = list(set(range(num_steps)) - positive_positions)
     return random.sample(negative_positions, 1)[0]
 
@@ -225,7 +243,9 @@ class TrainDataset(Dataset):
     ):
         self.cfg = cfg
         self.event_df: pd.DataFrame = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
+            .drop_nulls()
+            .to_pandas()
         )
         self.features = features
         # self.num_features = len(cfg.features)
@@ -234,11 +254,20 @@ class TrainDataset(Dataset):
         )
         self.num_features = num_features
 
+        self.available_target_labels = [
+            mapping[label] for label in self.cfg.labels if label in mapping
+        ]
+
     def __len__(self):
         return len(self.event_df)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
-        event = np.random.choice(["onset", "wakeup"], p=[0.5, 0.5])
+        event = np.random.choice(
+            # self.available_target_labels,
+            # p=[1 / len(self.available_target_labels)] * len(self.available_target_labels),
+            ["onset", "wakeup"],
+            p=[0.5, 0.5],
+        )
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
         # extract data matching series_id
@@ -248,7 +277,7 @@ class TrainDataset(Dataset):
 
         if random.random() < self.cfg.bg_sampling_rate:
             # sample background (potentially include labels in duration)
-            pos = negative_sampling(this_event_df, n_steps)
+            pos = negative_sampling(this_event_df, self.cfg.labels, n_steps)
         else:
             # always include labels in duration
             pos = self.event_df.at[idx, event]
@@ -272,8 +301,19 @@ class TrainDataset(Dataset):
 
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
-        label = get_label(this_event_df, num_frames, self.cfg.duration, start, end)
-        label[:, [1, 2]] = gaussian_label(label[:, [1, 2]], offset=self.cfg.offset, sigma=self.cfg.sigma)
+        label = get_label(
+            this_event_df, list(self.cfg.labels), num_frames, self.cfg.duration, start, end
+        )
+
+        target_indices = []
+        if "event_onset" in self.cfg.labels:
+            target_indices.append(list(self.cfg.labels).index("event_onset"))
+        if "event_wakeup" in self.cfg.labels:
+            target_indices.append(list(self.cfg.labels).index("event_wakeup"))
+
+        label[:, target_indices] = gaussian_label(
+            label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+        )
 
         return {
             "series_id": series_id,
@@ -294,7 +334,9 @@ class ValidDataset(Dataset):
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
         self.event_df = (
-            event_df.pivot(index=["series_id", "night"], columns="event", values="step").drop_nulls().to_pandas()
+            event_df.pivot(index=["series_id", "night"], columns="event", values="step")
+            .drop_nulls()
+            .to_pandas()
         )
         self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
@@ -307,7 +349,9 @@ class ValidDataset(Dataset):
     def __getitem__(self, idx):
         key = self.keys[idx]
         feature = self.chunk_features[key]
-        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(0)  # (1, ..., num_features, duration)
+        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(
+            0
+        )  # (1, ..., num_features, duration)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -319,7 +363,9 @@ class ValidDataset(Dataset):
         # start = chunk_id * self.cfg.duration
         # end = start + self.cfg.duration
         total_duration = sum(
-            feature.shape[-1] for key, features in self.chunk_features.items() if key.startswith(series_id)
+            feature.shape[-1]
+            for key, features in self.chunk_features.items()
+            if key.startswith(series_id)
         )
         start, end = Indexer(
             total_duration,
@@ -332,6 +378,7 @@ class ValidDataset(Dataset):
 
         label = get_label(
             self.event_df.query("series_id == @series_id").reset_index(drop=True),
+            list(self.cfg.labels),
             num_frames,
             self.cfg.duration,
             start,
@@ -391,13 +438,22 @@ class SegDataModule(LightningDataModule):
         self.event_df = pl.read_csv(self.data_dir / "train_events.csv").drop_nulls()
 
         with open(
-            project_root_path / "run" / "conf" / "split" / self.cfg.split_type.name / f"{self.cfg.split.name}.yaml"
+            project_root_path
+            / "run"
+            / "conf"
+            / "split"
+            / self.cfg.split_type.name
+            / f"{self.cfg.split.name}.yaml"
         ) as f:
             series_ids_dict = omegaconf.OmegaConf.load(f)
         self.train_series_ids = series_ids_dict["train_series_ids"]
         self.valid_series_ids = series_ids_dict["valid_series_ids"]
-        self.train_event_df = self.event_df.filter(pl.col("series_id").is_in(self.train_series_ids))
-        self.valid_event_df = self.event_df.filter(pl.col("series_id").is_in(self.valid_series_ids))
+        self.train_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.train_series_ids)
+        )
+        self.valid_event_df = self.event_df.filter(
+            pl.col("series_id").is_in(self.valid_series_ids)
+        )
 
         self.train_features = None
         self.valid_chunk_features = None
@@ -424,7 +480,10 @@ class SegDataModule(LightningDataModule):
                 next_margin_steps=self.cfg.next_margin_steps,
             )
         if stage == "test":
-            series_ids = [x.name for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")]
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -437,7 +496,10 @@ class SegDataModule(LightningDataModule):
             )
 
         if stage == "dev":
-            series_ids = [x.name for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")]
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -474,7 +536,7 @@ class SegDataModule(LightningDataModule):
         )
         return torch.utils.data.DataLoader(
             valid_dataset,
-            batch_size=self.cfg.batch_size,
+            batch_size=self.cfg.valid_batch_size or self.cfg.batch_size,
             shuffle=False,
             num_workers=self.cfg.num_workers,
             pin_memory=True,

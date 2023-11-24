@@ -50,6 +50,9 @@ all_model_dir_path_dict = {
     54: ranchantan_pred_dir_path / "exp054",
     55: ranchantan_pred_dir_path / "exp055",
     58: jumtras_pred_dir_path / "exp058",
+    60: ranchantan_pred_dir_path / "exp060",
+    73: ranchantan_pred_dir_path / "exp073_resume",
+    75: ranchantan_pred_dir_path / "exp075-wakeup_5",
 }
 
 # weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
@@ -66,13 +69,14 @@ all_model_dir_path_dict = {
 # weight_dict = {"19": 0.1, "27": 0.1, "47": 0.1, "50": 0.2, "52": 0.2, "53": 0.3}  # 20
 # weight_dict = {47: 1, 50: 0, 52: 0, 53: 0}  # 21
 # weight_dict = {19: 0.1, 27: 0.1, 50: 0.2, 53: 0.3, 55: 0.1, 58: 0.2}  # 22
-weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
+# weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
+weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
 
 
-# score_th = 0.005
-# distance = 96
-score_th = 1e-4
-distance = 88
+score_th = 0.005
+distance = 96
+# score_th = 1e-4
+# distance = 88
 
 
 if __name__ == "__main__":
@@ -89,7 +93,9 @@ if __name__ == "__main__":
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
 
     folds = sorted(map(int, set(args.folds.split(","))))
     print(f"{folds = }")

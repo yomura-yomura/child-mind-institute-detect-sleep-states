@@ -3,6 +3,7 @@ Forked from https://www.kaggle.com/code/chauyh/kagglechildsleep-fast-ap-metric-c
 """
 from typing import Literal
 
+import joblib
 import numpy as np
 import tqdm
 from nptyping import DataFrame, Float, Int, NDArray, Shape
@@ -11,16 +12,27 @@ from nptyping import Structure as S
 from .event_detection_ap import TOLERANCES
 
 
+def score(
+    event_df: DataFrame[S["series_id: Str, step: Int, event: Str"]],
+    sub_df: DataFrame[S["series_id: Str, step: Int, event: Str"]],
+    n_jobs: int = -1,
+    show_progress=True,
+) -> float:
+    ap_list_dict = get_score_dict(event_df, sub_df, print_score=False, n_jobs=n_jobs, show_progress=show_progress)
+    print(ap_list_dict)
+    return np.mean([np.mean(ap_list) for ap_list in ap_list_dict.values()])
+
+
 def get_score_dict(
     event_df: DataFrame[S["series_id: Str, step: Int, event: Str"]],
     sub_df: DataFrame[S["series_id: Str, step: Int, event: Str"]],
     print_score: bool = True,
+    n_jobs: int = -1,
+    show_progress: bool = True,
 ) -> dict[Literal["onset", "wakeup"], list[float]]:
-    metrics_dict = {
-        "onset": [EventMetrics(tol) for tol in TOLERANCES],
-        "wakeup": [EventMetrics(tol) for tol in TOLERANCES],
-    }
-    for series_id in tqdm.tqdm(event_df["series_id"].unique(), desc="calc score"):
+    metrics_dict = {event: [EventMetrics(tol) for tol in TOLERANCES] for event in event_df["event"].unique()}
+
+    def calc_metric(series_id: str) -> list[list[tuple]]:
         for event, metrics_list in metrics_dict.items():
             for metrics in metrics_list:
                 target_sub_df = sub_df.query(f"series_id == '{series_id}' & event == '{event}'")
@@ -29,6 +41,23 @@ def get_score_dict(
                     pred_probs=target_sub_df["score"],
                     gt_locs=event_df.query(f"series_id == '{series_id}' & event == '{event}'")["step"].to_numpy("i4"),
                 )
+        return [
+            [(metrics.matches, metrics.probs, metrics.num_positive) for metrics in metrics_list]
+            for metrics_list in metrics_dict.values()
+        ]
+
+    unique_series_ids_iter = event_df["series_id"].unique()
+    if show_progress:
+        unique_series_ids_iter = tqdm.tqdm(unique_series_ids_iter, desc="calc score")
+
+    for result_list_list in joblib.Parallel(n_jobs=n_jobs)(
+        joblib.delayed(calc_metric)(series_id) for series_id in unique_series_ids_iter
+    ):
+        for metrics_list, result_list in zip(metrics_dict.values(), result_list_list, strict=True):
+            for metrics, (matches, probs, num_positive) in zip(metrics_list, result_list, strict=True):
+                metrics.matches = matches
+                metrics.probs = probs
+                metrics.num_positive = num_positive
 
     ap_list_dict = {
         event: [metrics.get_metrics()["average_precision"] for metrics in metrics_list]
@@ -36,11 +65,13 @@ def get_score_dict(
     }
 
     if print_score:
-        onset_ap = np.mean(ap_list_dict["onset"])
-        wakeup_ap = np.mean(ap_list_dict["wakeup"])
-        print(f"{onset_ap = :.3f}")
-        print(f"{wakeup_ap = :.3f}")
-        print(f"EventDetectionAP = {np.mean([onset_ap, wakeup_ap]):.3f}")
+        scores = []
+        for event, ap_list in ap_list_dict.items():
+            score = np.mean(ap_list)
+            print(f"{event} = {score:.3f}")
+            scores.append(score)
+
+        print(f"EventDetectionAP = {np.mean(scores):.3f}")
 
     return ap_list_dict
 
