@@ -15,10 +15,10 @@
 
 - sigma=108
 
-- features=[pct_change_enmo,pct_change_anglez,n_unique_anglez_1min,hour_sin,hour_cos]
+- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos,pct_change_anglez,pct_change_enmo]
 
-- early_stopping_patience=20
+- early_stopping_patience=40
 
-- val_check_interval=200
+- val_check_interval=100
 - check_val_every_n_epoch=null
-- val_after_steps=2000
+- val_after_steps=5000
