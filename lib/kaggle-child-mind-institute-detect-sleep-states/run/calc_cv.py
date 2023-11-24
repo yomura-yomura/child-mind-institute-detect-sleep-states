@@ -16,7 +16,8 @@ import child_mind_institute_detect_sleep_states.score
 # exp_name = "ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
 # exp_name = "jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet"
 # exp_name = "jumtras/exp043"
-exp_name = "ranchantan/exp050-transformer-decoder_retry"
+exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
+# exp_name = "combined/exp050_exp75-wakeup"
 
 # predicted_fold_dir_path = pathlib.Path("tmp/predicted/ranchantan/exp041/train/fold_0/")
 # predicted_dir_path = pathlib.Path("predicted/ranchantan/exp047/train/")
@@ -76,6 +77,7 @@ def calc_score(
     # # sub_df = sub_df.groupby(["series_id", "night"]).head(20)
     sub_df = sub_df.sort_values(["series_id", "step"])
     print(sub_df.shape, len(sub_df) / len(series_ids))
+
     # score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
     score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
         event_df, sub_df
@@ -88,11 +90,11 @@ if __name__ == "__main__":
         # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
         #     sleep_prob_th=0.2, min_sleeping_hours=6
         # ),
-        "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-            # watch_interval_hour=6, sleep_occupancy_th=0.3
-            watch_interval_hour=6,
-            sleep_occupancy_th=0.5,
-        ),
+        # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        #     # watch_interval_hour=6, sleep_occupancy_th=0.3
+        #     watch_interval_hour=6,
+        #     sleep_occupancy_th=0.5,
+        # ),
     }
 
     scores = []
@@ -104,6 +106,7 @@ if __name__ == "__main__":
             # score_th=1e-4,
             # distance=88,
             # n_records_per_series_id=1000,
+            downsample_rate=2,
             score_th=0.005,
             distance=96,
             post_process_modes=post_process_modes,
