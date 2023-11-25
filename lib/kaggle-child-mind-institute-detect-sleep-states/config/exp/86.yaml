@@ -1,0 +1,26 @@
+#- exp_name=exp047
+- exp_name=exp086
+
+- split_type=base
+
+- scale_type=robust_scaler
+
+- feature_extractor=StackedGRUFeatureExtractor
+- feature_extractor.num_layers=4
+
+- duration=17280  # 24h
+
+- batch_size=4
+- optimizer.lr=0.00005
+
+- sigma=108
+
+- features=[enmo_lag_diff_abs,pct_change_anglez,rolling_std_1min_anglez,rolling_std_1min_enmo,hour_sin,hour_cos,week_sin,week_cos]
+
+- features=[anglez,enmo,hour_sin,hour_cos,week_sin,week_cos,anglez_lag_diff_abs_cumsum,enmo_lag_diff_abs_cumsum]
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=5000
