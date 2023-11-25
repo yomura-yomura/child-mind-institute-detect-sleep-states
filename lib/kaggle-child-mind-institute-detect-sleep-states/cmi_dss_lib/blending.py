@@ -1,9 +1,11 @@
 import multiprocessing
 import os
 import pathlib
-from typing import Callable, Sequence, Literal
+from typing import Callable, Sequence
 
+import cmi_dss_lib.utils.common
 import cmi_dss_lib.utils.metrics
+import cmi_dss_lib.utils.post_process
 import numpy as np
 import pandas as pd
 import tqdm
@@ -22,7 +24,7 @@ def calc_score(
     all_event_df,
     preds_dict,
     post_process_modes,
-    calc_type: Literal["fast", "normal"] = "fast",
+    calc_type: str = "fast",
     score_th=0.005,
     distance=96,
     n_records_per_series_id=None,

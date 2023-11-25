@@ -1,23 +1,23 @@
-- exp_name=s_exp003_2
+- exp_name=s_exp003
 - input_model_names=[ranchantan/exp047_retry,ranchantan/exp050-transformer-decoder_retry,jumtras/exp052,jumtras/exp053]
 
-- split_type=base
-
-- model.segmentation_model_name=unet
+#- model.segmentation_model_name=manet
 - model.encoder_name=resnet18
-#- feature_extractor=StackedGRUFeatureExtractor
-- decoder=UNet1DDecoder
-
 - duration=17280  # 24h
 #- duration=8640  # 12h
 #- duration=1024  # 12h
-#- batch_size=4
-#- optimizer.lr=0.00005
-- batch_size=1
-- valid_batch_size=16
-- optimizer.lr=0.00001
+- batch_size=4
+- optimizer.lr=0.00005
 
-- val_after_steps=9000
+#- sigma=108
+#- offset=24
 
-- sigma=10
-- offset=48
+- epoch=40
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=1000
+
+- labels=[event_onset,event_wakeup]

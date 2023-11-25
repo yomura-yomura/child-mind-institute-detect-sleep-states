@@ -1,4 +1,4 @@
-from typing import Sequence, TypeAlias, TypedDict
+from typing import Literal, Sequence, TypeAlias, TypedDict
 
 import cmi_dss_lib.datamodule.seg
 import numpy as np
@@ -7,6 +7,7 @@ import pandas as pd
 import polars as pl
 from nptyping import DataFrame, Float, NDArray, Shape, Structure
 from scipy.signal import find_peaks
+from typing_extensions import NotRequired
 
 SubmissionDataFrame = DataFrame[
     Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
@@ -24,8 +25,13 @@ class CuttingProbsBySleepProbSetting(TypedDict):
 
 
 class PostProcessModeWithSetting(TypedDict, total=False):
-    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting
-    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting
+    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | dict[
+        Literal["onset", "wakeup"], SleepingEdgesAsProbsSetting
+    ]
+
+    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | dict[
+        Literal["onset", "wakeup"], CuttingProbsBySleepProbSetting
+    ]
 
 
 PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
@@ -81,7 +87,6 @@ def post_process_for_seg(
 
         series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
 
-    # preds = preds if "cutting_probs_by_sleep_prob" in post_process_modes else preds[:, :, [1, 2]]
     if "cutting_probs_by_sleep_prob" in post_process_modes:
         if print_msg:
             print("enable 'cutting_probs_by_sleep_prob'")
@@ -95,12 +100,33 @@ def post_process_for_seg(
         # preds = data["pred"]
         #
         # series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
-        sleep_occupancy_th = setting["sleep_occupancy_th"]
-        watch_interval_hour = int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
+        if "onset" in setting and "wakeup" in setting:
+            sleep_occupancy_th = {
+                event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]
+            }
+            watch_interval_hour = {
+                event: int(setting[event]["watch_interval_hour"] * 60 * 12 / downsample_rate)
+                for event in ["onset", "wakeup"]
+            }
+        else:
+            sleep_occupancy_th = {
+                event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]
+            }
+            watch_interval_hour = {
+                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
+                for event in ["onset", "wakeup"]
+            }
     else:
         sleep_occupancy_th = watch_interval_hour = None
+
+    if preds.shape[-1] == 3:
+        label_index_dict = {event: i for i, event in enumerate(["sleep", "onset", "wakeup"])}
+    else:
+        label_index_dict = {
+            event: labels.index("sleep") if "sleep" in labels else None
+            for event in ["sleep", "onset", "wakeup"]
+        }
 
     records = []
     for series_id in unique_series_ids:
@@ -108,23 +134,23 @@ def post_process_for_seg(
         this_series_preds = preds[series_idx].reshape(-1, len(labels))
 
         for i, event_name in enumerate(possible_events):
-            this_event_preds = this_series_preds[:, labels.index(f"event_{event_name}")]
+            this_event_preds = this_series_preds[:, label_index_dict[event_name]]
             steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
             scores = this_event_preds[steps]
 
             for step, score in zip(steps, scores, strict=True):
                 if "cutting_probs_by_sleep_prob" in post_process_modes:
                     max_len_step = this_series_preds.shape[0]
-                    sleep_preds = this_series_preds[:, labels.index("sleep")]
+                    sleep_preds = this_series_preds[:, label_index_dict["sleep"]]
 
                     if event_name == "onset":
-                        max_step = min(step + watch_interval_hour, max_len_step - 1)
+                        max_step = min(step + watch_interval_hour[event_name], max_len_step - 1)
                         if step < max_step:
                             sleep_score = np.median(sleep_preds[step:max_step])
                         else:
                             sleep_score = np.nan
                     elif event_name == "wakeup":
-                        min_step = max(step - watch_interval_hour, 0)
+                        min_step = max(step - watch_interval_hour[event_name], 0)
                         if min_step < step:
                             sleep_score = np.median(sleep_preds[min_step:step])
                         else:
@@ -133,7 +159,7 @@ def post_process_for_seg(
                         assert False
 
                     # skip
-                    if sleep_score < sleep_occupancy_th:
+                    if sleep_score < sleep_occupancy_th[event_name]:
                         continue
 
                 records.append(

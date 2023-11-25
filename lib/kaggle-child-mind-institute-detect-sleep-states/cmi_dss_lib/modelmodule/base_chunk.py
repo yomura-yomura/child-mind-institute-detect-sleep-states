@@ -43,6 +43,7 @@ class BaseChunkModule(LightningModule):
                 self.val_event_df = self.val_event_df[self.val_event_df["event"] != "onset"]
             if "event_wakeup" not in self.cfg.labels:
                 self.val_event_df = self.val_event_df[self.val_event_df["event"] != "wakeup"]
+            assert len(self.val_event_df) > 0
             print(self.val_event_df)
 
         self.num_time_steps = (

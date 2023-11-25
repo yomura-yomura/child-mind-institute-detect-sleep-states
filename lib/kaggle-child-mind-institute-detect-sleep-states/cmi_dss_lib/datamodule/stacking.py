@@ -11,7 +11,7 @@ from nptyping import Float, NDArray, Shape
 from sklearn.preprocessing import StandardScaler
 
 from ..config import StackingConfig
-from .seg import Indexer, TestDataset, TrainDataset, ValidDataset, pad_if_needed
+from .seg import Indexer, TrainDataset, ValidDataset, pad_if_needed
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent
 

@@ -59,3 +59,5 @@ class StackingConfig(DictConfig):
 
     optimizer: TrainOptimizerConfig
     scheduler: TrainSchedulerConfig
+
+    labels: list[str]

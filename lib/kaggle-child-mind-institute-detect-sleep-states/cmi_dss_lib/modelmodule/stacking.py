@@ -25,7 +25,7 @@ class StackingChunkModule(BaseChunkModule):
                 encoder_weights=cfg.model.encoder_weights,
                 decoder_use_batchnorm=True,
                 in_channels=3,
-                classes=3,
+                classes=len(cfg.labels),
             )
         elif cfg.model.segmentation_model_name == "unet":
             self.model = smp.Unet(
@@ -34,7 +34,7 @@ class StackingChunkModule(BaseChunkModule):
                 encoder_weights=cfg.model.encoder_weights,
                 decoder_use_batchnorm=True,
                 in_channels=3,
-                classes=3,
+                classes=len(cfg.labels),
             )
         else:
             raise ValueError(f"unexpected {cfg.model.segmentation_model_name=}")

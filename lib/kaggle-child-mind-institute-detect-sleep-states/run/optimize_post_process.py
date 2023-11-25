@@ -1,7 +1,5 @@
 import pathlib
 
-import cmi_dss_lib.utils.metrics
-import cmi_dss_lib.utils.post_process
 import numpy as np
 import tqdm
 from cmi_dss_lib.blending import calc_score, get_keys_and_preds, optimize
@@ -58,14 +56,33 @@ if __name__ == "__main__":
             return scores, grid_parameter
 
     elif post_process_type == "cutting_probs_by_sleep_prob":
+        # sleep_occupancy_ths = np.linspace(0, 0.1, 10 + 1)
+        # watch_interval_hours = np.linspace(0, 12, 24 + 1)
+        sleep_occupancy_ths = np.arange(0.01, 0.05, 0.01)
+        watch_interval_hours = np.arange(6, 9, 0.5)
         grid_parameters = pd.merge(
-            pd.Series(np.linspace(0, 0.1, 10 + 1), name="sleep_occupancy_th"),
-            pd.Series(np.linspace(0, 12, 24 + 1), name="watch_interval_hour"),
+            pd.merge(
+                pd.Series(sleep_occupancy_ths, name="sleep_occupancy_th_onset"),
+                pd.Series(watch_interval_hours, name="watch_interval_hour_onset"),
+                how="cross",
+            ),
+            pd.merge(
+                pd.Series(sleep_occupancy_ths, name="sleep_occupancy_th_wakeup"),
+                pd.Series(watch_interval_hours, name="watch_interval_hour_wakeup"),
+                how="cross",
+            ),
             how="cross",
         ).to_numpy()
 
         def calc_all_scores(grid_parameter, score_th=0.0005, distance=96, calc_type="fast"):
-            sleep_occupancy_th, watch_interval_hour = grid_parameter
+            # sleep_occupancy_th, watch_interval_hour = grid_parameter
+            (
+                sleep_occupancy_th_onset,
+                watch_interval_hour_onset,
+                sleep_occupancy_th_wakeup,
+                watch_interval_hour_wakeup,
+            ) = grid_parameter
+
             scores = [
                 calc_score(
                     i_fold,
@@ -78,9 +95,15 @@ if __name__ == "__main__":
                     calc_type=calc_type,
                     post_process_modes=dict(
                         cutting_probs_by_sleep_prob=dict(
-                            sleep_occupancy_th=sleep_occupancy_th,
-                            watch_interval_hour=watch_interval_hour,
-                        )
+                            onset=dict(
+                                sleep_occupancy_th=sleep_occupancy_th_onset,
+                                watch_interval_hour=watch_interval_hour_onset,
+                            ),
+                            wakeup=dict(
+                                sleep_occupancy_th=sleep_occupancy_th_wakeup,
+                                watch_interval_hour=watch_interval_hour_wakeup,
+                            ),
+                        ),
                     ),
                     print_msg=False,
                 )
@@ -95,7 +118,7 @@ if __name__ == "__main__":
 
     record_at_max = optimize(
         "grid_search",
-        f"post_process/{post_process_type}/{model_dir_path.name}",
+        f"post_process/{post_process_type}-v2/{model_dir_path.name}",
         calc_all_scores,
         grid_parameters,
     )
