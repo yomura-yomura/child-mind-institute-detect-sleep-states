@@ -16,7 +16,8 @@ if __name__ == "__main__":
 
     # inference_step_offsets = np.arange(0, 24, 2) * 12 * 60
     # inference_step_offsets = np.arange(0, 24, 6) * 12 * 60
-    inference_step_offsets = np.arange(0, 24, 4) * 12 * 60
+    # inference_step_offsets = np.arange(0, 24, 4) * 12 * 60
+    inference_step_offsets = np.arange(0, 20, 4) * 12 * 60
     event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
         "train"
     ).dropna()

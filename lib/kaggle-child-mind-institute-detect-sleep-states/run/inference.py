@@ -20,6 +20,7 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
+        "--multi-run",
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34",  # 1
@@ -98,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("model_path", type=pathlib.Path)
     parser.add_argument("config_path_or_hydra_arguments", nargs="*")
     parser.add_argument("--folds", type=str, default=None)
-    parser.add_argument("--multirun", type=bool, action="store_true", default=False)
+    parser.add_argument("--multirun", action="store_true", default=False)
     args = parser.parse_args(args)
 
     if args.folds is None:
