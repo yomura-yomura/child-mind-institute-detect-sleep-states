@@ -98,6 +98,7 @@ if __name__ == "__main__":
     parser.add_argument("model_path", type=pathlib.Path)
     parser.add_argument("config_path_or_hydra_arguments", nargs="*")
     parser.add_argument("--folds", type=str, default=None)
+    parser.add_argument("--multirun", type=bool, action="store_true", default=False)
     args = parser.parse_args(args)
 
     if args.folds is None:
@@ -123,10 +124,11 @@ if __name__ == "__main__":
                 "dir.model_dir": f"{args.model_path / f'fold_{i_fold}'}",
             },
         )
-        sys.argv.insert(
-            1,
-            "--multirun",
-        )
+        if args.multirun:
+            sys.argv.insert(
+                1,
+                "--multirun",
+            )
 
         main()
         cmi_dss_lib.utils.common.clean_memory()
