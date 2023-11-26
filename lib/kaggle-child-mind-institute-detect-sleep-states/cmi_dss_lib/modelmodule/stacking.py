@@ -14,7 +14,7 @@ class StackingChunkModule(BaseChunkModule):
     def __init__(
         self,
         cfg: StackingConfig,
-        val_event_df: pl.DataFrame | None,
+        val_event_df: pl.DataFrame | None = None,
         model_save_dir_path: pathlib.Path | None = None,
     ):
         super().__init__(cfg, val_event_df, cfg.duration, model_save_dir_path)
@@ -48,7 +48,7 @@ class StackingChunkModule(BaseChunkModule):
             self.embedding_linear = nn.Linear(len(cfg.input_model_names), hidden_size)
             self.feature_extractors = None
         else:
-            hidden_size = cfg.feature_extractor.hidden_size
+            hidden_size = cfg.feature_extractor.hidden_size * 2
             self.embedding_linear = None
 
             self.feature_extractors = nn.ModuleList(

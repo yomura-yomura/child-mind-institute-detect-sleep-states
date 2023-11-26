@@ -19,6 +19,8 @@ defaults:
   - split: fold_0
   - split_type: 08_nan
 
+phase: train
+
 seed: 42
 exp_name: dummy
 
@@ -28,6 +30,8 @@ input_model_names:
 
 use_amp: false
 
+# Dataset
+
 duration: 5760 # duration * 5 = 秒数
 prev_margin_steps: 0
 next_margin_steps: 0
@@ -35,11 +39,17 @@ next_margin_steps: 0
 downsample_rate: 1
 upsample_rate: 1
 
-# Dataset
-offset: 10  # how long gaussian sigma spreads at most on half side
 sigma: 10
+offset: 10  # how long gaussian sigma spreads at most on half side
+
+sigma_onset: null
+offset_onset: null
+
+sigma_wakeup: null
+offset_wakeup: null
 
 bg_sampling_rate: 0.5
+sampling_with_start_timing_hour: false
 
 scale_type: null
 
@@ -89,3 +99,6 @@ labels:
   - "sleep"
   - "event_onset"
   - "event_wakeup"
+
+# Inference
+inference_step_offset: 0

@@ -28,8 +28,8 @@ cfg = cast(
     hydra.compose("train", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))),
 )
 
-cfg.sigma = 10
-cfg.offset = 12 * 4
+cfg.sigma = 12 * 5
+cfg.offset = 12 * 20
 datamodule = cmi_dss_lib.datamodule.seg.SegDataModule(cfg)
 datamodule.setup("fit")
 val_dataset = datamodule.train_dataloader().dataset
@@ -42,6 +42,13 @@ while True:
     i = np.argmax(feat_record["label"][:, 1])
     if i > 0:
         break
-px.line(
-    title=f"{cfg.sigma=}, {cfg.offset=}", y=feat_record["label"][:, 1][i - 100 : i + 100]
-).show()
+
+
+labels_with_sigma = feat_record["label"][:, 1][i - cfg.offset * 2 : i + cfg.offset * 2].numpy()
+x = np.arange(-len(labels_with_sigma) // 2, len(labels_with_sigma) // 2)
+fig = px.line(title=f"{cfg.sigma=}, {cfg.offset=}", x=x, y=labels_with_sigma)
+fig.show()
+
+import standard_fit.plotly.express as sfpx
+
+sfpx.fit(fig, "gaussian")

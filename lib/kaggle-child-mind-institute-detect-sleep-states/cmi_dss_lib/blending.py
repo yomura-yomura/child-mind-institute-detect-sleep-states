@@ -94,13 +94,13 @@ def get_grid(
     return weight * step
 
 
-def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
+def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str], folds: list[int]):
     predicted_npz_dir_paths = [
         [
             pathlib.Path(model_dir_path) / "train" / f"fold_{i_fold}"
             for model_dir_path in model_dir_paths
         ]
-        for i_fold in range(5)
+        for i_fold in folds
     ]  # (fold, model)
     for predicted_npz_dir_paths_by_fold in predicted_npz_dir_paths:
         for path in predicted_npz_dir_paths_by_fold:
@@ -119,7 +119,7 @@ def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
 
     keys_dict = {}
     preds_dict = {}
-    for i_fold in tqdm.trange(5):
+    for i_fold in tqdm.tqdm(folds):
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
@@ -133,7 +133,7 @@ def optimize(
     search_type: str,
     models_dir_name: str,
     calc_all_scores: Callable[
-        [Sequence[float], dict | None, float, float], tuple[Sequence[float], Sequence[float]]
+        [Sequence[float], dict | None, float, float, str], tuple[Sequence[float], Sequence[float]]
     ],
     all_weights_to_find,
     initial_weight_dict=None,

@@ -14,7 +14,8 @@ model_dir_path = ranchantan_pred_dir_path / "exp050-transformer-decoder_retry"
 
 if __name__ == "__main__":
     # post_process_type = "base"
-    post_process_type = "cutting_probs_by_sleep_prob"
+    # post_process_type = "cutting_probs_by_sleep_prob"
+    post_process_type = "sleeping_edges_as_probs"
 
     keys_dict, preds_dict = get_keys_and_preds([model_dir_path])
 
@@ -74,7 +75,9 @@ if __name__ == "__main__":
             how="cross",
         ).to_numpy()
 
-        def calc_all_scores(grid_parameter, score_th=0.0005, distance=96, calc_type="fast"):
+        def calc_all_scores(
+            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
+        ):
             # sleep_occupancy_th, watch_interval_hour = grid_parameter
             (
                 sleep_occupancy_th_onset,
@@ -104,6 +107,43 @@ if __name__ == "__main__":
                                 watch_interval_hour=watch_interval_hour_wakeup,
                             ),
                         ),
+                    ),
+                    print_msg=False,
+                )
+                for i_fold in tqdm.trange(5, desc="calc score over n-folds")
+            ]
+            mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
+            print(f"{mean_score_str} ({', '.join(score_strs)}) at {grid_parameter}")
+            return scores, grid_parameter
+
+    elif post_process_type == "sleeping_edges_as_probs":
+        sleep_prob_ths = np.linspace(0, 1, 20 + 1)
+        min_sleeping_hours = np.linspace(0, 12, 24 + 1)
+        grid_parameters = pd.merge(
+            pd.Series(sleep_prob_ths, name="sleep_prob_th"),
+            pd.Series(min_sleeping_hours, name="min_sleeping_hour"),
+            how="cross",
+        ).to_numpy()
+
+        def calc_all_scores(
+            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
+        ):
+            sleep_prob_th, min_sleeping_hours = grid_parameter
+
+            scores = [
+                calc_score(
+                    i_fold,
+                    [1],
+                    keys_dict,
+                    all_event_df,
+                    preds_dict,
+                    score_th=score_th,
+                    distance=distance,
+                    calc_type=calc_type,
+                    post_process_modes=dict(
+                        sleeping_edges_as_probs=dict(
+                            sleep_prob_th=sleep_prob_th, min_sleeping_hours=min_sleeping_hours
+                        )
                     ),
                     print_msg=False,
                 )

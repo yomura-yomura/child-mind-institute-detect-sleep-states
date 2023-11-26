@@ -52,6 +52,7 @@ def post_process_for_seg(
     Args:
         keys: list of keys. key is "{series_id}_{chunk_id}"
         preds: (num_series * num_chunks, duration, 3)
+        labels:
         downsample_rate: see conf
         score_th: threshold for score. Defaults to 0.5.
         distance: minimum interval between detectable peaks
@@ -124,14 +125,14 @@ def post_process_for_seg(
         label_index_dict = {event: i for i, event in enumerate(["sleep", "onset", "wakeup"])}
     else:
         label_index_dict = {
-            event: labels.index("sleep") if "sleep" in labels else None
+            event: labels.index(f"event_{event}") if f"event_{event}" in labels else None
             for event in ["sleep", "onset", "wakeup"]
         }
 
     records = []
     for series_id in unique_series_ids:
         series_idx = np.where(series_ids == series_id)[0]
-        this_series_preds = preds[series_idx].reshape(-1, len(labels))
+        this_series_preds = preds[series_idx].reshape(-1, preds.shape[-1])
 
         for i, event_name in enumerate(possible_events):
             this_event_preds = this_series_preds[:, label_index_dict[event_name]]
