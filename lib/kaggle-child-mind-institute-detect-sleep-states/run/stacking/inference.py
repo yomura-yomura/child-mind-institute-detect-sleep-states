@@ -52,7 +52,6 @@ def load_model(cfg: StackingConfig) -> L.LightningModule:
 
 @hydra.main(config_path="../conf", config_name="stacking", version_base="1.2")
 def main(cfg: StackingConfig):
-    cfg.dir.sub_dir = str(project_root_path / "run")
     print(cfg)
     child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
         kaggle_dataset_dir_path=cfg.dir.data_dir

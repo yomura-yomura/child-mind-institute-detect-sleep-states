@@ -42,7 +42,7 @@ def run(cfg: DictConfig, module, datamodule) -> float | None:
     if cfg.phase == "train":
         from run.calc_cv import calc_score
 
-        score = calc_score(pred_dir_path, cfg.labels, cfg.downsample_rate)
+        score = calc_score(pred_dir_path, cfg.labels, cfg.downsample_rate, calc_type="normal")
         print(f"{score:.4f}")
         return score
 
