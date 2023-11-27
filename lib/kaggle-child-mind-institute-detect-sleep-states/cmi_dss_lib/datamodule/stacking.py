@@ -7,13 +7,14 @@ import polars as pl
 import torch
 import torch.utils.data
 import tqdm
+from lightning.pytorch.utilities.types import EVAL_DATALOADERS
 from nptyping import Float, NDArray, Shape
 from sklearn.preprocessing import StandardScaler
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 
 from ..config import StackingConfig
-from .seg import Indexer, TrainDataset, ValidDataset, pad_if_needed
+from .seg import Indexer, TestDataset, TrainDataset, ValidDataset, pad_if_needed
 
 project_root_path = pathlib.Path(__file__).parent.parent.parent
 
@@ -143,6 +144,33 @@ class StackingDataModule(L.LightningDataModule):
                     for key, chunk_feature in self.valid_chunk_features.items()
                 }
 
+            predicted_paths = [
+                pathlib.Path(
+                    self.cfg.dir.sub_dir,
+                    "predicted",
+                    input_model_name,
+                    self.cfg.phase,
+                    f"{self.cfg.split.name}",
+                )
+                for input_model_name in self.cfg.input_model_names
+            ]
+            series_ids = list(
+                set(
+                    npz_path.stem
+                    for predicted_path in predicted_paths
+                    for npz_path in predicted_path.glob("*.npz")
+                )
+            )
+            if stage == "test":
+                assert self.scaler_list is None
+                self.test_chunk_features = load_chunk_features(
+                    predicted_paths,
+                    series_ids=series_ids,
+                    duration=self.cfg.duration,
+                    prev_margin_steps=self.cfg.prev_margin_steps,
+                    next_margin_steps=self.cfg.next_margin_steps,
+                )
+
     def train_dataloader(self) -> torch.utils.data.DataLoader:
         train_dataset = TrainDataset(
             cfg=self.cfg,
@@ -169,6 +197,19 @@ class StackingDataModule(L.LightningDataModule):
         return torch.utils.data.DataLoader(
             valid_dataset,
             batch_size=self.cfg.valid_batch_size or self.cfg.batch_size,
+            shuffle=False,
+            num_workers=self.cfg.num_workers,
+            pin_memory=True,
+        )
+
+    def test_dataloader(self) -> torch.utils.data.DataLoader:
+        test_dataset = TestDataset(
+            cfg=self.cfg,
+            chunk_features=self.test_chunk_features,
+        )
+        return torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=self.cfg.batch_size,
             shuffle=False,
             num_workers=self.cfg.num_workers,
             pin_memory=True,

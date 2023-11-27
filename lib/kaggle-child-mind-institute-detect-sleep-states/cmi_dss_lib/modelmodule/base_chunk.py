@@ -247,7 +247,7 @@ class BaseChunkModule(LightningModule):
 
         # score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df, sub_df)
         score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-            self.val_event_df, sub_df
+            self.val_event_df, sub_df, calc_type="normal"
         )
 
         self.log(
