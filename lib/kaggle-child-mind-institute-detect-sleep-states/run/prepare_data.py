@@ -1,6 +1,5 @@
 import pathlib
 import pickle
-import shutil
 
 import hydra
 import numpy as np
@@ -188,16 +187,18 @@ def main(cfg: PrepareDataConfig):
             "rolling_std_1min_enmo",
         ]
 
-        col_dict_v2 = {}
-
         # preprocess
         series_df = series_df.with_columns(
             pl.col("anglez").cast(pl.Float32),
             pl.col("enmo").cast(pl.Float32),
             pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
         )
+
         feature_names = []
         if "v1" in data_versions:
+            feature_names += feature_names_to_preprocess_v1
+
+        if "v1" in data_versions or "v2" in data_versions:
             series_df = series_df.with_columns(
                 pl.col("anglez")
                 .diff(n=1)
@@ -215,49 +216,54 @@ def main(cfg: PrepareDataConfig):
                 pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
                 pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
             )
-            feature_names += feature_names_to_preprocess_v1
+
         if "v2" in data_versions:
-            series_df = series_df.with_columns(
-                pl.col("anglez")
-                .rolling_std(window_size="12i", closed="both")
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("rolling_std_1min_anglez"),
-                pl.col("enmo")
-                .rolling_std(window_size="12i", closed="both")
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("rolling_std_1min_enmo"),
-            ).with_columns(
-                (pl.col("anglez_lag_diff") / pl.col("anglez").add(1e-6))
-                .abs()
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("pct_change_anglez"),
-                (pl.col("enmo_lag_diff") / pl.col("enmo").add(1e-6))
-                .abs()
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("pct_change_enmo"),
-                pl.col("anglez_lag_diff_abs")
-                .cum_sum()
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("anglez_lag_diff_abs_cumsum"),
-                pl.col("enmo_lag_diff_abs")
-                .cum_sum()
-                .over("series_id")
-                .cast(pl.Float32)
-                .alias("enmo_lag_diff_abs_cumsum"),
-                pl.when(pl.col(f"pct_change_anglez") > 1.0)
-                .then(0)
-                .otherwise(pl.col(f"pct_change_anglez"))
-                .alias(f"pct_change_anglez"),
-                pl.when(pl.col(f"pct_change_enmo") > 1.0)
-                .then(0)
-                .otherwise(pl.col(f"pct_change_enmo"))
-                .cast(pl.Float32)
-                .alias(f"pct_change_enmo"),
+            series_df = (
+                series_df.with_columns(
+                    pl.col("anglez")
+                    .rolling_std(window_size="12i", closed="both")
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("rolling_std_1min_anglez"),
+                    pl.col("enmo")
+                    .rolling_std(window_size="12i", closed="both")
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("rolling_std_1min_enmo"),
+                )
+                .with_columns(
+                    (pl.col("anglez_lag_diff") / pl.col("anglez").add(1e-6))
+                    .abs()
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("pct_change_anglez"),
+                    (pl.col("enmo_lag_diff") / pl.col("enmo").add(1e-6))
+                    .abs()
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("pct_change_enmo"),
+                    pl.col("anglez_lag_diff_abs")
+                    .cum_sum()
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("anglez_lag_diff_abs_cumsum"),
+                    pl.col("enmo_lag_diff_abs")
+                    .cum_sum()
+                    .over("series_id")
+                    .cast(pl.Float32)
+                    .alias("enmo_lag_diff_abs_cumsum"),
+                )
+                .with_columns(
+                    pl.when(pl.col(f"pct_change_anglez") > 1.0)
+                    .then(0)
+                    .otherwise(pl.col(f"pct_change_anglez"))
+                    .alias(f"pct_change_anglez"),
+                    pl.when(pl.col(f"pct_change_enmo") > 1.0)
+                    .then(0)
+                    .otherwise(pl.col(f"pct_change_enmo"))
+                    .cast(pl.Float32)
+                    .alias(f"pct_change_enmo"),
+                )
             )
             feature_names += feature_names_to_preprocess_v2
 
@@ -265,8 +271,8 @@ def main(cfg: PrepareDataConfig):
             series_df.select(
                 [
                     pl.col("series_id"),
-                    pl.col("anglez"),
-                    pl.col("enmo"),
+                    # pl.col("anglez"),
+                    # pl.col("enmo"),
                     # pl.col("anglez_int"),
                     # pl.col("enmo_int"),
                     *map(pl.col, feature_names),
@@ -288,47 +294,47 @@ def main(cfg: PrepareDataConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            features1 = series_df[feature_names_to_preprocess_v1].to_numpy()
-            features2 = series_df[feature_names_to_preprocess_v2].to_numpy()
-
             preprocessing_scaler_dir = pathlib.Path(cfg.dir.preprocessing_scaler_dir)
-            scaler_save_path1 = preprocessing_scaler_dir / "robust_scaler_v1.pkl"
-            scaler_save_path2 = preprocessing_scaler_dir / "robust_scaler_v2.pkl"
-            if cfg.just_load_scaler:
-                with open(scaler_save_path1, "rb") as f:
-                    scaler1 = pickle.load(f)
-                print(f"[Info] RobustScaler has been loaded from {scaler_save_path1}")
 
-                with open(scaler_save_path2, "rb") as f:
-                    scaler2 = pickle.load(f)
-                print(f"[Info] RobustScaler has been loaded from {scaler_save_path2}")
-            else:
-                scaler1 = sklearn.preprocessing.RobustScaler()
-                scaler1.fit(features1)
-                preprocessing_scaler_dir.mkdir(exist_ok=True)
-                with open(scaler_save_path1, "wb") as f:
-                    pickle.dump(scaler1, f)
-                print(f"[Info] RobustScaler has been saved as {scaler_save_path1}")
+            if "v1" in data_versions:
+                features1 = series_df[feature_names_to_preprocess_v1].to_numpy()
+                scaler_save_path1 = preprocessing_scaler_dir / "robust_scaler_v1.pkl"
 
-                scaler2 = sklearn.preprocessing.RobustScaler()
-                scaler2.fit(features2)
-                preprocessing_scaler_dir.mkdir(exist_ok=True)
-                with open(scaler_save_path2, "wb") as f:
-                    pickle.dump(scaler2, f)
-                print(f"[Info] RobustScaler has been saved as {scaler_save_path2}")
-            series_df[feature_names_to_preprocess_v1] = scaler1.transform(features1)
-            series_df[feature_names_to_preprocess_v2] = scaler2.transform(features2)
+                if cfg.just_load_scaler:
+                    with open(scaler_save_path1, "rb") as f:
+                        scaler1 = pickle.load(f)
+                    print(f"[Info] RobustScaler has been loaded from {scaler_save_path1}")
+                else:
+                    scaler1 = sklearn.preprocessing.RobustScaler()
+                    scaler1.fit(features1)
+                    preprocessing_scaler_dir.mkdir(exist_ok=True)
+                    with open(scaler_save_path1, "wb") as f:
+                        pickle.dump(scaler1, f)
+                    print(f"[Info] RobustScaler has been saved as {scaler_save_path1}")
+                series_df[feature_names_to_preprocess_v1] = scaler1.transform(features1)
 
-            feature_names_to_preprocess = (
-                feature_names_to_preprocess_v1 + feature_names_to_preprocess_v2
-            )
+            if "v2" in data_versions:
+                features2 = series_df[feature_names_to_preprocess_v2].to_numpy()
+                scaler_save_path2 = preprocessing_scaler_dir / "robust_scaler_v2.pkl"
 
+                if cfg.just_load_scaler:
+                    with open(scaler_save_path2, "rb") as f:
+                        scaler2 = pickle.load(f)
+                    print(f"[Info] RobustScaler has been loaded from {scaler_save_path2}")
+                else:
+                    scaler2 = sklearn.preprocessing.RobustScaler()
+                    scaler2.fit(features2)
+                    preprocessing_scaler_dir.mkdir(exist_ok=True)
+                    with open(scaler_save_path2, "wb") as f:
+                        pickle.dump(scaler2, f)
+                    print(f"[Info] RobustScaler has been saved as {scaler_save_path2}")
+                series_df[feature_names_to_preprocess_v2] = scaler2.transform(features2)
         else:
             raise ValueError(f"unexpected {cfg.scale_type}")
         # series_df[feature_names_to_preprocess] = series_df[feature_names_to_preprocess].fill_nan(0)
 
     feature_names = [
-        *feature_names_to_preprocess,
+        *feature_names,
         # "anglez_int",
         # "enmo_int",
         "hour_sin",
