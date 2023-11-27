@@ -124,6 +124,7 @@ class StackingDataModule(L.LightningDataModule):
             self.valid_chunk_features = load_chunk_features(
                 valid_predicted_paths,
                 series_ids=self.valid_series_ids,
+                dataset_type="train",
                 duration=self.cfg.duration,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
@@ -166,6 +167,7 @@ class StackingDataModule(L.LightningDataModule):
             self.test_chunk_features = load_chunk_features(
                 predicted_paths,
                 series_ids=series_ids,
+                dataset_type="test",
                 duration=self.cfg.duration,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
@@ -236,6 +238,7 @@ def load_features(
 def load_chunk_features(
     predicted_paths: list[pathlib.Path | str],
     series_ids: list[str],
+    dataset_type: str,
     duration: int,
     prev_margin_steps: int = 0,
     next_margin_steps: int = 0,
@@ -244,7 +247,7 @@ def load_chunk_features(
 
     total_duration_dict = dict(
         child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
-            "train", as_polars=True
+            dataset_type, as_polars=True
         )
         .filter(pl.col("series_id").is_in(series_ids))
         .group_by("series_id")

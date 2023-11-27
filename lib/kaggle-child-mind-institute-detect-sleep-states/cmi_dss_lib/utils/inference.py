@@ -76,7 +76,6 @@ def inference(
 
         if len(labels) < 3:
             preds = np.pad(preds, pad_width=[(0, 0), (0, 3 - len(labels))], constant_values=np.nan)
-        print(preds.shape)
         preds = preds[:, [events.index(event) for event in all_events]]
 
         np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
