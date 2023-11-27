@@ -19,10 +19,12 @@ import child_mind_institute_detect_sleep_states.pj_struct_paths
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
         # "../../output/train_stacking/s_exp006",
-        "../../cmi-dss-ensemble-stacking-models/s_exp006",
+        # "../../cmi-dss-ensemble-stacking-models/s_exp006",
+        "../../output/train_stacking/s_exp006",
         #
         # "phase=dev",
-        "phase=train",
+        # "phase=train",
+        "phase=test",
         # "batch_size=32",
         "batch_size=16",
     ]

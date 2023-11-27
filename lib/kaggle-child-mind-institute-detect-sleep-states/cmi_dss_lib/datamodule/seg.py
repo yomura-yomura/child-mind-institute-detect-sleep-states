@@ -453,7 +453,9 @@ class TestDataset(Dataset):
     def __getitem__(self, idx):
         key = self.keys[idx]
         feature = self.chunk_features[key]
-        feature = torch.FloatTensor(feature.T).unsqueeze(0)  # (1, num_features, duration)
+        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(
+            0
+        )  # (1, ..., num_features, duration)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],

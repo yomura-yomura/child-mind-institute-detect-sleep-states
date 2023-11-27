@@ -163,11 +163,12 @@ class StackingDataModule(L.LightningDataModule):
             )
         )
         if stage == "test":
+            assert len(series_ids) > 0
             assert self.scaler_list is None
             self.test_chunk_features = load_chunk_features(
                 predicted_paths,
                 series_ids=series_ids,
-                dataset_type="test",
+                dataset_type="train",
                 duration=self.cfg.duration,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
