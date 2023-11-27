@@ -438,15 +438,11 @@ class ValidDataset(Dataset):
 
 
 class TestDataset(Dataset):
-    def __init__(
-        self,
-        cfg: TrainConfig,
-        chunk_features: dict[str, np.ndarray],
-    ):
+    def __init__(self, cfg: TrainConfig, chunk_features: dict[str, np.ndarray], num_features: int):
         self.cfg = cfg
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
-        self.num_features = len(cfg.features)
+        self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
@@ -589,7 +585,11 @@ class SegDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):
-        test_dataset = TestDataset(self.cfg, chunk_features=self.test_chunk_features)
+        test_dataset = TestDataset(
+            self.cfg,
+            chunk_features=self.test_chunk_features,
+            num_features=len(self.cfg.features),
+        )
         return torch.utils.data.DataLoader(
             test_dataset,
             batch_size=self.cfg.batch_size,

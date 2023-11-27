@@ -206,6 +206,7 @@ class StackingDataModule(L.LightningDataModule):
         test_dataset = TestDataset(
             cfg=self.cfg,
             chunk_features=self.test_chunk_features,
+            num_features=len(self.cfg.input_model_names),
         )
         return torch.utils.data.DataLoader(
             test_dataset,
