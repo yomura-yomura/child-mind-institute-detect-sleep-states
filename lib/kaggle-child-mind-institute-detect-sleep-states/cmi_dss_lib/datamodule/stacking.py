@@ -144,32 +144,32 @@ class StackingDataModule(L.LightningDataModule):
                     for key, chunk_feature in self.valid_chunk_features.items()
                 }
 
-            predicted_paths = [
-                pathlib.Path(
-                    self.cfg.dir.sub_dir,
-                    "predicted",
-                    input_model_name,
-                    self.cfg.phase,
-                    f"{self.cfg.split.name}",
-                )
-                for input_model_name in self.cfg.input_model_names
-            ]
-            series_ids = list(
-                set(
-                    npz_path.stem
-                    for predicted_path in predicted_paths
-                    for npz_path in predicted_path.glob("*.npz")
-                )
+        predicted_paths = [
+            pathlib.Path(
+                self.cfg.dir.sub_dir,
+                "predicted",
+                input_model_name,
+                self.cfg.phase,
+                f"{self.cfg.split.name}",
             )
-            if stage == "test":
-                assert self.scaler_list is None
-                self.test_chunk_features = load_chunk_features(
-                    predicted_paths,
-                    series_ids=series_ids,
-                    duration=self.cfg.duration,
-                    prev_margin_steps=self.cfg.prev_margin_steps,
-                    next_margin_steps=self.cfg.next_margin_steps,
-                )
+            for input_model_name in self.cfg.input_model_names
+        ]
+        series_ids = list(
+            set(
+                npz_path.stem
+                for predicted_path in predicted_paths
+                for npz_path in predicted_path.glob("*.npz")
+            )
+        )
+        if stage == "test":
+            assert self.scaler_list is None
+            self.test_chunk_features = load_chunk_features(
+                predicted_paths,
+                series_ids=series_ids,
+                duration=self.cfg.duration,
+                prev_margin_steps=self.cfg.prev_margin_steps,
+                next_margin_steps=self.cfg.next_margin_steps,
+            )
 
     def train_dataloader(self) -> torch.utils.data.DataLoader:
         train_dataset = TrainDataset(
