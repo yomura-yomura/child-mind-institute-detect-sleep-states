@@ -15,6 +15,8 @@ from cmi_dss_lib.datamodule.seg import SegDataModule
 from cmi_dss_lib.modelmodule.seg import SegChunkModule
 from cmi_dss_lib.utils.common import trace
 
+import child_mind_institute_detect_sleep_states.pj_struct_paths
+
 project_root_path = pathlib.Path(__file__).parent.parent
 
 
@@ -85,6 +87,10 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
 @hydra.main(config_path="conf", config_name="train", version_base="1.2")
 def main(cfg: TrainConfig):
     print(cfg)
+
+    child_mind_institute_detect_sleep_states.pj_struct_paths.set_pj_struct_paths(
+        kaggle_dataset_dir_path=cfg.dir.data_dir
+    )
 
     with trace("load model"):
         module = load_model(cfg)

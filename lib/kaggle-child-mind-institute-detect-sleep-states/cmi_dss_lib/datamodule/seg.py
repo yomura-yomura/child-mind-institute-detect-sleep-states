@@ -53,7 +53,7 @@ def load_features(
 def load_chunk_features(
     duration: int,
     feature_names: list[str],
-    series_ids: Optional[list[str]],
+    series_ids: list[str],
     processed_dir: Path,
     phase: str,
     scale_type: str,
@@ -66,9 +66,6 @@ def load_chunk_features(
     phase_dir_path = processed_dir / phase / scale_type
     if not phase_dir_path.exists():
         raise FileNotFoundError(f"{phase_dir_path.resolve()}")
-
-    if series_ids is None:
-        series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
         series_dir = phase_dir_path / series_id
@@ -528,11 +525,13 @@ class SegDataModule(LightningDataModule):
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
+
+        series_ids = [
+            series_dir.name
+            for series_dir in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            if series_dir.is_dir() and not series_dir.name.startswith(".")
+        ]
         if stage == "test":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -546,10 +545,6 @@ class SegDataModule(LightningDataModule):
             )
 
         if stage == "dev":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
