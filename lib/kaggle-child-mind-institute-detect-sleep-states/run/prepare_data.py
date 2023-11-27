@@ -317,7 +317,7 @@ def main(cfg: PrepareDataConfig):
                 # 特徴量を追加
                 this_series_df = add_feature(this_series_df, feature_names)
                 
-                # NOTE: メモリーエラーを避けるためにここでrolling
+                # NOTE メモリーエラーを避けるためにここでrolling
                 #if len(rolling_features) > 0:
                 #    this_series_df = add_rolling_features(this_series_df)
 
