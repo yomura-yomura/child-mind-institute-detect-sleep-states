@@ -244,6 +244,12 @@ def main(cfg: PrepareDataConfig):
         for series_id, this_series_df in tqdm(series_df.group_by("series_id"), total=n_unique):
             # 特徴量を追加
             this_series_df = add_feature(this_series_df, feature_names)
+            
+            # NOTE メモリーエラーを避けるためにここでrolling
+            #if len(rolling_features) > 0:
+            #    this_series_df = add_rolling_features(this_series_df)
+            # 特徴量を追加
+            this_series_df = add_feature(this_series_df, feature_names)
 
             # NOTE: メモリーエラーを避けるためにここでrolling
             if len(rolling_features) > 0:
