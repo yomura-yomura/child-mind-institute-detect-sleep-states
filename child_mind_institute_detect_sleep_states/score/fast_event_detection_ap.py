@@ -6,7 +6,7 @@ from typing import Literal
 import joblib
 import numpy as np
 import tqdm
-from nptyping import DataFrame, Float, Int, NDArray, Shape
+from nptyping import Bool, DataFrame, Float, Int, NDArray, Shape
 from nptyping import Structure as S
 
 from .event_detection_ap import TOLERANCES
@@ -19,7 +19,12 @@ def score(
     show_progress=True,
     print_score=True,
 ) -> float:
-    ap_list_dict = get_score_dict(event_df, sub_df, print_score=print_score, n_jobs=n_jobs, show_progress=show_progress)
+    ap_list_dict = {
+        event: [metric["average_precision"] for metric in metric_list]
+        for event, metric_list in get_score_dict(
+            event_df, sub_df, print_score=print_score, n_jobs=n_jobs, show_progress=show_progress
+        ).items()
+    }
     return np.mean([np.mean(ap_list) for ap_list in ap_list_dict.values()])
 
 
@@ -61,21 +66,20 @@ def get_score_dict(
                 metrics.probs += probs
                 metrics.num_positive += num_positive
 
-    ap_list_dict = {
-        event: [metrics.get_metrics()["average_precision"] for metrics in metrics_list]
-        for event, metrics_list in metrics_dict.items()
+    metric_list_dict = {
+        event: [metrics.get_metrics() for metrics in metrics_list] for event, metrics_list in metrics_dict.items()
     }
 
     if print_score:
         scores = []
-        for event, ap_list in ap_list_dict.items():
-            score = np.mean(ap_list)
+        for event, metric_list in metric_list_dict.items():
+            score = np.mean([metric["average_precision"] for metric in metric_list])
             print(f"{event} = {score:.3f}")
             scores.append(score)
 
         print(f"EventDetectionAP = {np.mean(scores):.3f}")
 
-    return ap_list_dict
+    return metric_list_dict
 
 
 class EventMetrics:
@@ -139,7 +143,7 @@ def match_series(
     pred_probs: NDArray[Shape['"*"'], Float],
     gt_locs: list[int],
     tolerance: int,
-) -> NDArray[Shape['"*"'], Int]:
+) -> NDArray[Shape['"*"'], Bool]:
     """
     Probably faster algorithm for matching, since the gt are disjoint (within tolerance)
 

@@ -16,7 +16,8 @@ from cmi_dss_lib.utils.common import trace
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "../../output/train_stacking/s_exp006",
+        # "../../output/train_stacking/s_exp006",
+        "../../cmi-dss-ensemble-stacking-models/s_exp006",
         #
         # "phase=dev",
         "phase=train",

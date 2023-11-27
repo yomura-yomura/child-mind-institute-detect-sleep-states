@@ -65,14 +65,7 @@ class Plotter:
         )
         self.cfg.dir.sub_dir = project_root_path / "run"
 
-        self.target_pred_dir_path = (
-            project_root_path
-            / "run"
-            / "predicted"
-            / exp_name
-            / ("train" if inference_step_offset <= 0 else f"train-cfg.{inference_step_offset=}")
-            / self.cfg.split.name
-        )
+        self.target_pred_dir_path = self.get_pred_dir_path(exp_name, i_fold, inference_step_offset)
         assert self.target_pred_dir_path.exists()
 
         self.cfg.inference_step_offset = int(inference_step_offset)
@@ -98,16 +91,27 @@ class Plotter:
         else:
             raise ValueError(f"unexpected {dataset_type=}")
 
-    def get_data(self, i: int):
-        feat_record = self.val_dataset[i]
+    @staticmethod
+    def get_pred_dir_path(exp_name: str, i_fold: int, inference_step_offset: int = 0):
+        return (
+            project_root_path
+            / "run"
+            / "predicted"
+            / exp_name
+            / ("train" if inference_step_offset <= 0 else f"train-cfg.{inference_step_offset=}")
+            / f"fold_{i_fold}"
+        )
+
+    def get_data(self, chunk_id: int):
+        feat_record = self.val_dataset[chunk_id]
 
         if self.dataset_type == "train":
             series_id = feat_record["series_id"]
             preds = None
             start = end = None
         else:
-            series_id, i = feat_record["key"].split("_")
-            i = int(i)
+            series_id, chunk_id = feat_record["key"].split("_")
+            chunk_id = int(chunk_id)
             # assert int(feat_record["key"].split("_")[1]) == i
 
             preds = np.load(self.target_pred_dir_path / f"{series_id}.npz")["arr_0"]
@@ -117,9 +121,9 @@ class Plotter:
                 self.cfg.prev_margin_steps,
                 self.cfg.next_margin_steps,
             )
-            start, end = indexer.get_cropping_range(i)
+            start, end = indexer.get_cropping_range(chunk_id)
             preds = preds[start:end]
-        return (series_id, i), feat_record, preds, (start, end)
+        return (series_id, chunk_id), feat_record, preds, (start, end)
 
     def get_pred_df(self, i: int):
         _, _, preds, _ = self.get_data(i)
@@ -161,7 +165,7 @@ class Plotter:
         ]
 
     def plot(self, i: int, do_plot: bool = True):
-        (series_id, _), feat_record, preds, _ = self.get_data(i)
+        (series_id, chunk_id), feat_record, preds, _ = self.get_data(i)
 
         fig = self.get_pred_fig(i)
 
@@ -205,7 +209,7 @@ class Plotter:
             fig.add_vrect(x0=interest_start, x1=interest_end)
 
         fig.update_xaxes(range=(0, self.cfg.duration), matches="x", exponentformat="none")
-        fig.update_layout(title=f"{series_id}, chunk_id = {i}")
+        fig.update_layout(title=f"{series_id}, {chunk_id=}")
         fig.update_layout(hovermode="x")
 
         if do_plot:
@@ -250,11 +254,12 @@ def get_score(
     if len(target_event_df) == 0:
         return {}
 
-    score_dict = (
-        child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
+    score_dict = {
+        event: [metric["average_precision"] for metric in metric_list]
+        for event, metric_list in child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
             target_event_df, sub_df, show_progress=False
-        )
-    )
+        ).items()
+    }
     return score_dict
 
 
@@ -300,18 +305,61 @@ if __name__ == "__main__":
                 post_process_modes=None,
             )
             target_event_df = event_df[event_df["series_id"] == series_id]
-            score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-                target_event_df, sub_df, n_jobs=1
-            )
+            if len(target_event_df) == 0:
+                score_onset = score_wakeup = np.nan
+            else:
+                score_dict = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
+                    target_event_df, sub_df, n_jobs=1
+                )
+                score_onset = np.mean(score_dict["onset"])
+                score_wakeup = np.mean(score_dict["wakeup"])
+
             records.append(
                 {
                     "series_id": series_id,
                     "fold": i_fold,
-                    "score": score,
+                    "score": np.mean([score_onset, score_wakeup]),
+                    "score_onset": score_onset,
+                    "score_wakeup": score_wakeup,
                     "n_true_records": len(target_event_df),
                 }
             )
     score_df = pd.DataFrame(records)
+
+    #
+
+    series_id = "280e08693c6d"
+    target_pred_dir_path = Plotter.get_pred_dir_path(exp_name, 0)
+    preds = np.load(target_pred_dir_path / f"{series_id}.npz")["arr_0"]
+    sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
+        keys=[series_id] * len(preds),
+        preds=preds,
+        labels=plotter.cfg.labels,
+        downsample_rate=plotter.cfg.downsample_rate,
+        score_th=0.0005,
+        distance=96,
+        post_process_modes=None,
+    )
+    metric_dict = (
+        child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
+            event_df[event_df["series_id"] == series_id].dropna(), sub_df
+        )
+    )
+    metric_df = pd.DataFrame(
+        [
+            {"event": event, "th": th, "precision": p, "recall": r, "prob": prob}
+            for event, metric_list in metric_dict.items()
+            for th, metric in enumerate(metric_list)
+            for p, r, prob in zip(
+                metric["precision"], metric["recall"], metric["prob"], strict=True
+            )
+        ]
+    )
+    fig = px.line(
+        metric_df, title=series_id, x="recall", y="precision", color="th", facet_col="event"
+    )
+    fig.update_traces(mode="lines+markers")
+    fig.show()
 
     fig = px.histogram(score_df, x="score", facet_row="fold")
     fig.show()

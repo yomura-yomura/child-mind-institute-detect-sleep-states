@@ -1,4 +1,4 @@
-- exp_name=s_exp011
+- exp_name=s_exp011_resume
 - input_model_names=[19,27,50,53,55,58]
 
 - feature_extractor=LSTMFeatureExtractor
