@@ -146,15 +146,17 @@ def save_each_series(
 
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: PrepareDataConfig):
+    data_versions = cfg.data_version.split("+")
     processed_dir = (
         pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
     )
     print(f"{processed_dir = }")
 
-    # ディレクトリが存在する場合は削除
-    if processed_dir.exists():
-        shutil.rmtree(processed_dir, ignore_errors=True)
-        print(f"Removed {cfg.phase} dir: {processed_dir}")
+    # # ディレクトリが存在する場合は削除
+    # if processed_dir.exists():
+    #     shutil.rmtree(processed_dir, ignore_errors=True)
+    #     print(f"Removed {cfg.phase} dir: {processed_dir}")
+
     with trace("Load series"):
         # scan parquet
         if cfg.phase in ["train", "test", "dev"]:
@@ -162,23 +164,41 @@ def main(cfg: PrepareDataConfig):
                 dataset_type = "train"
             else:
                 dataset_type = "test"
-            series_lf = pl.scan_parquet(
+            series_df = pl.scan_parquet(
                 pathlib.Path(cfg.dir.data_dir) / f"{dataset_type}_series.parquet",
                 low_memory=True,
             )
         else:
             raise ValueError(f"Invalid phase: {cfg.phase}")
 
+        feature_names_to_preprocess_v1 = [
+            "anglez",
+            "enmo",
+            "anglez_lag_diff",
+            "enmo_lag_diff",
+            "anglez_lag_diff_abs",
+            "enmo_lag_diff_abs",
+        ]
+        feature_names_to_preprocess_v2 = [
+            "anglez_lag_diff_abs_cumsum",
+            "enmo_lag_diff_abs_cumsum",
+            "pct_change_anglez",
+            "pct_change_enmo",
+            "rolling_std_1min_anglez",
+            "rolling_std_1min_enmo",
+        ]
+
+        col_dict_v2 = {}
+
         # preprocess
-        series_df = (
-            series_lf.with_columns(
-                pl.col("anglez").cast(pl.Float32),
-                pl.col("enmo").cast(pl.Float32),
-                pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
-                # (pl.col("anglez") - ANGLEZ_MEAN) / ANGLEZ_STD,
-                # (pl.col("enmo") - ENMO_MEAN) / ENMO_STD,
-                # pl.col("anglez").cast(pl.Int16).alias("anglez_int"),
-                # pl.col("enmo").cast(pl.Int16).alias("enmo_int"),
+        series_df = series_df.with_columns(
+            pl.col("anglez").cast(pl.Float32),
+            pl.col("enmo").cast(pl.Float32),
+            pl.col("timestamp").str.to_datetime("%Y-%m-%dT%H:%M:%S%z"),
+        )
+        feature_names = []
+        if "v1" in data_versions:
+            series_df = series_df.with_columns(
                 pl.col("anglez")
                 .diff(n=1)
                 .over("series_id")
@@ -191,6 +211,13 @@ def main(cfg: PrepareDataConfig):
                 .fill_null(0)
                 .cast(pl.Float32)
                 .alias("enmo_lag_diff"),
+            ).with_columns(
+                pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
+                pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
+            )
+            feature_names += feature_names_to_preprocess_v1
+        if "v2" in data_versions:
+            series_df = series_df.with_columns(
                 pl.col("anglez")
                 .rolling_std(window_size="12i", closed="both")
                 .over("series_id")
@@ -201,10 +228,7 @@ def main(cfg: PrepareDataConfig):
                 .over("series_id")
                 .cast(pl.Float32)
                 .alias("rolling_std_1min_enmo"),
-            )
-            .with_columns(
-                pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
-                pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
+            ).with_columns(
                 (pl.col("anglez_lag_diff") / pl.col("anglez").add(1e-6))
                 .abs()
                 .over("series_id")
@@ -215,8 +239,6 @@ def main(cfg: PrepareDataConfig):
                 .over("series_id")
                 .cast(pl.Float32)
                 .alias("pct_change_enmo"),
-            )
-            .with_columns(
                 pl.col("anglez_lag_diff_abs")
                 .cum_sum()
                 .over("series_id")
@@ -237,23 +259,17 @@ def main(cfg: PrepareDataConfig):
                 .cast(pl.Float32)
                 .alias(f"pct_change_enmo"),
             )
-            .select(
+            feature_names += feature_names_to_preprocess_v2
+
+        series_df = (
+            series_df.select(
                 [
                     pl.col("series_id"),
                     pl.col("anglez"),
                     pl.col("enmo"),
                     # pl.col("anglez_int"),
                     # pl.col("enmo_int"),
-                    pl.col("anglez_lag_diff"),
-                    pl.col("enmo_lag_diff"),
-                    pl.col("anglez_lag_diff_abs"),
-                    pl.col("enmo_lag_diff_abs"),
-                    pl.col("anglez_lag_diff_abs_cumsum"),
-                    pl.col("enmo_lag_diff_abs_cumsum"),
-                    pl.col("pct_change_anglez"),
-                    pl.col("pct_change_enmo"),
-                    pl.col("rolling_std_1min_anglez"),
-                    pl.col("rolling_std_1min_enmo"),
+                    *map(pl.col, feature_names),
                     pl.col("timestamp"),
                 ]
             )
@@ -272,23 +288,6 @@ def main(cfg: PrepareDataConfig):
                     series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
                 ) / STD_DICT[feature_name]
         elif cfg.scale_type == "robust_scaler":
-            feature_names_to_preprocess_v1 = [
-                "anglez",
-                "enmo",
-                "anglez_lag_diff",
-                "enmo_lag_diff",
-                "anglez_lag_diff_abs",
-                "enmo_lag_diff_abs",
-            ]
-            feature_names_to_preprocess_v2 = [
-                "anglez_lag_diff_abs_cumsum",
-                "enmo_lag_diff_abs_cumsum",
-                "pct_change_anglez",
-                "pct_change_enmo",
-                "rolling_std_1min_anglez",
-                "rolling_std_1min_enmo",
-            ]
-
             features1 = series_df[feature_names_to_preprocess_v1].to_numpy()
             features2 = series_df[feature_names_to_preprocess_v2].to_numpy()
 

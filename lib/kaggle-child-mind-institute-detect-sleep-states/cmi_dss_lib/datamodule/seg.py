@@ -83,7 +83,7 @@ def load_chunk_features(
             axis=1,
         )  # (duration, feature)
 
-        if inference_step_offset > 0:
+        if inference_step_offset is not None:
             this_feature = this_feature[inference_step_offset:]
 
         indexer = Indexer(this_feature.shape[0], duration, prev_margin_steps, next_margin_steps)
