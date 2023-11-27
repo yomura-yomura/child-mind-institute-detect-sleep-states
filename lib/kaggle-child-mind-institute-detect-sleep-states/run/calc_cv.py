@@ -36,7 +36,7 @@ def calc_score(
     labels,
     downsample_rate,
     score_th: float = 0.005,
-    distance: int = 88,
+    distance: int = 96,
     calc_type: str = "fast",
     n_records_per_series_id: int | None = None,
     post_process_modes=None,
@@ -78,7 +78,6 @@ def calc_score(
     # sub_df = sub_df.head(400 * len(series_ids))
     # # sub_df = sub_df.groupby(["series_id", "night"]).head(20)
     sub_df = sub_df.sort_values(["series_id", "step"])
-    print(sub_df.shape, len(sub_df) / len(series_ids))
 
     if calc_type == "fast":
         score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(

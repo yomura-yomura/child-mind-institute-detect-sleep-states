@@ -48,6 +48,24 @@ ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan
 jumtras_pred_dir_path = project_root_path / "run" / "predicted" / "jumtras"
 stacking_pred_dir_path = project_root_path / "run" / "predicted" / "train_stacking"
 
+exp_name_dict = {
+    "3": "jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    "7": "ranchantan/exp015-lstm-feature-108-sigma",
+    "19": "ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    "27": "jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet",
+    "41": "ranchantan/exp041_retry",
+    "47": "ranchantan/exp047_retry",
+    "50": "ranchantan/exp050-transformer-decoder_retry_resume",
+    "52": "jumtras/exp052",
+    "53": "jumtras/exp053",
+    "54": "ranchantan/exp054",
+    "55": "ranchantan/exp055",
+    "58": "jumtras/exp058",
+    "60": "ranchantan/exp060",
+    "73": "ranchantan/exp073_resume",
+    "75": "ranchantan/exp075-wakeup_5",
+}
+
 all_model_dir_path_dict = {
     "3": jumtras_pred_dir_path / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
     "7": ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",

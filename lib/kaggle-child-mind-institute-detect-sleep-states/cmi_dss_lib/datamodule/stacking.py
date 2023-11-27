@@ -10,6 +10,8 @@ import tqdm
 from nptyping import Float, NDArray, Shape
 from sklearn.preprocessing import StandardScaler
 
+import child_mind_institute_detect_sleep_states.data.comp_dataset
+
 from ..config import StackingConfig
 from .seg import Indexer, TrainDataset, ValidDataset, pad_if_needed
 
@@ -45,6 +47,15 @@ class StackingDataModule(L.LightningDataModule):
         self.train_features = None
         self.valid_chunk_features = None
         self.test_chunk_features = None
+
+        from run.blending import exp_name_dict
+
+        self.cfg.input_model_names = [
+            input_model_name
+            if isinstance(input_model_name, str)
+            else exp_name_dict[str(input_model_name)]
+            for input_model_name in self.cfg.input_model_names
+        ]
 
         self.train_predicted_paths = [
             pathlib.Path(
@@ -189,10 +200,22 @@ def load_chunk_features(
 ) -> dict[str, NDArray[Shape["3, *, *"], Float]]:
     chunk_features = {}
 
+    total_duration_dict = dict(
+        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
+            "train", as_polars=True
+        )
+        .filter(pl.col("series_id").is_in(series_ids))
+        .group_by("series_id")
+        .count()
+        .collect()
+        .to_numpy()
+    )
     for series_id in series_ids:
         this_feature = np.stack(
             [
-                np.load(predicted_path / f"{series_id}.npz")["arr_0"].T
+                np.load(predicted_path / f"{series_id}.npz")["arr_0"][
+                    : total_duration_dict[series_id]
+                ].T
                 for predicted_path in predicted_paths
             ],
             axis=-1,

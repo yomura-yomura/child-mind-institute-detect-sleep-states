@@ -20,45 +20,46 @@ project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "--multi-run",
         # "../cmi-dss-ensemble-models/jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",  # 3
         # "../cmi-dss-ensemble-models/ranchantan/exp005-lstm-feature-2",
         # "../cmi-dss-ensemble-models/ranchantan/exp016-1d-resnet34",  # 1
         # "../cmi-dss-ensemble-models/ranchantan/exp015-lstm-feature-108-sigma",
-        # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
-        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder",
         # "../cmi-dss-ensemble-models/jumtras/exp043",
         # "../cmi-dss-ensemble-models/ranchantan/exp045-lstm-feature-extractor",
         # "../cmi-dss-ensemble-models/ranchantan/exp044-transformer-decoder",
         #
+        # "../cmi-dss-ensemble-models/ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma/",
+        # "../cmi-dss-ensemble-models/jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet/",
         # "../cmi-dss-ensemble-models/ranchantan/exp034-stacked-gru-4-layers-24h-duration-4bs-108sigma-no-bg_sampling_rate",
         # "../cmi-dss-ensemble-models/ranchantan/exp041_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp047_retry",
         # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry",
-        "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
+        # "../cmi-dss-ensemble-models/ranchantan/exp050-transformer-decoder_retry_resume",
         # "../cmi-dss-ensemble-models/jumtras/exp052",
         # "../cmi-dss-ensemble-models/jumtras/exp053",
         # "../cmi-dss-ensemble-models/ranchantan/exp054",
         # "../cmi-dss-ensemble-models/ranchantan/exp055",
+        "../cmi-dss-ensemble-models/jumtras/exp058",
         # "../cmi-dss-ensemble-models/ranchantan/exp060",
         # "../cmi-dss-ensemble-models/ranchantan/exp073_resume",
         # "../cmi-dss-ensemble-models/ranchantan/exp075-onset",
         # "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
         #
-        # "phase=dev",
-        "phase=train",
-        # "batch_size=32",
-        "batch_size=16",
+        "phase=dev",
+        # "phase=train",
+        "batch_size=32",
+        # "batch_size=16",
         # "batch_size=8",
         # "--folds",
-        # "3,4",
-        "inference_step_offset=5760,7200,8640,10080,11520,12960,14400,15840,17280"
+        # "2,3,4",
+        # "inference_step_offset=0,2880,5760,8640,11520,14400",
         #
         # "dir.sub_dir=tmp",
         # "prev_margin_steps=4320",
         # "next_margin_steps=4320",
+        # "--multirun",
     ]
 else:
     args = None
@@ -91,7 +92,8 @@ def main(cfg: TrainConfig):
     datamodule = SegDataModule(cfg)
 
     score = cmi_dss_lib.utils.inference.run(cfg, module, datamodule)
-    scores.append(score)
+    if score is not None:
+        scores.append(score)
 
 
 if __name__ == "__main__":

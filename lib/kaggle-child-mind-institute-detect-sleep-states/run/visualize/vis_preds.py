@@ -44,7 +44,7 @@ class Plotter:
             / ".hydra"
             / "overrides.yaml"
         )
-        assert overrides_yaml_path.exists()
+        assert overrides_yaml_path.exists(), overrides_yaml_path
 
         if exp_name.startswith("train_stacking"):
             self.cfg = cast(
@@ -259,9 +259,9 @@ def get_score(
 
 
 if __name__ == "__main__":
-    plotter50 = Plotter(
-        "ranchantan/exp050-transformer-decoder_retry_resume", i_fold=2, dataset_type="valid"
-    )
+    exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
+
+    plotter50 = Plotter(exp_name, i_fold=2, dataset_type="valid")
     plotter50.plot(5)
     # plotter50.plot(47)
 
@@ -285,26 +285,38 @@ if __name__ == "__main__":
     import tqdm
 
     records = []
-    for p in tqdm.tqdm(sorted(plotter.target_pred_dir_path.glob("*.npz"))):
-        series_id = p.stem
-        preds = np.load(p)["arr_0"]
-        sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-            keys=[series_id] * len(preds),
-            preds=preds,
-            labels=plotter.cfg.labels,
-            downsample_rate=plotter.cfg.downsample_rate,
-            score_th=0.0005,
-            distance=96,
-            post_process_modes=None,
-        )
-        target_event_df = event_df[event_df["series_id"] == series_id]
-        score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-            target_event_df, sub_df, n_jobs=1
-        )
-        records.append(
-            {"series_id": series_id, "score": score, "n_true_records": len(target_event_df)}
-        )
+    for i_fold in range(5):
+        plotter = Plotter(exp_name, i_fold=i_fold, dataset_type="valid")
+        for p in tqdm.tqdm(sorted(plotter.target_pred_dir_path.glob("*.npz"))):
+            series_id = p.stem
+            preds = np.load(p)["arr_0"]
+            sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
+                keys=[series_id] * len(preds),
+                preds=preds,
+                labels=plotter.cfg.labels,
+                downsample_rate=plotter.cfg.downsample_rate,
+                score_th=0.0005,
+                distance=96,
+                post_process_modes=None,
+            )
+            target_event_df = event_df[event_df["series_id"] == series_id]
+            score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
+                target_event_df, sub_df, n_jobs=1
+            )
+            records.append(
+                {
+                    "series_id": series_id,
+                    "fold": i_fold,
+                    "score": score,
+                    "n_true_records": len(target_event_df),
+                }
+            )
     score_df = pd.DataFrame(records)
+
+    fig = px.histogram(score_df, x="score", facet_row="fold")
+    fig.show()
+
+    fasd
 
     exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
     inference_step_offset = 0
@@ -353,4 +365,3 @@ if __name__ == "__main__":
         print()
 
     #
-

@@ -101,4 +101,4 @@ labels:
   - "event_wakeup"
 
 # Inference
-inference_step_offset: 0
+inference_step_offset: null

@@ -9,7 +9,7 @@ from ..modelmodule.base_chunk import BaseChunkModule
 from ..utils.common import trace
 
 
-def run(cfg: DictConfig, module, datamodule):
+def run(cfg: DictConfig, module, datamodule) -> float | None:
     L.seed_everything(cfg.seed)
 
     with trace("load test dataloader"):
@@ -30,7 +30,7 @@ def run(cfg: DictConfig, module, datamodule):
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
         cfg.phase
-        if cfg.inference_step_offset <= 0
+        if cfg.inference_step_offset is None
         else f"{cfg.phase}-{cfg.inference_step_offset=}",
         f"{cfg.split.name}",
     )

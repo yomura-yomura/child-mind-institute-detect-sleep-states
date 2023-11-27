@@ -16,20 +16,19 @@ if __name__ == "__main__":
 
     # inference_step_offsets = np.arange(0, 24, 2) * 12 * 60
     # inference_step_offsets = np.arange(0, 24, 6) * 12 * 60
-    # inference_step_offsets = np.arange(0, 24, 4) * 12 * 60
-    inference_step_offsets = np.arange(0, 20, 4) * 12 * 60
+    inference_step_offsets = np.arange(0, 24, 4) * 12 * 60
+    # inference_step_offsets = np.arange(0, 20, 4) * 12 * 60
     event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
         "train"
     ).dropna()
+
+    pred_dir_path = project_root_path / "run" / "predicted" / exp_name
 
     scores = []
     for i_fold in range(5):
         print(f"fold {i_fold + 1}")
         target_pred_dir_paths = [
-            project_root_path
-            / "run"
-            / "predicted"
-            / exp_name
+            pred_dir_path
             / ("train" if inference_step_offset <= 0 else f"train-cfg.{inference_step_offset=}")
             / f"fold_{i_fold}"
             for inference_step_offset in inference_step_offsets
@@ -47,8 +46,12 @@ if __name__ == "__main__":
             df["step"] += inference_step_offset
             return df.set_index("step")
 
-        preds_df_dict = {
-            series_id: pd.concat(
+        target_pred_mean_dir_path = pred_dir_path / "train_mean" / f"fold_{i_fold}"
+        target_pred_mean_dir_path.mkdir(exist_ok=True, parents=True)
+        for series_id in tqdm.tqdm(series_ids):
+            if (target_pred_mean_dir_path / f"{series_id}.npz").exists():
+                continue
+            df = pd.concat(
                 [
                     apply(
                         np.load(target_pred_dir_path / f"{series_id}.npz")["arr_0"],
@@ -60,32 +63,24 @@ if __name__ == "__main__":
                 ],
                 axis=1,
             )
-            for series_id in tqdm.tqdm(series_ids)
-        }
-
-        def get_sub_df(series_id, df):
             preds = pd.concat([df.iloc[:, i::3].mean(axis=1) for i in range(3)], axis=1).to_numpy(
                 "f2"
             )
-            return cmi_dss_lib.utils.post_process.post_process_for_seg(
-                keys=[series_id] * len(preds),
-                preds=preds,
-                labels=["sleep", "event_onset", "event_wakeup"],
-                downsample_rate=2,
-                score_th=0.0005,
-                distance=96,
-            )
+            np.savez_compressed(target_pred_mean_dir_path / f"{series_id}.npz", preds)
 
-        sub_df = pd.concat(
-            [get_sub_df(series_id, df) for series_id, df in tqdm.tqdm(preds_df_dict.items())]
+        from calc_cv import calc_score
+
+        score = calc_score(
+            target_pred_mean_dir_path,
+            labels=["sleep", "event_onset", "event_wakeup"],
+            downsample_rate=2,
+            calc_type="normal",
+            # score_th=0.0005,
+            # distance=96,
+            score_th=1e-4,
+            distance=88,
+            n_records_per_series_id=1000,
         )
-
-        target_event_df = event_df[event_df["series_id"].isin(list(preds_df_dict.keys()))]
-        # score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-        #     target_event_df, sub_df
-        # )
-
-        score = cmi_dss_lib.utils.metrics.event_detection_ap(target_event_df, sub_df)
         scores.append(score)
         print(f"{score = :.4f}")
         print()

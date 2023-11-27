@@ -1,9 +1,10 @@
-- exp_name=s_exp009
+- exp_name=s_exp010
 - input_model_names=[ranchantan/exp047_retry,ranchantan/exp050-transformer-decoder_retry,jumtras/exp052,jumtras/exp053]
 
 - feature_extractor=LSTMFeatureExtractor
 #- model.segmentation_model_name=manet
 - model.encoder_name=resnet18
+- decoder=UNet1DDecoder
 
 - duration=17280  # 24h
 #- duration=8640  # 12h

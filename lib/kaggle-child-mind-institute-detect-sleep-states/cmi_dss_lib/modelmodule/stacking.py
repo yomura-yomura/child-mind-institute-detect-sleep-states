@@ -35,7 +35,7 @@ class StackingChunkModule(BaseChunkModule):
                 decoder_use_batchnorm=True,
                 in_channels=3,
                 classes=len(cfg.labels),
-            )
+                )
         else:
             raise ValueError(f"unexpected {cfg.model.segmentation_model_name=}")
 
@@ -72,7 +72,7 @@ class StackingChunkModule(BaseChunkModule):
                         n_classes=1,
                         num_time_steps=cfg.duration,
                     )
-                    for _ in range(3)
+                    for _ in range(len(self.cfg.labels))
                 ]
             )
             self.concat_linear = None
@@ -105,10 +105,7 @@ class StackingChunkModule(BaseChunkModule):
             x = self.concat_linear(x).squeeze(3)
         else:
             x = torch.stack(
-                [
-                    feature_extractor(x[:, i].permute(0, 2, 1))
-                    for i, feature_extractor in enumerate(self.decoders)
-                ],
+                [decoder(x[:, i].permute(0, 2, 1)) for i, decoder in enumerate(self.decoders)],
                 dim=1,
             ).squeeze(
                 3
