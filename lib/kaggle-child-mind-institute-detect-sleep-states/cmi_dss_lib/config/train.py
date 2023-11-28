@@ -99,10 +99,20 @@ class TrainConfig(DictConfig):
 @dataclasses.dataclass
 class PsuedoLabelConfig:
     use_psuedo: bool
+    save_psuedo: bool
+    save_path:str
+    use_version:int
+    v0:"PsuedoLabelv0Config"
+    v1:"PsuedoLabelv1Config"
+@dataclasses.dataclass
+class PsuedoLabelv0Config:
     path_psuedo:str
     th_sleep:float
     th_prop:float
 
+class PsuedoLabelv1Config:
+    path_psuedo:str
+    watch_interval:float
 @dataclasses.dataclass
 class TrainSplit(DictConfig):
     name: Literal["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]
