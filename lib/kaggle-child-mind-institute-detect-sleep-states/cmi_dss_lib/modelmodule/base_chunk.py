@@ -218,9 +218,8 @@ class BaseChunkModule(LightningModule):
         if len(self.validation_step_outputs) == 0:
             return
 
-        # n_jobs = -1
-        n_jobs = 1
-
+        n_jobs = -1
+        # n_jobs = 1
         # sub_df_list = []
         sub_df = pd.concat(
             joblib.Parallel(n_jobs=n_jobs)(

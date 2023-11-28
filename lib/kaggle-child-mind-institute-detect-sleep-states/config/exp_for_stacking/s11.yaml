@@ -1,4 +1,4 @@
-- exp_name=s_exp011_resume
+- exp_name=s_exp011_resume2
 - input_model_names=[19,27,50,53,55,58]
 
 - feature_extractor=LSTMFeatureExtractor
@@ -23,6 +23,6 @@
 
 - val_check_interval=100
 - check_val_every_n_epoch=null
-- val_after_steps=1000
+- val_after_steps=8000
 
 - labels=[event_onset,event_wakeup]

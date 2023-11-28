@@ -16,7 +16,11 @@ from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
+        # "../../config/exp_for_stacking/s11.yaml",
         "../../config/exp_for_stacking/s11.yaml",
+        "resume_from_checkpoint=../../output/train_stacking/s_exp011_resume"
+        # "--folds",
+        # "1,2,3,4"
         # "--folds", "1,2,3,4"
         # "--gpus",
         # "1",

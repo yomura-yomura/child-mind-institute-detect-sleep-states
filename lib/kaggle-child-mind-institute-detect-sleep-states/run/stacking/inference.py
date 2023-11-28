@@ -23,8 +23,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         "../../output/train_stacking/s_exp006",
         #
         # "phase=dev",
-        # "phase=train",
-        "phase=test",
+        "phase=train",
+        # "phase=test",
         # "batch_size=32",
         "batch_size=16",
     ]
@@ -65,7 +65,8 @@ def main(cfg: StackingConfig):
     datamodule = StackingDataModule(cfg)
 
     score = cmi_dss_lib.utils.inference.run(cfg, module, datamodule)
-    scores.append(score)
+    if score is not None:
+        scores.append(score)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,10 @@ def override_default_hydra_config(
                     print(f"Info: {k}={overrides_dict_[k]} is replaced with {k}={v}")
                 overrides_dict_[k] = v
         else:
-            k, v = p.split("=", maxsplit=1)
+            try:
+                k, v = p.split("=", maxsplit=1)
+            except ValueError:
+                raise ValueError(f"unexpected config_path_or_hydra_arguments: {p}")
             if k in overrides_dict_.keys():
                 print(f"Info: {k}={overrides_dict_[k]} is replaced with {k}={v}")
             overrides_dict_[k] = v

@@ -344,7 +344,6 @@ class TrainDataset(Dataset):
         label = get_label(
             this_event_df, list(self.cfg.labels), num_frames, self.cfg.duration, start, end
         )
-
         if "event_onset" in self.cfg.labels:
             i = list(self.cfg.labels).index("event_onset")
             label[:, [i]] = gaussian_label(
@@ -359,6 +358,8 @@ class TrainDataset(Dataset):
                 offset=self.cfg.offset_wakeup or self.cfg.offset,
                 sigma=self.cfg.sigma_wakeup or self.cfg.sigma,
             )
+        if np.isnan(label).any():
+            raise RuntimeError(f"encountered nan in label: {label}")
 
         return {
             "series_id": series_id,

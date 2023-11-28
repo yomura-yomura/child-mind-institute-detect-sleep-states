@@ -1,4 +1,5 @@
 import pathlib
+import warnings
 
 import lightning as L
 import numpy as np
@@ -78,4 +79,8 @@ def inference(
             preds = np.pad(preds, pad_width=[(0, 0), (0, 3 - len(labels))], constant_values=np.nan)
         preds = preds[:, [events.index(event) for event in all_events]]
 
-        np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
+        try:
+            np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds.astype("f2"))
+        except FloatingPointError:
+            warnings.warn(f"FloatingPointError encountered")
+            np.savez_compressed(pred_dir_path / f"{series_id}.npz", preds)
