@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 import hydra
+import lightning as L
 import pandas as pd
 import torch
 import tqdm
@@ -14,7 +15,7 @@ from omegaconf import DictConfig, OmegaConf
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
-# train_type = "train"
+train_type = "train"
 # exp_name = "exp005-lstm-feature"
 # exp_name = "exp005-lstm-feature-2"
 # exp_name = "exp014-lstm-feature"
@@ -43,9 +44,10 @@ project_root_path = pathlib.Path(__file__).parent.parent
 # exp_name = "exp060"
 # exp_name = "exp073_resume"
 # exp_name = "exp075-onset"
+exp_name = "exp088"
 
-train_type = "stacking"
-exp_name = "s_exp006"
+# train_type = "stacking"
+# exp_name = "s_exp006"
 
 # upload = False
 upload = True
@@ -56,7 +58,7 @@ def main(cfg: DictConfig):
     if train_type == "train":
         dataset_output_dir_path = project_root_path / "cmi-dss-ensemble-models" / "ranchantan"
         module = SegChunkModule.load_from_checkpoint(
-            f"{p}",
+            f"{best_model_path}",
             cfg=cfg,
             val_event_df=None,
             feature_dim=len(cfg.features),
@@ -66,25 +68,34 @@ def main(cfg: DictConfig):
         )
     elif train_type == "stacking":
         dataset_output_dir_path = project_root_path / "cmi-dss-ensemble-stacking-models"
-        module = StackingChunkModule.load_from_checkpoint(
-            f"{p}",
-            cfg=cfg,
-        )
+        # module = StackingChunkModule.load_from_checkpoint(
+        #     f"{best_model_path}",
+        #     cfg=cfg,
+        #     map_location="cpu",
+        # )
     else:
         raise ValueError(f"unexpected {train_type=}")
 
-    output_dir_path = dataset_output_dir_path / p.relative_to(train_output_dir_path).parent
+    output_dir_path = (
+        dataset_output_dir_path / best_model_path.relative_to(train_output_dir_path).parent
+    )
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
     (output_dir_path / ".hydra").mkdir(exist_ok=True)
     shutil.copy(
-        p.parent / ".hydra" / "overrides.yaml", output_dir_path / ".hydra" / "overrides.yaml"
+        best_model_path.parent / ".hydra" / "overrides.yaml",
+        output_dir_path / ".hydra" / "overrides.yaml",
     )
 
-    torch.save(
-        module.model.state_dict(),
-        output_dir_path / "best_model.pth",
-    )
+    if train_type == "train":
+        torch.save(
+            module.model.state_dict(),
+            output_dir_path / "best_model.pth",
+        )
+    elif train_type == "stacking":
+        shutil.copy(best_model_path, output_dir_path / "best.ckpt")
+    else:
+        raise ValueError(f"unexpected {train_type=}")
 
 
 if __name__ == "__main__":
@@ -112,11 +123,13 @@ if __name__ == "__main__":
     print(path_df)
 
     scores = []
-    for p, i_fold, version in tqdm.tqdm(path_df.itertuples(index=False)):
-        print(p.readlink().name)
-        scores.append(float(p.readlink().stem.split("EventDetectionAP=", maxsplit=1)[1]))
-        p = p.parent / p.readlink().name
-        overrides_args = OmegaConf.load(p.parent / ".hydra" / "overrides.yaml")
+    for best_model_path, i_fold, version in tqdm.tqdm(path_df.itertuples(index=False)):
+        print(best_model_path.readlink().name)
+        scores.append(
+            float(best_model_path.readlink().stem.split("EventDetectionAP=", maxsplit=1)[1])
+        )
+        best_model_path = best_model_path.parent / best_model_path.readlink().name
+        overrides_args = OmegaConf.load(best_model_path.parent / ".hydra" / "overrides.yaml")
         sys.argv = overrides_args
         main()
 
@@ -125,8 +138,8 @@ if __name__ == "__main__":
     if upload:
         if train_type == "train":
             dataset_metadata_json = {
-                "title": "CMI-DSS Segmentation Model",
-                "id": "ranchantan/cmi-dss-seg-model",
+                "title": "CMI-DSS Ensemble Models",
+                "id": "ranchantan/cmi-dss-ensemble-models",
                 "licenses": [{"name": "CC0-1.0"}],
             }
         else:

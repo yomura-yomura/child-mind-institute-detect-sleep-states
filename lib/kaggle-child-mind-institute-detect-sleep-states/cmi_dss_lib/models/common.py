@@ -15,7 +15,9 @@ from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtract
 from cmi_dss_lib.models.spec1D import Spec1D
 from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 
-from child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm_attention.model import FOGModel
+from child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm_attention.model import (
+    FOGModel,
+)
 
 from ..config import TrainConfig
 
@@ -33,7 +35,9 @@ DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
 
-def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: int) -> FEATURE_EXTRACTORS:
+def get_feature_extractor(
+    cfg: TrainConfig, feature_dim: int, num_time_steps: int
+) -> FEATURE_EXTRACTORS:
     feature_extractor: FEATURE_EXTRACTORS
     if cfg.feature_extractor.name == "CNNSpectrogram":
         assert cfg.model_dim == 2
@@ -116,8 +120,8 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
         )
     elif cfg.feature_extractor.name == "StackedAttentionLSTMFeatureExtractor":
         feature_extractor = FOGModel(
+            patch_size=cfg.feature_extractor.patch_size,
             duration=cfg.duration,
-            height=cfg.feature_extractor.height,
             n_features=feature_dim,
             n_encoder_layers=cfg.feature_extractor.n_encoder_layers,
             n_lstm_layers=cfg.feature_extractor.n_lstm_layers,
@@ -127,6 +131,7 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
             mha_n_heads=cfg.feature_extractor.mha_n_heads,
             mha_dropout=cfg.feature_extractor.mha_dropout,
         )
+        feature_extractor.height = cfg.feature_extractor.mha_embed_dim
         feature_extractor.out_chans = 1
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
@@ -134,7 +139,9 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
     return feature_extractor
 
 
-def get_decoder(cfg: TrainConfig, n_channels: int, n_classes: int, num_time_steps: int) -> DECODERS:
+def get_decoder(
+    cfg: TrainConfig, n_channels: int, n_classes: int, num_time_steps: int
+) -> DECODERS:
     decoder: DECODERS
     if cfg.decoder.name == "UNet1DDecoder":
         decoder = UNet1DDecoder(

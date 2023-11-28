@@ -339,6 +339,9 @@ class TrainDataset(Dataset):
             antialias=False,
         ).squeeze(0)
 
+        if not np.isfinite(feature).all():
+            raise RuntimeError(f"encountered nan/inf in feature: {feature}")
+
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(
@@ -358,8 +361,8 @@ class TrainDataset(Dataset):
                 offset=self.cfg.offset_wakeup or self.cfg.offset,
                 sigma=self.cfg.sigma_wakeup or self.cfg.sigma,
             )
-        if np.isnan(label).any():
-            raise RuntimeError(f"encountered nan in label: {label}")
+        if not np.isfinite(label).all():
+            raise RuntimeError(f"encountered nan/inf in label: {label}")
 
         return {
             "series_id": series_id,

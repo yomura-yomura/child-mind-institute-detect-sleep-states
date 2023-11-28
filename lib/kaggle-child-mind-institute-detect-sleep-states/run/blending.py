@@ -30,16 +30,16 @@ post_process_modes = {
     # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
     #     watch_interval_hour=7.5, sleep_occupancy_th=0.03
     # ),
-    "cutting_probs_by_sleep_prob": dict(
-        onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-            watch_interval_hour=7.5,
-            sleep_occupancy_th=0.04,
-        ),
-        wakeup=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-            watch_interval_hour=6.0,
-            sleep_occupancy_th=0.03,
-        ),
-    )
+    # "cutting_probs_by_sleep_prob": dict(
+    #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #         watch_interval_hour=7.5,
+    #         sleep_occupancy_th=0.04,
+    #     ),
+    #     wakeup=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #         watch_interval_hour=6.0,
+    #         sleep_occupancy_th=0.03,
+    #     ),
+    # )
 }
 
 
@@ -82,6 +82,8 @@ all_model_dir_path_dict = {
     "60": ranchantan_pred_dir_path / "exp060",
     "73": ranchantan_pred_dir_path / "exp073_resume",
     "75": ranchantan_pred_dir_path / "exp075-wakeup_5",
+    "85": jumtras_pred_dir_path / "exp085",
+    "88": jumtras_pred_dir_path / "exp088",
 } | {
     "s6": stacking_pred_dir_path / "s_exp006",
 }
@@ -103,7 +105,21 @@ all_model_dir_path_dict = {
 # weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
 # weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
 # weight_dict = {"19": 0.1, "27": 0.1, "50": 0.2, "53": 0.3, "55": 0.1, "58": 0.2}  # 23
-weight_dict = {"19": 0.1, "50": 0.2, "53": 0.2, "s6": 0.3, "58": 0.2}
+# weight_dict = {"19": 0.1, "50": 0.2, "53": 0.2, "s6": 0.3, "58": 0.2}
+
+# weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
+# weight_dict = {"19": 0.05, "27": 0.05, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
+weight_dict = {
+    # "7": 0.05,
+    "19": 0.05,
+    "27": 0.05,
+    "50": 0.2,
+    "53": 0.3,
+    "58": 0.1,
+    "85": 0.2,
+    "88": 0.1,
+}
+
 
 score_th = 0.005
 distance = 96
@@ -119,7 +135,7 @@ if __name__ == "__main__":
     args = parser.parse_args(args)
 
     weight_dict = {str(k): v for k, v in weight_dict.items()}
-    assert sum(weight_dict.values()) == 1
+    assert np.isclose(sum(weight_dict.values()), 1), sum(weight_dict.values())
     print(f"{len(weight_dict) = }")
 
     folds = sorted(map(int, set(args.folds.split(","))))

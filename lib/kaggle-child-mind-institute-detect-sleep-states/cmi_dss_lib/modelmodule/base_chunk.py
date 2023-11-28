@@ -90,6 +90,8 @@ class BaseChunkModule(LightningModule):
 
         output = self.forward(batch, do_mixup=do_mixup, do_cutmix=do_cutmix)
         loss: torch.Tensor = output["loss"]
+        if not torch.isfinite(loss):
+            raise RuntimeError(f"encountered nan/inf loss: {loss}")
         # logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
         self.log(
             f"train_loss",
@@ -127,7 +129,8 @@ class BaseChunkModule(LightningModule):
         output = self.forward(batch)
         loss = output["loss"].detach().item() if "loss" in output.keys() else None
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
-
+        if torch.isnan(logits).any():
+            raise RuntimeError(f"encountered nan in logits: {logits}")
         resized_probs = resize(
             logits.sigmoid().detach().cpu(),
             size=[self.duration, logits.shape[2]],

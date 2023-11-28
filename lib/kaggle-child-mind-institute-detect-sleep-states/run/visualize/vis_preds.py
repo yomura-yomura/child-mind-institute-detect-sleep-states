@@ -308,11 +308,15 @@ if __name__ == "__main__":
             if len(target_event_df) == 0:
                 score_onset = score_wakeup = np.nan
             else:
-                score_dict = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
+                metric_dict = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
                     target_event_df, sub_df, n_jobs=1
                 )
-                score_onset = np.mean(score_dict["onset"])
-                score_wakeup = np.mean(score_dict["wakeup"])
+                score_onset = np.mean(
+                    [metric["average_precision"] for metric in metric_dict["onset"]]
+                )
+                score_wakeup = np.mean(
+                    [metric["average_precision"] for metric in metric_dict["wakeup"]]
+                )
 
             records.append(
                 {

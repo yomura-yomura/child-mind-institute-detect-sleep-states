@@ -18,9 +18,10 @@ import child_mind_institute_detect_sleep_states.pj_struct_paths
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        # "../../output/train_stacking/s_exp006",
-        # "../../cmi-dss-ensemble-stacking-models/s_exp006",
         "../../output/train_stacking/s_exp006",
+        # "../../cmi-dss-ensemble-stacking-models/s_exp006",
+        # "../../output/train_stacking/s_exp006",
+        # "../../output/train_stacking/s_exp011_resume",
         #
         # "phase=dev",
         "phase=train",
@@ -37,16 +38,11 @@ project_root_path = pathlib.Path(__file__).parent.parent.parent
 def load_model(cfg: StackingConfig) -> L.LightningModule:
     model_fold_dir_path = pathlib.Path(cfg.dir.model_dir)
 
-    if (weight_path := model_fold_dir_path / "best.ckpt").exists():
-        module = StackingChunkModule.load_from_checkpoint(
-            weight_path,
-            cfg=cfg,
-        )
-    else:
-        module = StackingChunkModule(cfg)
-
-        weight_path = model_fold_dir_path / "best_model.pth"
-        module.model.load_state_dict(torch.load(weight_path))
+    weight_path = model_fold_dir_path / "best.ckpt"
+    module = StackingChunkModule.load_from_checkpoint(
+        weight_path,
+        cfg=cfg,
+    )
     print(f'load weight from "{weight_path}"')
 
     return module

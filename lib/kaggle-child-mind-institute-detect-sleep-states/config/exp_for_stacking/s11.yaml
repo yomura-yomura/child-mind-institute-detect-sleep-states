@@ -1,4 +1,4 @@
-- exp_name=s_exp011_resume2
+- exp_name=s_exp011_retry
 - input_model_names=[19,27,50,53,55,58]
 
 - feature_extractor=LSTMFeatureExtractor
@@ -12,7 +12,7 @@
 - batch_size=4
 - optimizer.lr=0.00005
 
-- use_amp=true
+#- use_amp=true
 
 #- sigma=108
 #- offset=24
@@ -23,6 +23,6 @@
 
 - val_check_interval=100
 - check_val_every_n_epoch=null
-- val_after_steps=8000
+- val_after_steps=5000
 
 - labels=[event_onset,event_wakeup]

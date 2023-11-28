@@ -18,14 +18,17 @@ from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "../config/exp/50_resume.yaml",
+        # "../config/exp/50_resume.yaml",
+        "../config/exp/96.yaml",
         # "--folds", "1,2,3,4"
     ]
 else:
     args = None
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s:%(name)s - %(message)s"
+)
 LOGGER = logging.getLogger(Path(__file__).name)
 
 
@@ -42,7 +45,9 @@ def main(cfg: TrainConfig):
     datamodule = SegDataModule(cfg)
     LOGGER.info("Set Up DataModule")
 
-    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    model_save_dir_path = (
+        project_root_path / cfg.dir.output_dir / "train" / cfg.exp_name / cfg.split.name
+    )
 
     module = SegChunkModule(
         cfg=cfg,
@@ -91,7 +96,9 @@ def main(cfg: TrainConfig):
     if cfg.resume_from_checkpoint is None:
         resume_from_checkpoint = None
     else:
-        resume_from_checkpoint = os.path.join(cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt")
+        resume_from_checkpoint = os.path.join(
+            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
+        )
         if not os.path.exists(resume_from_checkpoint):
             raise FileNotFoundError(resume_from_checkpoint)
         print(f"Info: Training resumes from {resume_from_checkpoint}")
