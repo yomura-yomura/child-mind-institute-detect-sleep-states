@@ -29,7 +29,7 @@ phase: train
 scale_type: constant
 
 # training
-epoch: 50
+epoch: 70
 #batch_size: 64
 batch_size: 32  # 0.0005
 #batch_size: 16
@@ -73,19 +73,19 @@ sampling_with_start_timing_hour: false
 
 early_stopping_patience: 20
 
-# PsuedoLabeling
-psuedo_label:
-  use_psuedo: False
-  save_psuedo: False
+# PseudoLabeling
+Pseudo_label:
+  use_Pseudo: False
+  save_Pseudo: False
   save_path: None
   use_version: 1
 
   v0:
-    path_psuedo: None
+    path_Pseudo: None
     th_sleep: 0.9
     th_prop: 0.5
   v1:
-    path_psuedo: None
+    path_Pseudo: None
     watch_interval: 2
 
 # augmentation
@@ -121,8 +121,8 @@ features:
 
 # optimizer
 optimizer:
-  lr: 0.0005
-#  lr: 0.00025
+#  lr: 0.0005
+  lr: 0.00025
 
 # scheduler
 scheduler:

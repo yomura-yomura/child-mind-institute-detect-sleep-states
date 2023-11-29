@@ -14,12 +14,7 @@ i_fold = 0
 hydra.initialize(config_path="../conf", version_base="1.2")
 
 overrides_yaml_path = (
-    project_root_path
-    / "cmi-dss-ensemble-models"
-    / exp_name
-    / f"fold_{i_fold + 1}"
-    / ".hydra"
-    / "overrides.yaml"
+    project_root_path / "cmi-dss-ensemble-models" / exp_name / f"fold_{i_fold + 1}" / ".hydra" / "overrides.yaml"
 )
 assert overrides_yaml_path.exists()
 
