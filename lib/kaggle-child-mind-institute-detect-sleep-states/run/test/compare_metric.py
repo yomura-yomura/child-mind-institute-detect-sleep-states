@@ -44,9 +44,7 @@ for i in range(5):
         )
     sub_df = pd.concat(sub_df_list)
 
-    d = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
-        event_df, sub_df
-    )
+    d = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(event_df, sub_df)
     print(d)
     print()
 
@@ -55,9 +53,7 @@ for i in range(5):
     fig = px.imshow(
         np.stack([d["onset"], d["wakeup"]], axis=0),
         title=f"fold {i + 1}",
-        x=list(
-            map(str, child_mind_institute_detect_sleep_states.score.event_detection_ap.TOLERANCES)
-        ),
+        x=list(map(str, child_mind_institute_detect_sleep_states.score.event_detection_ap.TOLERANCES)),
         y=["onset", "wakeup"],
         text_auto=".2f",
     )

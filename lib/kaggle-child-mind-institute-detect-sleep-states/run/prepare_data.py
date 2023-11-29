@@ -130,9 +130,7 @@ def add_rolling_features(this_series_df: pl.DataFrame) -> pl.DataFrame:
     return this_series_df
 
 
-def save_each_series(
-    this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool
-):
+def save_each_series(this_series_df: pl.DataFrame, columns: list[str], output_dir: pathlib.Path, save_as_npz: bool):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for col_name in columns:
@@ -146,9 +144,7 @@ def save_each_series(
 @hydra.main(config_path="conf", config_name="prepare_data", version_base="1.2")
 def main(cfg: PrepareDataConfig):
     data_versions = cfg.data_version.split("+")
-    processed_dir = (
-        pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
-    )
+    processed_dir = pathlib.Path(cfg.dir.output_dir).resolve() / "prepare_data" / cfg.phase / cfg.scale_type
     print(f"{processed_dir = }")
 
     # # ディレクトリが存在する場合は削除
@@ -200,18 +196,8 @@ def main(cfg: PrepareDataConfig):
 
         if "v1" in data_versions or "v2" in data_versions:
             series_df = series_df.with_columns(
-                pl.col("anglez")
-                .diff(n=1)
-                .over("series_id")
-                .fill_null(0)
-                .cast(pl.Float32)
-                .alias("anglez_lag_diff"),
-                pl.col("enmo")
-                .diff(n=1)
-                .over("series_id")
-                .fill_null(0)
-                .cast(pl.Float32)
-                .alias("enmo_lag_diff"),
+                pl.col("anglez").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("anglez_lag_diff"),
+                pl.col("enmo").diff(n=1).over("series_id").fill_null(0).cast(pl.Float32).alias("enmo_lag_diff"),
             ).with_columns(
                 pl.col("anglez_lag_diff").abs().cast(pl.Float32).alias("anglez_lag_diff_abs"),
                 pl.col("enmo_lag_diff").abs().cast(pl.Float32).alias("enmo_lag_diff_abs"),
@@ -290,9 +276,9 @@ def main(cfg: PrepareDataConfig):
             feature_names_to_preprocess = ["anglez", "enmo"]
 
             for feature_name in feature_names_to_preprocess:
-                series_df[[feature_name]] = (
-                    series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]
-                ) / STD_DICT[feature_name]
+                series_df[[feature_name]] = (series_df[[feature_name]].to_numpy() - MEAN_DICT[feature_name]) / STD_DICT[
+                    feature_name
+                ]
         elif cfg.scale_type == "robust_scaler":
             preprocessing_scaler_dir = pathlib.Path(cfg.dir.preprocessing_scaler_dir)
 
@@ -378,9 +364,7 @@ def main(cfg: PrepareDataConfig):
             # 特徴量をそれぞれnpy/npzで保存
 
             series_dir = processed_dir / series_id
-            save_each_series(
-                this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
-            )
+            save_each_series(this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz)
 
 
 if __name__ == "__main__":

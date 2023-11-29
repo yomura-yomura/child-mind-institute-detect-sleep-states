@@ -30,9 +30,7 @@ def run(cfg: DictConfig, module, datamodule) -> float | None:
         cfg.dir.sub_dir,
         "predicted",
         *pathlib.Path(cfg.dir.model_dir).parts[-3:-1],
-        cfg.phase
-        if cfg.inference_step_offset is None
-        else f"{cfg.phase}-{cfg.inference_step_offset=}",
+        cfg.phase if cfg.inference_step_offset is None else f"{cfg.phase}-{cfg.inference_step_offset=}",
         f"{cfg.split.name}",
     )
 
@@ -64,15 +62,12 @@ def inference(
     all_events = ["sleep", "onset", "wakeup"]
     left_events = all_events.copy()
     events = [
-        left_events.pop(left_events.index(label[6:] if label.startswith("event_") else label))
-        for label in labels
+        left_events.pop(left_events.index(label[6:] if label.startswith("event_") else label)) for label in labels
     ]
     for event in left_events:
         events.append(event)
 
-    for series_id, preds in BaseChunkModule._evaluation_epoch_end(
-        [pred for preds in predictions for pred in preds]
-    ):
+    for series_id, preds in BaseChunkModule._evaluation_epoch_end([pred for preds in predictions for pred in preds]):
         assert preds.shape[-1] == len(labels)
 
         if len(labels) < 3:

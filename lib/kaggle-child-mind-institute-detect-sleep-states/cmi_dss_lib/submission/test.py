@@ -44,8 +44,7 @@ def create_submission_csv(
             ]
             if not use_stacking:
                 weight = model_dir_path_info_dict[
-                    "/kaggle/input/cmi-dss-ensemble-models/"
-                    + "/".join(predicted_mean_dir_path.parts[-4:-2])
+                    "/kaggle/input/cmi-dss-ensemble-models/" + "/".join(predicted_mean_dir_path.parts[-4:-2])
                 ][0]
                 folded_preds *= weight
 

@@ -19,9 +19,7 @@ if __name__ == "__main__":
 
     keys_dict, preds_dict = get_keys_and_preds([model_dir_path])
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     import pandas as pd
 
@@ -75,9 +73,7 @@ if __name__ == "__main__":
             how="cross",
         ).to_numpy()
 
-        def calc_all_scores(
-            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
-        ):
+        def calc_all_scores(grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"):
             # sleep_occupancy_th, watch_interval_hour = grid_parameter
             (
                 sleep_occupancy_th_onset,
@@ -125,9 +121,7 @@ if __name__ == "__main__":
             how="cross",
         ).to_numpy()
 
-        def calc_all_scores(
-            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
-        ):
+        def calc_all_scores(grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"):
             sleep_prob_th, min_sleeping_hours = grid_parameter
 
             scores = [
@@ -141,9 +135,7 @@ if __name__ == "__main__":
                     distance=distance,
                     calc_type=calc_type,
                     post_process_modes=dict(
-                        sleeping_edges_as_probs=dict(
-                            sleep_prob_th=sleep_prob_th, min_sleeping_hours=min_sleeping_hours
-                        )
+                        sleeping_edges_as_probs=dict(sleep_prob_th=sleep_prob_th, min_sleeping_hours=min_sleeping_hours)
                     ),
                     print_msg=False,
                 )

@@ -2,8 +2,8 @@ import dataclasses
 from typing import Literal
 
 from omegaconf import DictConfig
-from .dir import DirConfig
 
+from .dir import DirConfig
 
 __all__ = ["PrepareDataConfig"]
 

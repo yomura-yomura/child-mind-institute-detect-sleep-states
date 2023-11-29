@@ -22,16 +22,12 @@ def get_kde() -> gaussian_kde:
 
 
 if __name__ == "__main__":
-    df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
-        "train", as_polars=True
-    )
+    df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df("train", as_polars=True)
     df = (
         df.group_by("series_id")
         .head(1)
         .with_columns(pl.col("timestamp").str.to_datetime())
-        .with_columns(
-            start_timing_hour=pl.col("timestamp").dt.hour() + pl.col("timestamp").dt.minute() / 60
-        )
+        .with_columns(start_timing_hour=pl.col("timestamp").dt.hour() + pl.col("timestamp").dt.minute() / 60)
         .collect()
     )
     assert all(df["timestamp"].dt.minute().unique() == [0, 15, 30, 45])
@@ -41,9 +37,9 @@ if __name__ == "__main__":
 
     kde = get_kde()
 
-    fig = px.histogram(
-        x=data, histnorm="probability density", barmode="group", nbins=25
-    ).update_traces(name="data", showlegend=True)
+    fig = px.histogram(x=data, histnorm="probability density", barmode="group", nbins=25).update_traces(
+        name="data", showlegend=True
+    )
     x = np.arange(13, 24, 0.1)
     fig.add_trace(dict(name="kde", mode="lines", x=x, y=kde(x)))
 
