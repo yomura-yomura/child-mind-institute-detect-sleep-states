@@ -50,6 +50,7 @@ offset_wakeup: null
 
 bg_sampling_rate: 0.5
 sampling_with_start_timing_hour: false
+fix_start_timing_hour_with: null
 
 scale_type: null
 

@@ -71,6 +71,7 @@ class TrainConfig(DictConfig):
 
     bg_sampling_rate: float
     sampling_with_start_timing_hour: bool
+    fix_start_timing_hour_with: float | None
 
     # Train
     epoch: int

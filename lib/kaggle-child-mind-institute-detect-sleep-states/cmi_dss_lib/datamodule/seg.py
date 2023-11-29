@@ -245,7 +245,7 @@ def get_labeling_interval(
         )
     pseudo_interval[:, 0] += buffer
     pseudo_interval[:, 1] -= buffer
-    return Pseudo_interval
+    return pseudo_interval
 
 
 ###################
@@ -313,6 +313,7 @@ class TrainDataset(Dataset):
         ]
 
         if self.cfg.sampling_with_start_timing_hour:
+            assert self.cfg.fix_start_timing_hour_with is None
             assert self.cfg.duration == 17280
             assert self.cfg.prev_margin_steps == self.cfg.next_margin_steps == 0
             from run.anl_start_timing_for_each_series_id import get_kde, get_start_timing_hour_dict
@@ -322,6 +323,14 @@ class TrainDataset(Dataset):
         else:
             self.start_timing_hour_dict = None
             self.start_timing_hour_sampler = None
+
+        if self.cfg.fix_start_timing_hour_with is not None:
+            assert not self.cfg.sampling_with_start_timing_hour
+
+            from run.anl_start_timing_for_each_series_id import get_start_timing_hour_dict
+
+            self.start_timing_hour_dict = get_start_timing_hour_dict()
+            self.start_timing_hour = self.cfg.fix_start_timing_hour_with
 
     def __len__(self):
         return len(self.event_df)
@@ -349,9 +358,14 @@ class TrainDataset(Dataset):
             pos = self.event_df.at[idx, event]
 
         # crop
-        if self.cfg.sampling_with_start_timing_hour:
+        if self.cfg.sampling_with_start_timing_hour or self.cfg.fix_start_timing_hour_with:
             this_start_hour = self.start_timing_hour_dict[series_id]
-            sampled_start_hour = self.start_timing_hour_sampler.resample(size=1)[0][0]
+            if self.cfg.sampling_with_start_timing_hour:
+                sampled_start_hour = self.start_timing_hour_sampler.resample(size=1)[0][0]
+            elif self.cfg.fix_start_timing_hour_with:
+                sampled_start_hour = self.start_timing_hour
+            else:
+                assert False
 
             pos_to_sample = np.arange(pos - self.cfg.duration, pos) + 1
             hours_to_sample = (this_start_hour + pos_to_sample / (12 * 60)) % 24
@@ -367,12 +381,12 @@ class TrainDataset(Dataset):
                     ]
                 ]
             )
-            if start < 0:
-                warnings.warn("pos < 0", UserWarning)
-                start = max(start, 0)
-            if start > n_steps - self.cfg.duration:
-                warnings.warn("pos > n_steps - duration", UserWarning)
-                start = min(start, n_steps - self.cfg.duration)
+            # if start < 0:
+            #     warnings.warn("pos < 0", UserWarning)
+            #     start = max(start, 0)
+            # if start > n_steps - self.cfg.duration:
+            #     warnings.warn("pos > n_steps - duration", UserWarning)
+            #     start = min(start, n_steps - self.cfg.duration)
             end = start + self.cfg.duration
         else:
             start, end = random_crop(
@@ -380,8 +394,16 @@ class TrainDataset(Dataset):
                 self.cfg.duration,
                 n_steps,
             )
-
-        feature = this_feature[..., start:end, :]  # (..., duration, num_features)
+        if start >= 0:
+            feature = this_feature[..., start:end, :]
+        else:
+            n_steps_to_pad = -start
+            start = 0
+            feature = np.pad(
+                this_feature[..., start:end, :],
+                pad_width=[*([(0, 0)] * (this_feature.ndim - 2)), (n_steps_to_pad, 0), (0, 0)],
+            )
+        # feature: (..., duration, num_features)
 
         # upsample
         feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(0)

@@ -52,9 +52,24 @@ def calc_score(
         )
     ]
 
+    import cmi_dss_lib.data.utils
+
+    start_timing_dict = cmi_dss_lib.data.utils.get_start_timing_dict("train")
+
     sub_df_list = []
     for series_id in tqdm.tqdm(series_ids):
         preds = np.load(predicted_fold_dir_path / f"{series_id}.npz")["arr_0"]
+        timing = (
+            pd.Series(np.arange(preds.shape[0]).astype("m8[s]") * 5) + start_timing_dict[series_id]
+        )
+        sel = ((13 <= timing.dt.hour) & (timing.dt.hour <= 18)).to_numpy(bool)
+        print(series_id, preds[sel].max(axis=0))
+        preds[sel, 1] = 0
+
+        sel = ((20 <= timing.dt.hour) | (timing.dt.hour <= 3)).to_numpy(bool)
+        print(series_id, preds[sel].max(axis=0))
+        preds[sel, 2] = 0
+
         sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             series_id,
             preds,
@@ -64,13 +79,9 @@ def calc_score(
             distance=distance,
             post_process_modes=post_process_modes,
         )
-
         if n_records_per_series_id is not None:
-            sub_df = (
-                sub_df.drop(columns=["row_id"])
-                .sort_values(["score"], ascending=False)
-                .head(n_records_per_series_id)
-            )
+            sub_df = sub_df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
+        print(f"{len(sub_df) = }")
         sub_df_list.append(sub_df)
     sub_df = pd.concat(sub_df_list)
     # sub_df["night"] = sub_df["step"] // (12 * 60 * 24)
@@ -98,10 +109,10 @@ if __name__ == "__main__":
         # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
         #     sleep_prob_th=0.2, min_sleeping_hours=6
         # ),
-        "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-            watch_interval_hour=7.5,
-            sleep_occupancy_th=0.03,
-        ),
+        # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        #     watch_interval_hour=7.5,
+        #     sleep_occupancy_th=0.03,
+        # ),
         # "cutting_probs_by_sleep_prob": dict(
         #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
         #         watch_interval_hour=7.5,
@@ -120,11 +131,11 @@ if __name__ == "__main__":
         score = calc_score(
             predicted_fold_dir_path,
             labels=["sleep", "event_onset", "event_wakeup"],
-            # score_th=1e-4,
-            # distance=88,
-            # n_records_per_series_id=1000,
-            score_th=0.005,
-            distance=96,
+            score_th=1e-4,
+            distance=88,
+            n_records_per_series_id=1000,
+            # score_th=0.005,
+            # distance=96,
             downsample_rate=2,
             calc_type="normal",
             post_process_modes=post_process_modes,
