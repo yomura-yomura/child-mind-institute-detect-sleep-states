@@ -105,8 +105,8 @@ class TrainConfig(DictConfig):
 
 @dataclasses.dataclass
 class PseudoLabelConfig:
-    use_Pseudo: bool
-    save_Pseudo: bool
+    use_pseudo: bool
+    save_pseudo: bool
     save_path: str
     use_version: int
     v0: "PseudoLabelV0Config"
@@ -115,13 +115,13 @@ class PseudoLabelConfig:
 
 @dataclasses.dataclass
 class PseudoLabelV0Config:
-    path_Pseudo: str
+    path_pseudo: str
     th_sleep: float
     th_prop: float
 
 
 class PseudoLabelv1Config:
-    path_Pseudo: str
+    path_pseudo: str
     watch_interval: float
 
 

@@ -230,14 +230,14 @@ def get_labeling_interval(
     this_event_df: pd.DataFrame, max_steps: int, th_nan_label: int = 24 * 60 * 12, buffer: int = 8 * 60 * 12
 ):
     this_event_df["shift_onset"] = this_event_df["onset"].shift(-1).fillna(max_steps)
-    Pseudo_interval = this_event_df[this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label][
+    pseudo_interval = this_event_df[this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label][
         ["wakeup", "shift_onset"]
     ].values
     first_onset = this_event_df.head(1)["onset"].values[0]
     if first_onset >= th_nan_label:
-        Pseudo_interval = np.concatenate([np.array([[-buffer, first_onset + buffer]]), Pseudo_interval])
-    Pseudo_interval[:, 0] += buffer
-    Pseudo_interval[:, 1] -= buffer
+        pseudo_interval = np.concatenate([np.array([[-buffer, first_onset + buffer]]), pseudo_interval])
+    pseudo_interval[:, 0] += buffer
+    pseudo_interval[:, 1] -= buffer
     return Pseudo_interval
 
 
@@ -274,13 +274,13 @@ class TrainDataset(Dataset):
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
-        self.use_pseudo_label = self.cfg.pseudo_label.use_Pseudo
+        self.use_pseudo_label = self.cfg.pseudo_label.use_pseudo
         if self.use_pseudo_label:
-            self.Pseudo_version = self.cfg.pseudo_label.use_version
+            self.pseudo_version = self.cfg.pseudo_label.use_version
 
             # Pseudo label version 0
-            if self.Pseudo_version == 0:
-                self.id_to_pseudo_label = load_predicted(self.cfg.pseudo_label.v0.path_Pseudo)
+            if self.pseudo_version == 0:
+                self.id_to_pseudo_label = load_predicted(self.cfg.pseudo_label.v0.path_pseudo)
                 self.id_to_label_interval = {}
                 for s_id, df in self.event_df.groupby("series_id"):
                     self.id_to_label_interval[s_id] = (
@@ -291,8 +291,8 @@ class TrainDataset(Dataset):
                     )
 
             # Pseudo label version 1
-            elif self.Pseudo_version == 1:
-                self.df_pseudo_label = pd.read_csv(self.cfg.pseudo_label.v1.path_Pseudo)
+            elif self.pseudo_version == 1:
+                self.df_pseudo_label = pd.read_csv(self.cfg.pseudo_label.v1.path_pseudo)
 
         self.available_target_labels = [mapping[label] for label in self.cfg.labels if label in mapping]
 
@@ -385,7 +385,7 @@ class TrainDataset(Dataset):
         label = get_label(this_event_df, list(self.cfg.labels), num_frames, self.cfg.duration, start, end)
 
         # 正解ラベル周辺の予測値を使った疑似ラベリング
-        if self.use_pseudo_label and self.Pseudo_version == 1:
+        if self.use_pseudo_label and self.pseudo_version == 1:
             label = self.pseudo_labeling(label=label, start=start, end=end, num_frames=num_frames, series_id=series_id)
 
         target_indices = []
@@ -407,13 +407,13 @@ class TrainDataset(Dataset):
             raise RuntimeError(f"encountered nan/inf in label: {label}")
             target_indices.append(list(self.cfg.labels).index("event_wakeup"))
 
-        # if not self.use_pseudo_label and not self.Pseudo_version == 1:
+        # if not self.use_pseudo_label and not self.pseudo_version == 1:
         # label[:, target_indices] = gaussian_label(
         #    label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
         # )
 
         # ラベルがない区間の疑似ラベリング
-        if self.use_pseudo_label and self.Pseudo_version == 0:
+        if self.use_pseudo_label and self.pseudo_version == 0:
             label = self.pseudo_labeling(label=label, start=start, end=end, num_frames=num_frames, series_id=series_id)
 
         return {
@@ -427,19 +427,19 @@ class TrainDataset(Dataset):
 
         # ver0 ラベルがない場所に疑似ラベリング
 
-        if self.Pseudo_version == 0:
+        if self.pseudo_version == 0:
             th_sleep = self.cfg.pseudo_label.v0.th_sleep
             th_prop = self.cfg.pseudo_label.v0.th_prop
-            Pseudo_idx = np.arange(start // self.cfg.downsample_rate, end // self.cfg.downsample_rate)
-            is_Pseudo = False
+            pseudo_idx = np.arange(start // self.cfg.downsample_rate, end // self.cfg.downsample_rate)
+            is_pseudo = False
             for wakeup, onset in self.id_to_label_interval[series_id]:
-                mask = (Pseudo_idx >= wakeup) & (Pseudo_idx <= onset)
+                mask = (pseudo_idx >= wakeup) & (pseudo_idx <= onset)
                 if np.any(mask):
-                    is_Pseudo = True
+                    is_pseudo = True
                     break
 
-            if is_Pseudo:
-                Pseudo_idx = np.arange(num_frames)[mask]
+            if is_pseudo:
+                pseudo_idx = np.arange(num_frames)[mask]
 
                 # Pseudo labelを呼び出し
                 pseudo_label = self.id_to_pseudo_label[series_id].reshape(-1, 3)[start:end]
@@ -455,7 +455,7 @@ class TrainDataset(Dataset):
                     .squeeze(0)
                     .numpy()
                 )
-                pseudo_label = pseudo_label[Pseudo_idx]
+                pseudo_label = pseudo_label[pseudo_idx]
 
                 # crop sleep
                 pseudo_label[:, 0] = np.where(pseudo_label[:, 0] <= th_sleep, 0, pseudo_label[:, 0])
@@ -465,19 +465,19 @@ class TrainDataset(Dataset):
                 pseudo_label[:, 2] = np.where(pseudo_label[:, 2] <= th_prop, 0, pseudo_label[:, 2])
                 # ori_lab = copy.deepcopy(label)
 
-                label[Pseudo_idx] = pseudo_label
-        elif self.Pseudo_version == 1:
+                label[pseudo_idx] = pseudo_label
+        elif self.pseudo_version == 1:
             watch_interval = 12 * 60 * self.cfg.pseudo_label.v1.watch_interval
             th_min_interval = 12 * 10  # 10min
-            df_Pseudo = self.df_pseudo_label.query("series_id == @series_id & step <= @end & step >= @start")
-            # save Pseudo label
-            if self.cfg.pseudo_label.save_Pseudo:
+            df_pseudo = self.df_pseudo_label.query("series_id == @series_id & step <= @end & step >= @start")
+            # save pseudo label
+            if self.cfg.pseudo_label.save_pseudo:
                 did_labeling = False
                 ori_label = copy.deepcopy(label)
 
-            if not df_Pseudo.empty:
+            if not df_pseudo.empty:
                 labels = list(self.cfg.labels)
-                for idx, event, score in df_Pseudo[["step", "event", "score"]].values:
+                for idx, event, score in df_pseudo[["step", "event", "score"]].values:
                     # idxのwatch_interval間に正解ラベルが存在しないか判定
                     not_exist_true_label = self.event_df[event][idx - watch_interval : idx + watch_interval].empty
 
@@ -524,13 +524,13 @@ class TrainDataset(Dataset):
             # NOTE:
             label[label > 1] = 1
 
-            # save Pseudo label (疑似ラベリングの付与したときのみにファイル保存)
-            if self.cfg.pseudo_label.save_Pseudo:
+            # save pseudo label (疑似ラベリングの付与したときのみにファイル保存)
+            if self.cfg.pseudo_label.save_pseudo:
                 ori_label[:, target_indices] = gaussian_label(
                     ori_label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
                 )
 
-                # save Pseudo
+                # save pseudo
                 if did_labeling:
                     path = Path(self.cfg.pseudo_label.save_path)
                     if not path.exists():
@@ -538,7 +538,7 @@ class TrainDataset(Dataset):
                     np.savez(
                         Path(path) / f"{series_id}_{start}_{end}.npz",
                         label=ori_label,
-                        Pseudo=label,
+                        pseudo=label,
                         start=np.array([start]),
                         end=np.array([end]),
                     )

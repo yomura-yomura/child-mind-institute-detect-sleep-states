@@ -75,17 +75,17 @@ early_stopping_patience: 20
 
 # PseudoLabeling
 pseudo_label:
-  use_Pseudo: False
-  save_Pseudo: False
+  use_pseudo: False
+  save_pseudo: False
   save_path: None
   use_version: 1
 
   v0:
-    path_Pseudo: None
+    path_pseudo: None
     th_sleep: 0.9
     th_prop: 0.5
   v1:
-    path_Pseudo: None
+    path_pseudo: None
     watch_interval: 2
 
 # augmentation
