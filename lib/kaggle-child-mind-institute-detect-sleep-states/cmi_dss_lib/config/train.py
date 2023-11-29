@@ -37,7 +37,7 @@ class TrainConfig(DictConfig):
     scale_type: Literal["constant", "robust_scaler"]
 
     # Pseudo labeling
-    Pseudo_label: "PseudoLabelConfig"
+    pseudo_label: "PseudoLabelConfig"
 
     # weight
 

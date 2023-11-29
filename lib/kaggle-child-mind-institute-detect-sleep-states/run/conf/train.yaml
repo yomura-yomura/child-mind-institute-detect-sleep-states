@@ -74,7 +74,7 @@ sampling_with_start_timing_hour: false
 early_stopping_patience: 20
 
 # PseudoLabeling
-Pseudo_label:
+pseudo_label:
   use_Pseudo: False
   save_Pseudo: False
   save_path: None

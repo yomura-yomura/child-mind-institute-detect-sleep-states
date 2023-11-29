@@ -6,9 +6,9 @@ from cmi_dss_lib.utils.post_process import post_process_for_seg
 from tqdm import tqdm
 
 
-def preprocess_for_Pseudo_labels(dict_data, result_path: str, score_th: float = 0.5) -> None:
+def preprocess_for_pseudo_labels(dict_data, result_path: str, score_th: float = 0.5) -> None:
     """submitファイルのscore_th以上のラベルを抽出
-    Pseudo_labeling v1で使用
+    pseudo_labeling v1で使用
     """
 
     list_df = []
@@ -26,7 +26,7 @@ def preprocess_for_Pseudo_labels(dict_data, result_path: str, score_th: float = 
         ).drop(columns=["row_id"])
         list_df.append(df.query("score >= @score_th"))
 
-    pd.concat(list_df).to_csv(f"{result_path}/Pseudo_label_{score_th}.csv", index=None)
+    pd.concat(list_df).to_csv(f"{result_path}/pseudo_label_{score_th}.csv", index=None)
     return
 
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     dict_data = load_predicted(path_data)
 
     # 保存先を指定
-    result_path = Path(__file__).parent.parent / "Pseudo_label"
+    result_path = Path(__file__).parent.parent / "pseudo_label"
 
     result_path.mkdir(exist_ok=True, parents=True)
-    preprocess_for_Pseudo_labels(dict_data=dict_data, result_path=result_path)
+    preprocess_for_pseudo_labels(dict_data=dict_data, result_path=result_path)
