@@ -164,6 +164,9 @@ processed_data/
 output/
 wandb/
 *.out
+/data/
+/processed_data/
+/output/
 wandb
 *.out
 *.npz

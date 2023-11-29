@@ -25,6 +25,8 @@ class StackingConfig(DictConfig):
     use_amp: bool
     model: Model
 
+    # Dataset
+
     duration: int
     prev_margin_steps: int
     next_margin_steps: int
@@ -36,6 +38,7 @@ class StackingConfig(DictConfig):
     sigma: int
 
     bg_sampling_rate: float
+    sampling_with_start_timing_hour: bool
 
     # Training
     epoch: int
@@ -59,3 +62,8 @@ class StackingConfig(DictConfig):
 
     optimizer: TrainOptimizerConfig
     scheduler: TrainSchedulerConfig
+
+    labels: list[str]
+
+    # Inference
+    inference_step_offset: int

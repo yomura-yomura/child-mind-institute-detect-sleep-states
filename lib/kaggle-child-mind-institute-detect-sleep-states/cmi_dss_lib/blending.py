@@ -3,7 +3,9 @@ import os
 import pathlib
 from typing import Callable, Sequence
 
+import cmi_dss_lib.utils.common
 import cmi_dss_lib.utils.metrics
+import cmi_dss_lib.utils.post_process
 import numpy as np
 import pandas as pd
 import tqdm
@@ -22,6 +24,7 @@ def calc_score(
     all_event_df,
     preds_dict,
     post_process_modes,
+    calc_type: str = "fast",
     score_th=0.005,
     distance=96,
     n_records_per_series_id=None,
@@ -56,15 +59,18 @@ def calc_score(
     if print_msg:
         print(df_submit.shape, len(df_submit) / len(series_ids))
 
-    return child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-        event_df[event_df["series_id"].isin(unique_series_ids)],
-        df_submit,
-        n_jobs=1,
-        show_progress=False,
-    )
-    # return cmi_dss_lib.utils.metrics.event_detection_ap(
-    #     event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
-    # )
+    if calc_type == "fast":
+        return child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
+            event_df[event_df["series_id"].isin(unique_series_ids)],
+            df_submit,
+            n_jobs=1,
+            show_progress=False,
+            print_score=print_msg,
+        )
+    else:
+        return cmi_dss_lib.utils.metrics.event_detection_ap(
+            event_df[event_df["series_id"].isin(unique_series_ids)], df_submit
+        )
 
 
 def get_grid(
@@ -88,13 +94,13 @@ def get_grid(
     return weight * step
 
 
-def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
+def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str], folds: list[int]):
     predicted_npz_dir_paths = [
         [
             pathlib.Path(model_dir_path) / "train" / f"fold_{i_fold}"
             for model_dir_path in model_dir_paths
         ]
-        for i_fold in range(5)
+        for i_fold in folds
     ]  # (fold, model)
     for predicted_npz_dir_paths_by_fold in predicted_npz_dir_paths:
         for path in predicted_npz_dir_paths_by_fold:
@@ -113,7 +119,7 @@ def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str]):
 
     keys_dict = {}
     preds_dict = {}
-    for i_fold in tqdm.trange(5):
+    for i_fold in tqdm.tqdm(folds):
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
@@ -127,10 +133,10 @@ def optimize(
     search_type: str,
     models_dir_name: str,
     calc_all_scores: Callable[
-        [Sequence[float], dict | None, float, float], tuple[Sequence[float], Sequence[float]]
+        [Sequence[float], dict | None, float, float, str], tuple[Sequence[float], Sequence[float]]
     ],
-    weight,
-    weight_dict,
+    all_weights_to_find,
+    initial_weight_dict=None,
     n_cpus=None,
 ):
     if n_cpus is None:
@@ -213,10 +219,14 @@ def optimize(
                 #     weight = np.concatenate([weight, new_weight], axis=0)
 
                 loaded_weight = np.array(df["weights"].tolist())
-                weight = np.array(
-                    [w for w in weight if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))]
+                all_weights_to_find = np.array(
+                    [
+                        w
+                        for w in all_weights_to_find
+                        if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))
+                    ]
                 )
-                print(f"-> {weight.shape = }")
+                print(f"-> {all_weights_to_find.shape = }")
 
                 records = df.to_dict("records")
             else:
@@ -224,39 +234,19 @@ def optimize(
 
             n_steps_to_save = 30
             with multiprocessing.Pool(n_cpus) as p:
-                with tqdm.tqdm(total=len(weight), desc="grid search") as t:
-                    for scores, weights in p.imap_unordered(calc_all_scores, weight.tolist()):
+                with tqdm.tqdm(total=len(all_weights_to_find), desc="grid search") as t:
+                    for scores, weights in p.imap_unordered(
+                        calc_all_scores, all_weights_to_find.tolist()
+                    ):
                         t.update(1)
                         records.append(
                             {"CV": np.mean(scores), "scores": scores, "weights": weights}
                         )
 
                         if len(records) % n_steps_to_save == 0:
-                            df = pd.DataFrame(records)
-                            target_csv_path.parent.mkdir(parents=True, exist_ok=True)
-                            df.to_csv(target_csv_path, index=False)
+                            print_best_score_so_far(records, target_csv_path)
 
-                            record_at_max = df.iloc[df["CV"].argmax()]
-                            print(
-                                f"""
-max:
-CV = {record_at_max["CV"]:.4f}
-weights = {dict(zip(weight_dict, record_at_max["weights"]))}
-"""
-                            )
-
-            df = pd.DataFrame(records)
-            target_csv_path.parent.mkdir(parents=True, exist_ok=True)
-            df.to_csv(target_csv_path, index=False)
-
-            record_at_max = df.iloc[df["CV"].argmax()]
-            print(
-                f"""
-max:
-CV = {record_at_max["CV"]:.4f} ({", ".join(f"{s:.4f}" for s in record_at_max["scores"])})
-weights = {dict(zip(weight_dict, record_at_max["weights"]))}
-"""
-            )
+            record_at_max = print_best_score_so_far(records, target_csv_path)
             return record_at_max
         case "optuna":
             import optuna
@@ -265,12 +255,12 @@ weights = {dict(zip(weight_dict, record_at_max["weights"]))}
                 total = 0
 
                 weights = []
-                for i in range(len(weight_dict) - 1):
+                for i in range(len(initial_weight_dict) - 1):
                     weight = trial.suggest_float(f"w{i}", 0, 1 - total)
                     total += weight
                     weights.append(weight)
                 weights.append(1 - total)
-                assert len(weights) == len(weight_dict)
+                assert len(weights) == len(initial_weight_dict)
                 scores, _ = calc_all_scores(weights)
                 return np.mean(scores)
 
@@ -280,5 +270,28 @@ weights = {dict(zip(weight_dict, record_at_max["weights"]))}
                 load_if_exists=True,
                 study_name=models_dir_name,
             )
-            study.enqueue_trial({f"w{i}": w for i, w in enumerate(weight_dict.values())})
+            study.enqueue_trial({f"w{i}": w for i, w in enumerate(initial_weight_dict.values())})
             study.optimize(objective, n_trials=100, n_jobs=n_cpus, show_progress_bar=True)
+
+
+def print_best_score_so_far(
+    records: list[dict], target_csv_path: pathlib.Path, initial_weight_dict=None
+):
+    df = pd.DataFrame(records)
+    target_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(target_csv_path, index=False)
+
+    record_at_max = df.iloc[df["CV"].argmax()]
+
+    if initial_weight_dict is None:
+        weights = record_at_max["weights"]
+    else:
+        weights = dict(zip(initial_weight_dict, record_at_max["weights"]))
+    print(
+        f"""
+    max:
+    CV = {record_at_max["CV"]:.4f}
+    weights = {weights}
+    """
+    )
+    return record_at_max

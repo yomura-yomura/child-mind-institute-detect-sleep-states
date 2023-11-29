@@ -14,7 +14,7 @@ class StackingChunkModule(BaseChunkModule):
     def __init__(
         self,
         cfg: StackingConfig,
-        val_event_df: pl.DataFrame | None,
+        val_event_df: pl.DataFrame | None = None,
         model_save_dir_path: pathlib.Path | None = None,
     ):
         super().__init__(cfg, val_event_df, cfg.duration, model_save_dir_path)
@@ -25,7 +25,7 @@ class StackingChunkModule(BaseChunkModule):
                 encoder_weights=cfg.model.encoder_weights,
                 decoder_use_batchnorm=True,
                 in_channels=3,
-                classes=3,
+                classes=len(cfg.labels),
             )
         elif cfg.model.segmentation_model_name == "unet":
             self.model = smp.Unet(
@@ -34,8 +34,8 @@ class StackingChunkModule(BaseChunkModule):
                 encoder_weights=cfg.model.encoder_weights,
                 decoder_use_batchnorm=True,
                 in_channels=3,
-                classes=3,
-            )
+                classes=len(cfg.labels),
+                )
         else:
             raise ValueError(f"unexpected {cfg.model.segmentation_model_name=}")
 
@@ -48,7 +48,7 @@ class StackingChunkModule(BaseChunkModule):
             self.embedding_linear = nn.Linear(len(cfg.input_model_names), hidden_size)
             self.feature_extractors = None
         else:
-            hidden_size = cfg.feature_extractor.hidden_size
+            hidden_size = cfg.feature_extractor.hidden_size * 2
             self.embedding_linear = None
 
             self.feature_extractors = nn.ModuleList(
@@ -72,7 +72,7 @@ class StackingChunkModule(BaseChunkModule):
                         n_classes=1,
                         num_time_steps=cfg.duration,
                     )
-                    for _ in range(3)
+                    for _ in range(len(self.cfg.labels))
                 ]
             )
             self.concat_linear = None
@@ -105,10 +105,7 @@ class StackingChunkModule(BaseChunkModule):
             x = self.concat_linear(x).squeeze(3)
         else:
             x = torch.stack(
-                [
-                    feature_extractor(x[:, i].permute(0, 2, 1))
-                    for i, feature_extractor in enumerate(self.decoders)
-                ],
+                [decoder(x[:, i].permute(0, 2, 1)) for i, decoder in enumerate(self.decoders)],
                 dim=1,
             ).squeeze(
                 3

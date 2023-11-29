@@ -43,6 +43,7 @@ class BaseChunkModule(LightningModule):
                 self.val_event_df = self.val_event_df[self.val_event_df["event"] != "onset"]
             if "event_wakeup" not in self.cfg.labels:
                 self.val_event_df = self.val_event_df[self.val_event_df["event"] != "wakeup"]
+            assert len(self.val_event_df) > 0
             print(self.val_event_df)
 
         self.num_time_steps = (
@@ -89,6 +90,8 @@ class BaseChunkModule(LightningModule):
 
         output = self.forward(batch, do_mixup=do_mixup, do_cutmix=do_cutmix)
         loss: torch.Tensor = output["loss"]
+        if not torch.isfinite(loss):
+            raise RuntimeError(f"encountered nan/inf loss: {loss}")
         # logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
         self.log(
             f"train_loss",
@@ -126,7 +129,8 @@ class BaseChunkModule(LightningModule):
         output = self.forward(batch)
         loss = output["loss"].detach().item() if "loss" in output.keys() else None
         logits = output["logits"]  # (batch_size, n_time_steps, n_classes)
-
+        if torch.isnan(logits).any():
+            raise RuntimeError(f"encountered nan in logits: {logits}")
         resized_probs = resize(
             logits.sigmoid().detach().cpu(),
             size=[self.duration, logits.shape[2]],
@@ -217,11 +221,13 @@ class BaseChunkModule(LightningModule):
         if len(self.validation_step_outputs) == 0:
             return
 
+        n_jobs = -1
+        # n_jobs = 1
         # sub_df_list = []
         sub_df = pd.concat(
-            joblib.Parallel(n_jobs=-1)(
+            joblib.Parallel(n_jobs=n_jobs)(
                 joblib.delayed(cmi_dss_lib.utils.post_process.post_process_for_seg)(
-                    keys=[series_id] * len(preds),
+                    series_id=series_id,
                     preds=preds,
                     labels=list(self.cfg.labels),
                     downsample_rate=self.cfg.downsample_rate,
@@ -246,7 +252,10 @@ class BaseChunkModule(LightningModule):
 
         # score = cmi_dss_lib.utils.metrics.event_detection_ap(self.val_event_df, sub_df)
         score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-            self.val_event_df, sub_df
+            self.val_event_df,
+            sub_df,
+            n_jobs=n_jobs
+            # calc_type="normal"
         )
 
         self.log(

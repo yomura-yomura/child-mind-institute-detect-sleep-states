@@ -16,19 +16,23 @@ from child_mind_institute_detect_sleep_states.model.loggers import WandbLogger
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
     args = [
-        "../config/exp_for_stacking/s2.yaml",
+        # "../../config/exp_for_stacking/s11.yaml",
+        "../../config/exp_for_stacking/s11.yaml",
+        "resume_from_checkpoint=../../output/train_stacking/s_exp011_resume"
+        # "--folds",
+        # "1,2,3,4"
         # "--folds", "1,2,3,4"
-        "--gpus",
-        "1",
+        # "--gpus",
+        # "1",
     ]
 else:
     args = None
 
 
-project_root_path = pathlib.Path(__file__).parent.parent
+project_root_path = pathlib.Path(__file__).parent.parent.parent
 
 
-@hydra.main(config_path="conf", config_name="stacking", version_base="1.2")
+@hydra.main(config_path="../conf", config_name="stacking", version_base="1.2")
 def main(cfg: StackingConfig):
     cfg.dir.sub_dir = str(project_root_path / "run")
     print(cfg)
@@ -46,20 +50,6 @@ def main(cfg: StackingConfig):
     module = StackingChunkModule(
         cfg, val_event_df=datamodule.valid_event_df, model_save_dir_path=model_save_dir_path
     )
-    # from cmi_dss_lib.modelmodule.seg import SegChunkModule
-    # module = SegChunkModule(
-    #     cfg,
-    #     val_event_df=datamodule.valid_event_df,
-    #     model_save_dir_path=model_save_dir_path,
-    #     feature_dim=len(cfg.input_model_names),
-    #     num_classes=3,
-    #     duration=cfg.duration,
-    # )
-
-    # preds = module.cuda()(
-    #     {k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in x.items()}
-    # )
-    # print(preds)
 
     trainer = L.Trainer(
         devices=1,
@@ -132,4 +122,4 @@ if __name__ == "__main__":
             args.config_path_or_hydra_arguments, {"split": f"fold_{i_fold}"}
         )
         main()
-        break
+        # break

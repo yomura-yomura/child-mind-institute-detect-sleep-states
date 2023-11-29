@@ -1,0 +1,26 @@
+- exp_name=exp088
+
+- split_type=base
+
+- scale_type=robust_scaler
+
+- feature_extractor=StackedGRUFeatureExtractor
+- feature_extractor.num_layers=4
+
+- duration=17280  # 24h
+
+- batch_size=4
+- optimizer.lr=0.00005
+
+- sigma=108
+
+#- bg_sampling_rate=0.3
+- sampling_with_start_timing_hour=true
+
+- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos]
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=5000

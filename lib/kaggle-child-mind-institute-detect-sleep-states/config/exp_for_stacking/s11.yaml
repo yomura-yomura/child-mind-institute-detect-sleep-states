@@ -1,0 +1,28 @@
+- exp_name=s_exp011_retry
+- input_model_names=[19,27,50,53,55,58]
+
+- feature_extractor=LSTMFeatureExtractor
+- model.segmentation_model_name=manet
+- model.encoder_name=resnet34
+#- decoder=UNet1DDecoder
+
+- duration=17280  # 24h
+#- duration=8640  # 12h
+#- duration=1024  # 12h
+- batch_size=4
+- optimizer.lr=0.00005
+
+#- use_amp=true
+
+#- sigma=108
+#- offset=24
+
+- epoch=40
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=5000
+
+- labels=[event_onset,event_wakeup]

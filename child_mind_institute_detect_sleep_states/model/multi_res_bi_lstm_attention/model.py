@@ -36,7 +36,8 @@ class FOGEncoder(nn.Module):
     def __init__(
         self,
         duration: int,
-        height: int,
+        # height: int,
+        patch_size: int,
         n_features: int,
         n_encoder_layers: int,
         n_lstm_layers: int,
@@ -46,7 +47,6 @@ class FOGEncoder(nn.Module):
         mha_dropout: float,
     ):
         super().__init__()
-        self.duration_encoder = nn.Linear(duration, duration // 8)
         self.first_linear = nn.Linear(n_features, mha_embed_dim)
         self.first_dropout = nn.Dropout(dropout)
         self.enc_layers = nn.ModuleList(
@@ -62,7 +62,8 @@ class FOGEncoder(nn.Module):
                 for _ in range(n_lstm_layers)
             ]
         )
-        self.duration_decoder = nn.Linear(duration // 8, height)
+        self.duration = duration
+        self.patch_size = patch_size
         # self.out_size = mha_embed_dim
         # if self.out_size is not None:
         #     self.pool = nn.AdaptiveAvgPool2d((None, self.out_size))
@@ -70,11 +71,17 @@ class FOGEncoder(nn.Module):
         # self.sequence_len = CFG["block_size"] // CFG["patch_size"]
         # self.pos_encoding = nn.Parameter(torch.randn(1, self.sequence_len, CFG["fog_model_dim"]) * 0.02)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor):
+        # x: (batch_size, in_channels, time_steps)
+        x = x.reshape(x.shape[0], x.shape[1], self.duration // self.patch_size, self.patch_size)
+
+        # x = torch.max(x, dim=-1)[0]
+        x = torch.mean(x, dim=-1)
+        # (batch_size, in_channels, duration // patch_size)
+
         # x /= 25.0
-        x = self.duration_encoder(x)
-        x = x.permute(0, 2, 1)
-        x = self.first_linear(x)
+        x = x.permute(0, 2, 1)  # (batch_size, duration // patch_size, in_channels)
+        x = self.first_linear(x)  # (batch_size, duration // patch_size, embed_dim)
         # if training:  # augmentation by randomly roll of the position encoding tensor
         #     random_pos_encoding = torch.roll(
         #         self.pos_encoding.repeat(GPU_BATCH_SIZE, 1, 1),
@@ -90,11 +97,7 @@ class FOGEncoder(nn.Module):
             x = layer(x)
         for layer in self.lstm_layers:
             x, _ = layer(x)
-
-        x = x.permute(0, 2, 1)
-        x = self.duration_decoder(x)
-        x = x.permute(0, 2, 1)
-
+        x = x.permute(0, 2, 1)  # (batch_size, embed_dim, duration // patch_size)
         return x
 
 
@@ -103,8 +106,8 @@ class FOGModel(nn.Module):
     def __init__(
         self,
         n_features: int,
-        duration: int,
-        height: int,
+        duration: int = 17280,
+        patch_size: int = 20,
         n_encoder_layers: int = 5,
         n_lstm_layers: int = 2,
         out_size: int = 2,
@@ -115,8 +118,8 @@ class FOGModel(nn.Module):
     ):
         super().__init__()
         self.encoder = FOGEncoder(
+            patch_size=patch_size,
             duration=duration,
-            height=height,
             n_features=n_features,
             n_encoder_layers=n_encoder_layers,
             n_lstm_layers=n_lstm_layers,
@@ -125,8 +128,7 @@ class FOGModel(nn.Module):
             mha_n_heads=mha_n_heads,
             mha_dropout=mha_dropout,
         )
-        self.height = height
-        self.last_linear = nn.Linear(mha_embed_dim, out_size)
+        self.last_linear = nn.Linear(duration // patch_size, out_size)
 
     def forward(self, x):
         x = self.encoder(x)

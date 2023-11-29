@@ -16,7 +16,7 @@ np.seterr(all="raise")
 project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["-s", "grid_search"]
+    args = ["-s", "grid_search", "-f", "0"]
 else:
     args = None
 
@@ -28,31 +28,64 @@ post_process_modes = {
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
     # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-    #     watch_interval_hour=6, sleep_occupancy_th=0.3
+    #     watch_interval_hour=7.5, sleep_occupancy_th=0.03
     # ),
+    # "cutting_probs_by_sleep_prob": dict(
+    #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #         watch_interval_hour=7.5,
+    #         sleep_occupancy_th=0.04,
+    #     ),
+    #     wakeup=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #         watch_interval_hour=6.0,
+    #         sleep_occupancy_th=0.03,
+    #     ),
+    # )
 }
 
 
 pred_dir_path = project_root_path / "run" / "predicted" / "train"
 ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan"
 jumtras_pred_dir_path = project_root_path / "run" / "predicted" / "jumtras"
+stacking_pred_dir_path = project_root_path / "run" / "predicted" / "train_stacking"
+
+exp_name_dict = {
+    "3": "jumtras/exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    "7": "ranchantan/exp015-lstm-feature-108-sigma",
+    "19": "ranchantan/exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    "27": "jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet",
+    "41": "ranchantan/exp041_retry",
+    "47": "ranchantan/exp047_retry",
+    "50": "ranchantan/exp050-transformer-decoder_retry_resume",
+    "52": "jumtras/exp052",
+    "53": "jumtras/exp053",
+    "54": "ranchantan/exp054",
+    "55": "ranchantan/exp055",
+    "58": "jumtras/exp058",
+    "60": "ranchantan/exp060",
+    "73": "ranchantan/exp073_resume",
+    "75": "ranchantan/exp075-wakeup_5",
+}
 
 all_model_dir_path_dict = {
-    3: jumtras_pred_dir_path / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
-    7: ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",
-    19: ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
-    27: jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
-    41: ranchantan_pred_dir_path / "exp041_retry",
-    47: ranchantan_pred_dir_path / "exp047_retry",
-    50: ranchantan_pred_dir_path / "exp050-transformer-decoder_retry_resume",
-    52: jumtras_pred_dir_path / "exp052",
-    53: jumtras_pred_dir_path / "exp053",
-    54: ranchantan_pred_dir_path / "exp054",
-    55: ranchantan_pred_dir_path / "exp055",
-    58: jumtras_pred_dir_path / "exp058",
-    60: ranchantan_pred_dir_path / "exp060",
-    73: ranchantan_pred_dir_path / "exp073_resume",
-    75: ranchantan_pred_dir_path / "exp075-wakeup_5",
+    "3": jumtras_pred_dir_path / "exp016-gru-feature-fp16-layer4-ep70-lr-half",
+    "7": ranchantan_pred_dir_path / "exp015-lstm-feature-108-sigma",
+    "19": ranchantan_pred_dir_path / "exp019-stacked-gru-4-layers-24h-duration-4bs-108sigma",
+    "27": jumtras_pred_dir_path / "exp027-TimesNetFeatureExtractor-1DUnet-Unet",
+    "41": ranchantan_pred_dir_path / "exp041_retry",
+    "47": ranchantan_pred_dir_path / "exp047_retry",
+    "50": ranchantan_pred_dir_path / "exp050-transformer-decoder_retry_resume",
+    "52": jumtras_pred_dir_path / "exp052",
+    "53": jumtras_pred_dir_path / "exp053",
+    "54": ranchantan_pred_dir_path / "exp054",
+    "55": ranchantan_pred_dir_path / "exp055",
+    "58": jumtras_pred_dir_path / "exp058",
+    "60": ranchantan_pred_dir_path / "exp060",
+    "73": ranchantan_pred_dir_path / "exp073_resume",
+    "75": ranchantan_pred_dir_path / "exp075-wakeup_5",
+    "85": jumtras_pred_dir_path / "exp085",
+    "88": jumtras_pred_dir_path / "exp088",
+} | {
+    "s6": stacking_pred_dir_path / "s_exp006",
 }
 
 # weight_dict = {3: 1, 7: 0, 19: 0, 27: 0, 41: 0, 50: 0}  # 17
@@ -70,7 +103,22 @@ all_model_dir_path_dict = {
 # weight_dict = {47: 1, 50: 0, 52: 0, 53: 0}  # 21
 # weight_dict = {19: 0.1, 27: 0.1, 50: 0.2, 53: 0.3, 55: 0.1, 58: 0.2}  # 22
 # weight_dict = {3: 1, 19: 0, 50: 0, 53: 0, 54: 0, 55: 0}
-weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
+# weight_dict = {3: 1, 50: 0, 52: 0, 53: 0, 55: 0, 58: 0}
+# weight_dict = {"19": 0.1, "27": 0.1, "50": 0.2, "53": 0.3, "55": 0.1, "58": 0.2}  # 23
+# weight_dict = {"19": 0.1, "50": 0.2, "53": 0.2, "s6": 0.3, "58": 0.2}
+
+# weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
+# weight_dict = {"19": 0.05, "27": 0.05, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
+weight_dict = {
+    # "7": 0.05,
+    "19": 0.05,
+    "27": 0.05,
+    "50": 0.2,
+    "53": 0.3,
+    "58": 0.1,
+    "85": 0.2,
+    "88": 0.1,
+}
 
 
 score_th = 0.005
@@ -83,28 +131,29 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--search-type", "-s", choices=["grid_search", "optuna"], default=None)
     parser.add_argument("--n-cpus", "-n", default=None, type=int)
-    parser.add_argument("--folds", type=str, default="0,1,2,3,4")
+    parser.add_argument("--folds", "-f", type=str, default="0,1,2,3,4")
     args = parser.parse_args(args)
 
-    weight_dict = {int(k): v for k, v in weight_dict.items()}
-    assert sum(weight_dict.values()) == 1
+    weight_dict = {str(k): v for k, v in weight_dict.items()}
+    assert np.isclose(sum(weight_dict.values()), 1), sum(weight_dict.values())
     print(f"{len(weight_dict) = }")
 
+    folds = sorted(map(int, set(args.folds.split(","))))
+    print(f"{folds = }")
+
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
-    keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths)
+    keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths, folds)
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
         "train"
     ).dropna()
-
-    folds = sorted(map(int, set(args.folds.split(","))))
-    print(f"{folds = }")
 
     def calc_all_scores(
         weights: list[float],
         post_process_modes: dict = None,
         score_th: float = score_th,
         distance: float = distance,
+        calc_type: str = "fast",
         n_records_per_series_id=None,
         print_msg: bool = False,
     ) -> tuple[list[float], list[float]]:
@@ -120,6 +169,7 @@ if __name__ == "__main__":
                     post_process_modes=post_process_modes,
                     score_th=score_th,
                     distance=distance,
+                    calc_type=calc_type,
                     n_records_per_series_id=n_records_per_series_id,
                     print_msg=print_msg,
                 )
@@ -138,6 +188,7 @@ if __name__ == "__main__":
             n_records_per_series_id=1000,
             post_process_modes=post_process_modes,
             print_msg=True,
+            calc_type="normal",
         )
 
         # calc_all_scores([0.1, 0.1, 0.1, 0.2, 0.2, 0.3], score_th=score_th, distance=distance)
@@ -171,4 +222,5 @@ if __name__ == "__main__":
             score_th=1e-4,
             distance=88,
             n_records_per_series_id=1000,
+            calc_type="normal",
         )

@@ -1,6 +1,7 @@
 import copy
 import pathlib
 import random
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -56,10 +57,11 @@ def load_features(
 def load_chunk_features(
     duration: int,
     feature_names: list[str],
-    series_ids: Optional[list[str]],
+    series_ids: list[str],
     processed_dir: Path,
     phase: str,
     scale_type: str,
+    inference_step_offset: int,
     prev_margin_steps: int = 0,
     next_margin_steps: int = 0,
 ) -> dict[str, np.ndarray]:
@@ -68,9 +70,6 @@ def load_chunk_features(
     phase_dir_path = processed_dir / phase / scale_type
     if not phase_dir_path.exists():
         raise FileNotFoundError(f"{phase_dir_path.resolve()}")
-
-    if series_ids is None:
-        series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
         series_dir = phase_dir_path / series_id
@@ -84,6 +83,9 @@ def load_chunk_features(
             ],
             axis=1,
         )  # (duration, feature)
+
+        if inference_step_offset is not None:
+            this_feature = this_feature[inference_step_offset:]
 
         indexer = Indexer(this_feature.shape[0], duration, prev_margin_steps, next_margin_steps)
 
@@ -297,6 +299,17 @@ class TrainDataset(Dataset):
             mapping[label] for label in self.cfg.labels if label in mapping
         ]
 
+        if self.cfg.sampling_with_start_timing_hour:
+            assert self.cfg.duration == 17280
+            assert self.cfg.prev_margin_steps == self.cfg.next_margin_steps == 0
+            from run.anl_start_timing_for_each_series_id import get_kde, get_start_timing_hour_dict
+
+            self.start_timing_hour_dict = get_start_timing_hour_dict()
+            self.start_timing_hour_sampler = get_kde()
+        else:
+            self.start_timing_hour_dict = None
+            self.start_timing_hour_sampler = None
+
     def __len__(self):
         return len(self.event_df)
 
@@ -309,6 +322,7 @@ class TrainDataset(Dataset):
         )
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
+
         # extract data matching series_id
         this_feature = self.features[series_id]  # (..., n_steps, num_features)
 
@@ -322,11 +336,37 @@ class TrainDataset(Dataset):
             pos = self.event_df.at[idx, event]
 
         # crop
-        start, end = random_crop(
-            pos,
-            self.cfg.duration,
-            n_steps,
-        )
+        if self.cfg.sampling_with_start_timing_hour:
+            this_start_hour = self.start_timing_hour_dict[series_id]
+            sampled_start_hour = self.start_timing_hour_sampler.resample(size=1)[0][0]
+
+            pos_to_sample = np.arange(pos - self.cfg.duration, pos) + 1
+            hours_to_sample = (this_start_hour + pos_to_sample / (12 * 60)) % 24
+
+            order = np.argsort(hours_to_sample)
+            start = int(
+                pos_to_sample[
+                    order[
+                        min(
+                            np.searchsorted(hours_to_sample[order], sampled_start_hour),
+                            len(hours_to_sample) - 1,
+                        )
+                    ]
+                ]
+            )
+            if start < 0:
+                warnings.warn("pos < 0", UserWarning)
+                start = max(start, 0)
+            if start > n_steps - self.cfg.duration:
+                warnings.warn("pos > n_steps - duration", UserWarning)
+                start = min(start, n_steps - self.cfg.duration)
+            end = start + self.cfg.duration
+        else:
+            start, end = random_crop(
+                pos,
+                self.cfg.duration,
+                n_steps,
+            )
 
         feature = this_feature[start:end]  # (duration, num_features)
 
@@ -337,6 +377,9 @@ class TrainDataset(Dataset):
             size=[self.num_features, self.upsampled_num_frames],
             antialias=False,
         ).squeeze(0)
+
+        if not np.isfinite(feature).all():
+            raise RuntimeError(f"encountered nan/inf in feature: {feature}")
 
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
@@ -350,8 +393,21 @@ class TrainDataset(Dataset):
 
         target_indices = []
         if "event_onset" in self.cfg.labels:
-            target_indices.append(list(self.cfg.labels).index("event_onset"))
+            i = list(self.cfg.labels).index("event_onset")
+            label[:, [i]] = gaussian_label(
+                label[:, [i]],
+                offset=self.cfg.offset_onset or self.cfg.offset,
+                sigma=self.cfg.sigma_onset or self.cfg.sigma,
+            )
         if "event_wakeup" in self.cfg.labels:
+            i = list(self.cfg.labels).index("event_wakeup")
+            label[:, [i]] = gaussian_label(
+                label[:, [i]],
+                offset=self.cfg.offset_wakeup or self.cfg.offset,
+                sigma=self.cfg.sigma_wakeup or self.cfg.sigma,
+            )
+        if not np.isfinite(label).all():
+            raise RuntimeError(f"encountered nan/inf in label: {label}")
             target_indices.append(list(self.cfg.labels).index("event_wakeup"))
 
         #if not self.use_psuedo_label and not self.psuedo_version == 1:
@@ -538,15 +594,11 @@ class ValidDataset(Dataset):
 
 
 class TestDataset(Dataset):
-    def __init__(
-        self,
-        cfg: TrainConfig,
-        chunk_features: dict[str, np.ndarray],
-    ):
+    def __init__(self, cfg: TrainConfig, chunk_features: dict[str, np.ndarray], num_features: int):
         self.cfg = cfg
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
-        self.num_features = len(cfg.features)
+        self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
@@ -557,7 +609,9 @@ class TestDataset(Dataset):
     def __getitem__(self, idx):
         key = self.keys[idx]
         feature = self.chunk_features[key]
-        feature = torch.FloatTensor(feature.T).unsqueeze(0)  # (1, num_features, duration)
+        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(
+            0
+        )  # (1, ..., num_features, duration)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -621,14 +675,17 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase=self.cfg.phase,
                 scale_type=self.cfg.scale_type,
+                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
+
+        series_ids = [
+            series_dir.name
+            for series_dir in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            if series_dir.is_dir() and not series_dir.name.startswith(".")
+        ]
         if stage == "test":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -636,15 +693,12 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="test",
                 scale_type=self.cfg.scale_type,
+                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
 
         if stage == "dev":
-            series_ids = [
-                x.name
-                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -652,6 +706,7 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="dev",
                 scale_type=self.cfg.scale_type,
+                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
@@ -689,7 +744,11 @@ class SegDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):
-        test_dataset = TestDataset(self.cfg, chunk_features=self.test_chunk_features)
+        test_dataset = TestDataset(
+            self.cfg,
+            chunk_features=self.test_chunk_features,
+            num_features=len(self.cfg.features),
+        )
         return torch.utils.data.DataLoader(
             test_dataset,
             batch_size=self.cfg.batch_size,

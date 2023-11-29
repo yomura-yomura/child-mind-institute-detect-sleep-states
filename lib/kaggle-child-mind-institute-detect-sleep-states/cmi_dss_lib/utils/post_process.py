@@ -1,4 +1,4 @@
-from typing import Sequence, TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 import cmi_dss_lib.datamodule.seg
 import numpy as np
@@ -19,47 +19,53 @@ class SleepingEdgesAsProbsSetting(TypedDict):
 
 
 class CuttingProbsBySleepProbSetting(TypedDict):
-    watch_interval_hour: int
+    watch_interval_hour: float
     sleep_occupancy_th: float
 
 
 class PostProcessModeWithSetting(TypedDict, total=False):
-    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting
-    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting
+    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | dict[
+        Literal["onset", "wakeup"], SleepingEdgesAsProbsSetting
+    ]
+
+    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | dict[
+        Literal["onset", "wakeup"], CuttingProbsBySleepProbSetting
+    ]
 
 
 PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
 
 
 def post_process_for_seg(
-    keys: Sequence[str],
+    series_id: str,
     preds: NDArray[Shape["*, 3"], Float],
     labels: list[str],
     downsample_rate: int,
     score_th: float = 0.01,
     distance: int = 5000,
     post_process_modes: PostProcessModes = None,
+    n_records_per_series_id: int | None = None,
     print_msg: bool = False,
 ) -> SubmissionDataFrame:
     """make submission dataframe for segmentation task
 
     Args:
-        keys: list of keys. key is "{series_id}_{chunk_id}"
-        preds: (num_series * num_chunks, duration, 3)
+        series_id:
+        preds: (duration, 3)
+        labels:
         downsample_rate: see conf
         score_th: threshold for score. Defaults to 0.5.
         distance: minimum interval between detectable peaks
         post_process_modes: extra post process names can be given
+        n_records_per_series_id:
         print_msg: print info
     Returns:
         pl.DataFrame: submission dataframe
     """
+    assert preds.ndim == 2
 
     if post_process_modes is None:
         post_process_modes = {}
-
-    series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-    unique_series_ids = np.unique(series_ids)
 
     possible_events = [
         cmi_dss_lib.datamodule.seg.mapping[label]
@@ -70,85 +76,97 @@ def post_process_for_seg(
     if "sleeping_edges_as_probs" in post_process_modes:
         if print_msg:
             print("enable 'sleeping_edges_as_probs'")
-        data = adapt_sleeping_edges_as_probs(
-            keys,
+        preds = adapt_sleeping_edges_as_probs(
             preds,
             downsample_rate=downsample_rate,
             **post_process_modes["sleeping_edges_as_probs"],
         )
-        keys = data["key"]
-        preds = data["pred"]
 
-        series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-
-    # preds = preds if "cutting_probs_by_sleep_prob" in post_process_modes else preds[:, :, [1, 2]]
     if "cutting_probs_by_sleep_prob" in post_process_modes:
         if print_msg:
             print("enable 'cutting_probs_by_sleep_prob'")
-        data = adapt_cutting_probs_by_sleep_prob(
-            keys,
-            preds,
-            downsample_rate=downsample_rate,
-            **post_process_modes["cutting_probs_by_sleep_prob"],
-        )
-        keys = data["key"]
-        preds = data["pred"]
+        # data = adapt_cutting_probs_by_sleep_prob(
+        #     keys,
+        #     preds,
+        #     downsample_rate=downsample_rate,
+        #     **post_process_modes["cutting_probs_by_sleep_prob"],
+        # )
+        # keys = data["key"]
+        # preds = data["pred"]
+        #
+        # series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
+        setting = post_process_modes["cutting_probs_by_sleep_prob"]
+        if "onset" in setting and "wakeup" in setting:
+            sleep_occupancy_th = {
+                event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]
+            }
+            watch_interval_hour = {
+                event: int(setting[event]["watch_interval_hour"] * 60 * 12 / downsample_rate)
+                for event in ["onset", "wakeup"]
+            }
+        else:
+            sleep_occupancy_th = {
+                event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]
+            }
+            watch_interval_hour = {
+                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
+                for event in ["onset", "wakeup"]
+            }
+    else:
+        sleep_occupancy_th = watch_interval_hour = None
 
-        series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-
-        # setting = post_process_modes["cutting_probs_by_sleep_prob"]
-        # sleep_occupancy_th = setting["sleep_occupancy_th"]
-        # watch_interval_hour = setting["watch_interval_hour"] * 60 * 12 // downsample_rate
-    # else:
-    #     sleep_occupancy_th = watch_interval_hour = None
+    if preds.shape[-1] == 3:
+        label_index_dict = {event: i for i, event in enumerate(["sleep", "onset", "wakeup"])}
+    else:
+        label_index_dict = {
+            event: labels.index(f"event_{event}") if f"event_{event}" in labels else None
+            for event in ["sleep", "onset", "wakeup"]
+        }
 
     records = []
-    for series_id in unique_series_ids:
-        series_idx = np.where(series_ids == series_id)[0]
-        this_series_preds = preds[series_idx].reshape(-1, len(labels))
 
-        for i, event_name in enumerate(possible_events):
-            this_event_preds = this_series_preds[:, labels.index(f"event_{event_name}")]
-            steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
-            scores = this_event_preds[steps]
+    for i, event_name in enumerate(possible_events):
+        this_event_preds = preds[:, label_index_dict[event_name]]
+        steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
+        scores = this_event_preds[steps]
 
-            for step, score in zip(steps, scores, strict=True):
-                # if "cutting_probs_by_sleep_prob" in post_process_modes:
-                #     max_len_step = this_series_preds.shape[0]
-                #     sleep_preds = this_series_preds[:, labels.index("sleep")]
-                #
-                #     if event_name == "onset":
-                #         max_step = min(step + watch_interval_hour, max_len_step - 1)
-                #         if step < max_step:
-                #             sleep_score = np.median(sleep_preds[step:max_step])
-                #         else:
-                #             sleep_score = np.nan
-                #     elif event_name == "wakeup":
-                #         min_step = max(step - watch_interval_hour, 0)
-                #         if min_step < step:
-                #             sleep_score = np.median(sleep_preds[min_step:step])
-                #         else:
-                #             sleep_score = np.nan
-                #     else:
-                #         assert False
-                #
-                #     # skip
-                #     if sleep_score < sleep_occupancy_th:
-                #         continue
+        for step, score in zip(steps, scores, strict=True):
+            if "cutting_probs_by_sleep_prob" in post_process_modes:
+                n_steps = preds.shape[0]
+                sleep_preds = preds[:, label_index_dict["sleep"]]
 
-                records.append(
-                    {
-                        "series_id": series_id,
-                        "step": step,
-                        "event": event_name,
-                        "score": score,
-                    }
-                )
+                if event_name == "onset":
+                    max_step = min(step + watch_interval_hour[event_name], n_steps - 1)
+                    if step < max_step:
+                        sleep_score = np.median(sleep_preds[step:max_step])
+                    else:
+                        sleep_score = np.nan
+                elif event_name == "wakeup":
+                    min_step = max(step - watch_interval_hour[event_name], 0)
+                    if min_step < step:
+                        sleep_score = np.median(sleep_preds[min_step:step])
+                    else:
+                        sleep_score = np.nan
+                else:
+                    assert False
+
+                # skip
+                if sleep_score < sleep_occupancy_th[event_name]:
+                    continue
+
+            records.append(
+                {
+                    "series_id": series_id,
+                    "step": step,
+                    "event": event_name,
+                    "score": score,
+                }
+            )
 
     if len(records) == 0:  # 一つも予測がない場合はdummyを入れる
         records.append(
             {
-                "series_id": unique_series_ids[-1],
+                "series_id": series_id,
                 "step": 0,
                 "event": "onset",
                 "score": 0,
@@ -156,50 +174,37 @@ def post_process_for_seg(
         )
 
     sub_df = pd.DataFrame(records).sort_values(by=["series_id", "step"])
-    sub_df["row_id"] = np.arange(len(sub_df))
-    sub_df = sub_df[["row_id", "series_id", "step", "event", "score"]]
+    if n_records_per_series_id is not None:
+        sub_df = sub_df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
+    sub_df = sub_df[["series_id", "step", "event", "score"]]
     return sub_df
 
 
 def adapt_sleeping_edges_as_probs(
-    keys, preds, downsample_rate: int, sleep_prob_th: float, min_sleeping_hours: int
+    preds, downsample_rate: int, sleep_prob_th: float, min_sleeping_hours: int
 ) -> NDArray:
-    series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
-    data = npu.from_dict(
-        {
-            "key": keys,
-            "pred": preds,
-            "series_id": series_ids,
-        }
+    n_steps = len(preds)
+    # concat_pred = preds.reshape(-1, 3)
+    _, props = find_peaks(
+        preds[..., 0],
+        width=min_sleeping_hours * 12 / downsample_rate * 60,
+        height=sleep_prob_th,
     )
-    corrected_data_list = []
-    for series_id, grouped_data in npu.groupby(data, "series_id"):
-        grouped_data = grouped_data[np.argsort(grouped_data["key"])]
-        n = len(grouped_data)
-        concat_pred = grouped_data["pred"].reshape(-1, 3)
-        _, props = find_peaks(
-            concat_pred[..., 0],
-            width=min_sleeping_hours * 12 / downsample_rate * 60,
-            height=sleep_prob_th,
-        )
 
-        for l_i, r_i in zip(props["left_ips"], props["right_ips"]):
-            for i, pos in enumerate([l_i, r_i]):
-                concat_pred[
+    for l_i, r_i in zip(props["left_ips"], props["right_ips"]):
+        for i, pos in enumerate([l_i, r_i]):
+            preds[
+                int(np.floor(pos)),
+                1 + i,
+            ] *= (
+                1
+                + preds[
                     int(np.floor(pos)),
-                    1 + i,
-                ] *= (
-                    1
-                    + concat_pred[
-                        int(np.floor(pos)),
-                        0,
-                    ]
-                )
-        corrected_data = grouped_data.copy()
-        corrected_data["pred"] = concat_pred.reshape(n, 3)
-        corrected_data_list.append(corrected_data)
+                    0,
+                ]
+            )
 
-    return np.concatenate(corrected_data_list)
+    return preds
 
 
 def adapt_cutting_probs_by_sleep_prob(
@@ -231,8 +236,8 @@ def adapt_cutting_probs_by_sleep_prob(
 
         # onset
         is_over_th = np.r_[median_sleep_probs > sleep_occupancy_th, [False] * n_invalid_steps]
-        concat_pred[~is_over_th, 1] = 0
 
+        concat_pred[~is_over_th, 1] = 0
         # wakeup
         is_over_th = np.r_[[False] * n_invalid_steps, median_sleep_probs > sleep_occupancy_th]
         concat_pred[~is_over_th, 2] = 0

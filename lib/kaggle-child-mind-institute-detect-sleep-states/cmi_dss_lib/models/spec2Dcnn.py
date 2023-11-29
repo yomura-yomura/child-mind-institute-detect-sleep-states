@@ -21,13 +21,18 @@ class Spec2DCNN(nn.Module):
     ):
         super().__init__()
         self.feature_extractor = feature_extractor
-        assert segmentation_model_name == "unet"
-        self.encoder = smp.Unet(
-            encoder_name=encoder_name,
-            encoder_weights=encoder_weights,
-            in_channels=in_channels,
-            classes=1,
-        )
+        if segmentation_model_name is None:
+            self.encoder = None
+        elif segmentation_model_name == "unet":
+            self.encoder = smp.Unet(
+                encoder_name=encoder_name,
+                encoder_weights=encoder_weights,
+                in_channels=in_channels,
+                classes=1,
+            )
+        else:
+            raise ValueError(f"unexpected {segmentation_model_name=}")
+
         self.decoder = decoder
         self.mixup = Mixup(mixup_alpha)
         self.cutmix = Cutmix(cutmix_alpha)
@@ -57,7 +62,13 @@ class Spec2DCNN(nn.Module):
         if do_cutmix and labels is not None:
             x, labels = self.cutmix(x, labels)
 
-        x = self.encoder(x).squeeze(1)  # (batch_size, height, n_time_steps)
+        if self.encoder is None:
+            assert x.shape[1] == 1
+            x = x[:, 0]
+        else:
+            x = self.encoder(x).squeeze(1)
+        # x: (batch_size, height, n_time_steps)
+
         logits = self.decoder(x)  # (batch_size, n_classes, n_time_steps)
 
         output = {"logits": logits}
