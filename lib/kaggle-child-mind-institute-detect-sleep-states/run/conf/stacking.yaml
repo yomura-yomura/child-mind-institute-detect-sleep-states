@@ -88,6 +88,21 @@ optimizer:
 scheduler:
   num_warmup_steps: 0
 
+# PseudoLabeling
+pseudo_label:
+  use_pseudo: False
+  save_pseudo: False
+  save_path: None
+  use_version: 1
+
+  v0:
+    path_pseudo: None
+    th_sleep: 0.9
+    th_prop: 0.5
+  v1:
+    path_pseudo: None
+    watch_interval: 2
+
 # augmentation
 augmentation:
   mixup_prob: 0.0
