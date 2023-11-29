@@ -26,4 +26,4 @@
 
 - val_check_interval=100
 - check_val_every_n_epoch=null
-- val_after_steps=800
+- val_after_steps=10000
