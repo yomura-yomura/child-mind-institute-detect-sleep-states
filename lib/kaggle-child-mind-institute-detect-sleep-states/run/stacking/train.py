@@ -43,13 +43,9 @@ def main(cfg: StackingConfig):
     datamodule.setup("fit")
     # x = next(iter(datamodule.train_dataloader()))
 
-    model_save_dir_path = (
-        project_root_path / cfg.dir.output_dir / "train_stacking" / cfg.exp_name / cfg.split.name
-    )
+    model_save_dir_path = project_root_path / cfg.dir.output_dir / "train_stacking" / cfg.exp_name / cfg.split.name
 
-    module = StackingChunkModule(
-        cfg, val_event_df=datamodule.valid_event_df, model_save_dir_path=model_save_dir_path
-    )
+    module = StackingChunkModule(cfg, val_event_df=datamodule.valid_event_df, model_save_dir_path=model_save_dir_path)
 
     trainer = L.Trainer(
         devices=1,
@@ -88,9 +84,7 @@ def main(cfg: StackingConfig):
     if cfg.resume_from_checkpoint is None:
         resume_from_checkpoint = None
     else:
-        resume_from_checkpoint = os.path.join(
-            cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt"
-        )
+        resume_from_checkpoint = os.path.join(cfg.resume_from_checkpoint, cfg.split.name, "last.ckpt")
         if not os.path.exists(resume_from_checkpoint):
             raise FileNotFoundError(resume_from_checkpoint)
         print(f"Info: Training resumes from {resume_from_checkpoint}")

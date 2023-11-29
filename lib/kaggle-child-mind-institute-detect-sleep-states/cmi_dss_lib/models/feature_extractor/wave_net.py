@@ -59,9 +59,7 @@ class WaveNet(nn.Module):
         self.wave_block3 = WaveBlock(32, 64, 4, kernel_size)
         self.wave_block4 = WaveBlock(64, 128, 1, kernel_size)
 
-        self.gru = nn.GRU(
-            input_size=128, hidden_size=128, num_layers=4, batch_first=True, bidirectional=True
-        )
+        self.gru = nn.GRU(input_size=128, hidden_size=128, num_layers=4, batch_first=True, bidirectional=True)
 
         self.use_last_linear = use_last_linear
         if self.use_last_linear:

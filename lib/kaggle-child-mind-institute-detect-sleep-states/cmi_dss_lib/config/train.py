@@ -14,6 +14,7 @@ __all__ = [
     "TrainAugmentationConfig",
     "TrainPostProcessAugmentationConfig",
     "TrainOptimizerConfig",
+    "PseudoLabelConfig"
 ]
 
 
@@ -34,6 +35,9 @@ class TrainConfig(DictConfig):
 
     phase: Literal["train", "test"]
     scale_type: Literal["constant", "robust_scaler"]
+
+    # Pseudo labeling
+    Pseudo_label:"PseudoLabelConfig"
 
     # weight
 
@@ -99,6 +103,24 @@ class TrainConfig(DictConfig):
     inference_step_offset: int
 
 
+
+@dataclasses.dataclass
+class PseudoLabelConfig:
+    use_Pseudo: bool
+    save_Pseudo: bool
+    save_path:str
+    use_version:int
+    v0:"PseudoLabelV0Config"
+    v1:"PseudoLabelv1Config"
+@dataclasses.dataclass
+class PseudoLabelV0Config:
+    path_Pseudo:str
+    th_sleep:float
+    th_prop:float
+
+class PseudoLabelv1Config:
+    path_Pseudo:str
+    watch_interval:float
 @dataclasses.dataclass
 class TrainSplit(DictConfig):
     name: Literal["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]
