@@ -279,7 +279,7 @@ class TrainDataset(Dataset):
             .to_pandas()
         )
         self.features = features
-        self.num_features = len(cfg.features)
+        self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )

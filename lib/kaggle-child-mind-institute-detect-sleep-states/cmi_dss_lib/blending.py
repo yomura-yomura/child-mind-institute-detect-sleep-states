@@ -40,7 +40,7 @@ def calc_score(
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
         df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-            keys=[series_id] * len(mean_preds),
+            series_id=series_id,
             preds=mean_preds,
             labels=["sleep", "event_onset", "event_wakeup"],
             # preds=corrected_preds[:, :, [1, 2]],
@@ -49,6 +49,7 @@ def calc_score(
             distance=distance,
             post_process_modes=post_process_modes,
             print_msg=print_msg,
+            n_records_per_series_id=None,
         ).drop(columns=["row_id"])
         if n_records_per_series_id is not None:
             df = df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
@@ -73,12 +74,16 @@ def calc_score(
         )
 
 
-def get_grid(n_cols: int, step: float, target_sum: float = 1, start: float = 0) -> NDArray[np.float_]:
+def get_grid(
+    n_cols: int, step: float, target_sum: float = 1, start: float = 0
+) -> NDArray[np.float_]:
     assert step < 1
     assert 0 <= target_sum
 
     target_sum *= round(1 / step)
-    base_weight = pd.DataFrame(np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4")
+    base_weight = pd.DataFrame(
+        np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4"
+    )
 
     weight = base_weight.copy()
     for i, _ in enumerate(tqdm.trange(n_cols - 1)):
@@ -92,7 +97,10 @@ def get_grid(n_cols: int, step: float, target_sum: float = 1, start: float = 0) 
 
 def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str], folds: list[int]):
     predicted_npz_dir_paths = [
-        [pathlib.Path(model_dir_path) / "train" / f"fold_{i_fold}" for model_dir_path in model_dir_paths]
+        [
+            pathlib.Path(model_dir_path) / "train" / f"fold_{i_fold}"
+            for model_dir_path in model_dir_paths
+        ]
         for i_fold in folds
     ]  # (fold, model)
     for predicted_npz_dir_paths_by_fold in predicted_npz_dir_paths:
@@ -101,7 +109,9 @@ def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str], folds: list[in
                 raise FileNotFoundError(path)
 
     count_by_series_id_df = (
-        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df("train", as_polars=True)
+        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
+            "train", as_polars=True
+        )
         .group_by("series_id")
         .count()
         .collect()
@@ -137,13 +147,19 @@ def optimize(
 
     match search_type:
         case "grid_search":
-            target_csv_path = project_root_path / "run" / "grid_search" / models_dir_name / "grid_search.csv"
+            target_csv_path = (
+                project_root_path / "run" / "grid_search" / models_dir_name / "grid_search.csv"
+            )
             print(f"{target_csv_path = }")
 
             if target_csv_path.exists():
                 df = pd.read_csv(target_csv_path)
-                df["scores"] = df["scores"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
-                df["weights"] = df["weights"].apply(lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")])
+                df["scores"] = df["scores"].apply(
+                    lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+                )
+                df["weights"] = df["weights"].apply(
+                    lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
+                )
 
                 # df = pd.concat(
                 #     [
@@ -205,7 +221,11 @@ def optimize(
 
                 loaded_weight = np.array(df["weights"].tolist())
                 all_weights_to_find = np.array(
-                    [w for w in all_weights_to_find if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))]
+                    [
+                        w
+                        for w in all_weights_to_find
+                        if not np.any(np.all(np.isclose(w, loaded_weight), axis=1))
+                    ]
                 )
                 print(f"-> {all_weights_to_find.shape = }")
 
@@ -216,9 +236,13 @@ def optimize(
             n_steps_to_save = 30
             with multiprocessing.Pool(n_cpus) as p:
                 with tqdm.tqdm(total=len(all_weights_to_find), desc="grid search") as t:
-                    for scores, weights in p.imap_unordered(calc_all_scores, all_weights_to_find.tolist()):
+                    for scores, weights in p.imap_unordered(
+                        calc_all_scores, all_weights_to_find.tolist()
+                    ):
                         t.update(1)
-                        records.append({"CV": np.mean(scores), "scores": scores, "weights": weights})
+                        records.append(
+                            {"CV": np.mean(scores), "scores": scores, "weights": weights}
+                        )
 
                         if len(records) % n_steps_to_save == 0:
                             print_best_score_so_far(records, target_csv_path)
@@ -251,7 +275,9 @@ def optimize(
             study.optimize(objective, n_trials=100, n_jobs=n_cpus, show_progress_bar=True)
 
 
-def print_best_score_so_far(records: list[dict], target_csv_path: pathlib.Path, initial_weight_dict=None):
+def print_best_score_so_far(
+    records: list[dict], target_csv_path: pathlib.Path, initial_weight_dict=None
+):
     df = pd.DataFrame(records)
     target_csv_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(target_csv_path, index=False)
