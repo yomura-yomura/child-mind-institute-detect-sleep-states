@@ -1,25 +1,26 @@
 from typing import Union
 
 import torch.nn as nn
-from cmi_dss_lib.models.decoder.lstmdecoder import LSTMDecoder
-from cmi_dss_lib.models.decoder.mlpdecoder import MLPDecoder
-from cmi_dss_lib.models.decoder.transformerdecoder import TransformerDecoder
-from cmi_dss_lib.models.decoder.unet1ddecoder import UNet1DDecoder
-from cmi_dss_lib.models.feature_extractor.cnn import CNNSpectrogram
-from cmi_dss_lib.models.feature_extractor.lstm import LSTMFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.panns import PANNsFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.spectrogram import SpecFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_gru import StackedGRUFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
-from cmi_dss_lib.models.feature_extractor.timesnet import TimesNetFeatureExtractor
-from cmi_dss_lib.models.spec1D import Spec1D
-from cmi_dss_lib.models.spec2Dcnn import Spec2DCNN
 
 from child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm_attention.model import (
     FOGModel,
 )
 
 from ..config import TrainConfig
+from ..models.spec1D import Spec1D
+from ..models.spec2Dcnn import Spec2DCNN
+from .decoder.lstmdecoder import LSTMDecoder
+from .decoder.mlpdecoder import MLPDecoder
+from .decoder.transformerdecoder import TransformerDecoder
+from .decoder.unet1ddecoder import UNet1DDecoder
+from .feature_extractor.cnn import CNNSpectrogram
+from .feature_extractor.lstm import LSTMFeatureExtractor
+from .feature_extractor.panns import PANNsFeatureExtractor
+from .feature_extractor.spectrogram import SpecFeatureExtractor
+from .feature_extractor.stacked_gru import StackedGRUFeatureExtractor
+from .feature_extractor.stacked_lstm import StackedLSTMFeatureExtractor
+from .feature_extractor.timesnet import TimesNetFeatureExtractor
+from .feature_extractor.wave_net import WaveNet
 
 FEATURE_EXTRACTORS = Union[
     CNNSpectrogram,
@@ -30,6 +31,7 @@ FEATURE_EXTRACTORS = Union[
     StackedLSTMFeatureExtractor,
     TimesNetFeatureExtractor,
     FOGModel,
+    WaveNet,
 ]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
@@ -132,6 +134,17 @@ def get_feature_extractor(
             mha_dropout=cfg.feature_extractor.mha_dropout,
         )
         feature_extractor.height = cfg.feature_extractor.mha_embed_dim
+        feature_extractor.out_chans = 1
+    elif cfg.feature_extractor.name == "WaveNet":
+        out_channels = 32
+        feature_extractor = WaveNet(
+            in_channels=feature_dim,
+            duration=cfg.duration,
+            out_size=num_time_steps,
+            use_last_linear=True,
+            out_channels=out_channels,
+        )
+        feature_extractor.height = out_channels
         feature_extractor.out_chans = 1
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")

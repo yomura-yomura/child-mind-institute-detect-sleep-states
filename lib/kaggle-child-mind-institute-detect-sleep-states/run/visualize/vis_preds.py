@@ -44,6 +44,16 @@ class Plotter:
             / ".hydra"
             / "overrides.yaml"
         )
+        if not overrides_yaml_path.exists():
+            overrides_yaml_path = (
+                project_root_path
+                / "output"
+                / "train"
+                / exp_name.split("/", maxsplit=1)[1]
+                / f"fold_{i_fold}"
+                / ".hydra"
+                / "overrides.yaml"
+            )
         assert overrides_yaml_path.exists(), overrides_yaml_path
 
         if exp_name.startswith("train_stacking"):
@@ -230,7 +240,7 @@ def get_sub_df(
     series_id: str, preds: NDArray, labels: list[str], score_th=0.0005, distance=96
 ) -> DataFrame:
     sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-        keys=[series_id] * len(preds),
+        series_id=series_id,
         preds=preds,
         labels=labels,
         downsample_rate=2,

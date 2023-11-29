@@ -227,7 +227,7 @@ class BaseChunkModule(LightningModule):
         sub_df = pd.concat(
             joblib.Parallel(n_jobs=n_jobs)(
                 joblib.delayed(cmi_dss_lib.utils.post_process.post_process_for_seg)(
-                    keys=[series_id] * len(preds),
+                    series_id=series_id,
                     preds=preds,
                     labels=list(self.cfg.labels),
                     downsample_rate=self.cfg.downsample_rate,

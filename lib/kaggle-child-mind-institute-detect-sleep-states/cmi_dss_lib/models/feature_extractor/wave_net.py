@@ -43,7 +43,15 @@ class WaveBlock(nn.Module):
 
 
 class WaveNet(nn.Module):
-    def __init__(self, in_channels: int = 3, kernel_size: int = 3, use_last_linear: bool = False):
+    def __init__(
+        self,
+        in_channels: int,
+        duration: int,
+        out_size: int,
+        kernel_size: int = 3,
+        use_last_linear: bool = False,
+        out_channels: int = 3,
+    ):
         super().__init__()
 
         # self.wave_block1 = Wave_Block(inch, 16, 12, kernel_size)
@@ -57,23 +65,27 @@ class WaveNet(nn.Module):
 
         self.use_last_linear = use_last_linear
         if self.use_last_linear:
-            self.fc1 = nn.Linear(256, 3)
+            self.fc1 = nn.Linear(256, out_channels)
+
+        self.fc2 = nn.Linear(duration, out_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch_size, in_channels, time_steps)
 
-        x = x.permute(0, 2, 1)  # (batch_size, time_steps, in_channels)
         # x = self.wave_block1(x)
         x = self.wave_block2(x)
         x = self.wave_block3(x)
         x = self.wave_block4(x)
 
-        print(x.shape)
-
-        x = x.permute(0, 2, 1)  # (batch_size, in_channels, time_steps)
+        x = x.permute(0, 2, 1)  # (batch_size, time_steps, in_channels)
         x, _ = self.gru(x)
 
         if self.use_last_linear:
             x = self.fc1(x)
+
+        x = x.permute(0, 2, 1)  # (batch_size, in_channels, time_steps)
+        x = self.fc2(x)
+
+        x = x.unsqueeze(1)  # x: (batch_size, out_chans, in_channels, time_steps)
 
         return x
