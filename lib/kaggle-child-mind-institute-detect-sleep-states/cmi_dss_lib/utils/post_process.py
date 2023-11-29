@@ -8,9 +8,7 @@ import polars as pl
 from nptyping import DataFrame, Float, NDArray, Shape, Structure
 from scipy.signal import find_peaks
 
-SubmissionDataFrame = DataFrame[
-    Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
-]
+SubmissionDataFrame = DataFrame[Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]]
 
 
 class SleepingEdgesAsProbsSetting(TypedDict):
@@ -24,9 +22,7 @@ class CuttingProbsBySleepProbSetting(TypedDict):
 
 
 class PostProcessModeWithSetting(TypedDict, total=False):
-    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | dict[
-        Literal["onset", "wakeup"], SleepingEdgesAsProbsSetting
-    ]
+    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | dict[Literal["onset", "wakeup"], SleepingEdgesAsProbsSetting]
 
     cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | dict[
         Literal["onset", "wakeup"], CuttingProbsBySleepProbSetting
@@ -68,9 +64,7 @@ def post_process_for_seg(
         post_process_modes = {}
 
     possible_events = [
-        cmi_dss_lib.datamodule.seg.mapping[label]
-        for label in labels
-        if label in cmi_dss_lib.datamodule.seg.mapping
+        cmi_dss_lib.datamodule.seg.mapping[label] for label in labels if label in cmi_dss_lib.datamodule.seg.mapping
     ]
 
     if "sleeping_edges_as_probs" in post_process_modes:
@@ -97,20 +91,15 @@ def post_process_for_seg(
         # series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
         if "onset" in setting and "wakeup" in setting:
-            sleep_occupancy_th = {
-                event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]
-            }
+            sleep_occupancy_th = {event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]}
             watch_interval_hour = {
                 event: int(setting[event]["watch_interval_hour"] * 60 * 12 / downsample_rate)
                 for event in ["onset", "wakeup"]
             }
         else:
-            sleep_occupancy_th = {
-                event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]
-            }
+            sleep_occupancy_th = {event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]}
             watch_interval_hour = {
-                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
-                for event in ["onset", "wakeup"]
+                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate) for event in ["onset", "wakeup"]
             }
     else:
         sleep_occupancy_th = watch_interval_hour = None
@@ -229,9 +218,7 @@ def adapt_cutting_probs_by_sleep_prob(
         n = len(grouped_data)
         concat_pred = grouped_data["pred"].reshape(-1, 3)
 
-        median_sleep_probs = np.median(
-            rolling(concat_pred[:, 0], window=watch_interval_hour, axis=0), axis=1
-        )
+        median_sleep_probs = np.median(rolling(concat_pred[:, 0], window=watch_interval_hour, axis=0), axis=1)
         n_invalid_steps = len(concat_pred) - len(median_sleep_probs)
 
         # onset

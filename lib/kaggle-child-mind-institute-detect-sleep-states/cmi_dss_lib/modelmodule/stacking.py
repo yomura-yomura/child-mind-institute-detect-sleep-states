@@ -35,7 +35,7 @@ class StackingChunkModule(BaseChunkModule):
                 decoder_use_batchnorm=True,
                 in_channels=3,
                 classes=len(cfg.labels),
-                )
+            )
         else:
             raise ValueError(f"unexpected {cfg.model.segmentation_model_name=}")
 
@@ -53,9 +53,7 @@ class StackingChunkModule(BaseChunkModule):
 
             self.feature_extractors = nn.ModuleList(
                 [
-                    get_feature_extractor(
-                        cfg, feature_dim=len(cfg.input_model_names), num_time_steps=cfg.duration
-                    )
+                    get_feature_extractor(cfg, feature_dim=len(cfg.input_model_names), num_time_steps=cfg.duration)
                     for _ in range(3)
                 ]
             )
@@ -87,10 +85,7 @@ class StackingChunkModule(BaseChunkModule):
 
         if self.feature_extractors is not None:
             x = torch.stack(
-                [
-                    feature_extractor(x[:, i])[:, 0]
-                    for i, feature_extractor in enumerate(self.feature_extractors)
-                ],
+                [feature_extractor(x[:, i])[:, 0] for i, feature_extractor in enumerate(self.feature_extractors)],
                 dim=1,
             )  # (batch_size, pred_type, hidden_size * num_directions, duration)
 

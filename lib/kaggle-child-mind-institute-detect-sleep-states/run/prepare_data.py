@@ -375,12 +375,12 @@ def main(cfg: PrepareDataConfig):
             # if len(rolling_features) > 0:
             #    this_series_df = add_rolling_features(this_series_df)
 
-                # 特徴量をそれぞれnpy/npzで保存
+            # 特徴量をそれぞれnpy/npzで保存
 
-                series_dir = processed_dir / series_id
-                save_each_series(
-                    this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
-                )
+            series_dir = processed_dir / series_id
+            save_each_series(
+                this_series_df, feature_names + rolling_features, series_dir, cfg.save_as_npz
+            )
 
 
 if __name__ == "__main__":

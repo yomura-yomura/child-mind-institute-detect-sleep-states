@@ -35,9 +35,7 @@ DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
 MODELS = Union[Spec1D, Spec2DCNN]
 
 
-def get_feature_extractor(
-    cfg: TrainConfig, feature_dim: int, num_time_steps: int
-) -> FEATURE_EXTRACTORS:
+def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: int) -> FEATURE_EXTRACTORS:
     feature_extractor: FEATURE_EXTRACTORS
     if cfg.feature_extractor.name == "CNNSpectrogram":
         assert cfg.model_dim == 2
@@ -169,9 +167,7 @@ def get_feature_extractor(
     return feature_extractor
 
 
-def get_decoder(
-    cfg: TrainConfig, n_channels: int, n_classes: int, num_time_steps: int
-) -> DECODERS:
+def get_decoder(cfg: TrainConfig, n_channels: int, n_classes: int, num_time_steps: int) -> DECODERS:
     decoder: DECODERS
     if cfg.decoder.name == "UNet1DDecoder":
         decoder = UNet1DDecoder(

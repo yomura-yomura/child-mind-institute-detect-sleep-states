@@ -18,9 +18,7 @@ if __name__ == "__main__":
     # inference_step_offsets = np.arange(0, 24, 6) * 12 * 60
     inference_step_offsets = np.arange(0, 24, 4) * 12 * 60
     # inference_step_offsets = np.arange(0, 20, 4) * 12 * 60
-    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     pred_dir_path = project_root_path / "run" / "predicted" / exp_name
 
@@ -34,11 +32,7 @@ if __name__ == "__main__":
             for inference_step_offset in inference_step_offsets
         ]
         series_ids = list(
-            set(
-                p.stem
-                for target_pred_dir_path in target_pred_dir_paths
-                for p in target_pred_dir_path.glob("*.npz")
-            )
+            set(p.stem for target_pred_dir_path in target_pred_dir_paths for p in target_pred_dir_path.glob("*.npz"))
         )
 
         def apply(preds, inference_step_offset):
@@ -63,9 +57,7 @@ if __name__ == "__main__":
                 ],
                 axis=1,
             )
-            preds = pd.concat([df.iloc[:, i::3].mean(axis=1) for i in range(3)], axis=1).to_numpy(
-                "f2"
-            )
+            preds = pd.concat([df.iloc[:, i::3].mean(axis=1) for i in range(3)], axis=1).to_numpy("f2")
             np.savez_compressed(target_pred_mean_dir_path / f"{series_id}.npz", preds)
 
         from calc_cv import calc_score

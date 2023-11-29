@@ -1,11 +1,10 @@
-
 from pathlib import Path
 
 path_data = "../../../data/eda"
 import numpy as np
 
 
-def load_predicted(path_data:str):
+def load_predicted(path_data: str):
     dict_preds = {}
     for p in Path(path_data).iterdir():
         for f in p.iterdir():
@@ -15,7 +14,8 @@ def load_predicted(path_data:str):
 
     return dict_preds
 
-#def load_predicted(path_data:str):
+
+# def load_predicted(path_data:str):
 #    series_id = []
 #    preds = []
 #    for f in range(5):

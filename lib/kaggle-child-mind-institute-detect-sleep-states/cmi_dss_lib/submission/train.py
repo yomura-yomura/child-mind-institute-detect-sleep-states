@@ -38,9 +38,7 @@ def validation(
     for i_fold in tqdm.trange(5):
         common_unique_series_ids = None
         for i_model in range(len(predicted_model_dir_paths)):
-            unique_series_ids = sorted(
-                p.stem for p in series_id_grouped_npz_dir_paths[i_fold][i_model].glob("*.npz")
-            )
+            unique_series_ids = sorted(p.stem for p in series_id_grouped_npz_dir_paths[i_fold][i_model].glob("*.npz"))
             assert len(unique_series_ids) == len(set(unique_series_ids))
 
             if common_unique_series_ids is None:
@@ -56,22 +54,18 @@ def validation(
     for i_fold in range(5):
         print(f"fold {i_fold}")
         sub_df_list = []
-        for series_id in tqdm.tqdm(
-            common_unique_series_ids_list[i_fold], desc="summing up preds for each series_id"
-        ):
+        for series_id in tqdm.tqdm(common_unique_series_ids_list[i_fold], desc="summing up preds for each series_id"):
             preds_list = []
             weights = []
             for i_model, pred_dir_path in enumerate(predicted_model_dir_paths):
                 preds_list.append(
-                    np.load(series_id_grouped_npz_dir_paths[i_fold][i_model] / f"{series_id}.npz")[
-                        "arr_0"
-                    ][: min_duration_dict[series_id]]
+                    np.load(series_id_grouped_npz_dir_paths[i_fold][i_model] / f"{series_id}.npz")["arr_0"][
+                        : min_duration_dict[series_id]
+                    ]
                 )
                 weights.append(
                     model_dir_path_info_dict[
-                        os.path.join(
-                            "/kaggle/input/cmi-dss-ensemble-models/", *pred_dir_path.parts[-3:-1]
-                        )
+                        os.path.join("/kaggle/input/cmi-dss-ensemble-models/", *pred_dir_path.parts[-3:-1])
                     ][0]
                 )
 
@@ -94,9 +88,7 @@ def validation(
         sub_df = pd.concat(sub_df_list)
         sub_df = sub_df.sort_values(["series_id", "step"])
 
-        event_df = pd.read_csv(
-            "/kaggle/input/child-mind-institute-detect-sleep-states/train_events.csv"
-        ).dropna()
+        event_df = pd.read_csv("/kaggle/input/child-mind-institute-detect-sleep-states/train_events.csv").dropna()
 
         score = cmi_dss_lib.utils.metrics.event_detection_ap(
             event_df[event_df["series_id"].isin(common_unique_series_ids_list[i_fold])], sub_df

@@ -40,7 +40,7 @@ def calc_score(
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
         df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-            keys=[series_id] * len(mean_preds),
+            series_id=series_id,
             preds=mean_preds,
             labels=["sleep", "event_onset", "event_wakeup"],
             # preds=corrected_preds[:, :, [1, 2]],
@@ -49,6 +49,7 @@ def calc_score(
             distance=distance,
             post_process_modes=post_process_modes,
             print_msg=print_msg,
+            n_records_per_series_id=None,
         ).drop(columns=["row_id"])
         if n_records_per_series_id is not None:
             df = df.sort_values(["score"], ascending=False).head(n_records_per_series_id)

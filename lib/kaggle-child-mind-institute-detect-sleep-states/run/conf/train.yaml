@@ -73,19 +73,19 @@ sampling_with_start_timing_hour: false
 
 early_stopping_patience: 20
 
-# PsuedoLabeling
-psuedo_label:
-  use_psuedo: False
-  save_psuedo: False
+# PseudoLabeling
+pseudo_label:
+  use_pseudo: False
+  save_pseudo: False
   save_path: None
   use_version: 1
 
   v0:
-    path_psuedo: None
+    path_pseudo: None
     th_sleep: 0.9
     th_prop: 0.5
   v1:
-    path_psuedo: None
+    path_pseudo: None
     watch_interval: 2
 
 # augmentation

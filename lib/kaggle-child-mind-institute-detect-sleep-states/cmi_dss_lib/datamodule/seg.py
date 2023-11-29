@@ -224,19 +224,28 @@ def negative_sampling(this_event_df: pd.DataFrame, labels: list[str], num_steps:
 
 
 ###################
-# Psuedo label
+# Pseudo label
 ###################
 
-def get_labeling_interval(this_event_df:pd.DataFrame,max_steps:int,th_nan_label:int = 24*60*12,buffer:int = 8*60*12):
-    
+
+def get_labeling_interval(
+    this_event_df: pd.DataFrame,
+    max_steps: int,
+    th_nan_label: int = 24 * 60 * 12,
+    buffer: int = 8 * 60 * 12,
+):
     this_event_df["shift_onset"] = this_event_df["onset"].shift(-1).fillna(max_steps)
-    psuedo_interval = this_event_df[this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label][["wakeup","shift_onset"]].values
+    pseudo_interval = this_event_df[
+        this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label
+    ][["wakeup", "shift_onset"]].values
     first_onset = this_event_df.head(1)["onset"].values[0]
     if first_onset >= th_nan_label:
-        psuedo_interval = np.concatenate([np.array([[-buffer,first_onset+buffer]]),psuedo_interval])
-    psuedo_interval[:,0] +=  buffer
-    psuedo_interval[:,1] -=  buffer
-    return psuedo_interval
+        pseudo_interval = np.concatenate(
+            [np.array([[-buffer, first_onset + buffer]]), pseudo_interval]
+        )
+    pseudo_interval[:, 0] += buffer
+    pseudo_interval[:, 1] -= buffer
+    return Pseudo_interval
 
 
 ###################
@@ -255,7 +264,6 @@ def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
     return input_size
 
 
-
 class TrainDataset(Dataset):
     def __init__(
         self,
@@ -271,25 +279,30 @@ class TrainDataset(Dataset):
             .to_pandas()
         )
         self.features = features
-        self.num_features = len(cfg.features)
+        self.num_features = num_features
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
-        self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
-        if self.use_psuedo_label:
-            self.psuedo_version = self.cfg.psuedo_label.use_version
+        self.use_pseudo_label = self.cfg.pseudo_label.use_pseudo
+        if self.use_pseudo_label:
+            self.pseudo_version = self.cfg.pseudo_label.use_version
 
-            # psuedo label version 0
-            if self.psuedo_version == 0:
-                self.id_to_psuedo_label = load_predicted(self.cfg.psuedo_label.v0.path_psuedo)
+            # Pseudo label version 0
+            if self.pseudo_version == 0:
+                self.id_to_pseudo_label = load_predicted(self.cfg.pseudo_label.v0.path_pseudo)
                 self.id_to_label_interval = {}
-                for s_id,df in self.event_df.groupby("series_id"):
-                    self.id_to_label_interval[s_id] =get_labeling_interval(this_event_df =df.reset_index(drop = True),max_steps = self.id_to_psuedo_label[s_id].shape[0])//self.cfg.downsample_rate
+                for s_id, df in self.event_df.groupby("series_id"):
+                    self.id_to_label_interval[s_id] = (
+                        get_labeling_interval(
+                            this_event_df=df.reset_index(drop=True),
+                            max_steps=self.id_to_pseudo_label[s_id].shape[0],
+                        )
+                        // self.cfg.downsample_rate
+                    )
 
-            # psuedo label version 1
-            elif self.psuedo_version == 1:
-                self.df_psuedo_label = pd.read_csv(self.cfg.psuedo_label.v1.path_psuedo)
-
+            # Pseudo label version 1
+            elif self.pseudo_version == 1:
+                self.df_pseudo_label = pd.read_csv(self.cfg.pseudo_label.v1.path_pseudo)
 
         self.available_target_labels = [
             mapping[label] for label in self.cfg.labels if label in mapping
@@ -388,8 +401,10 @@ class TrainDataset(Dataset):
         )
 
         # 正解ラベル周辺の予測値を使った疑似ラベリング
-        if self.use_psuedo_label and self.psuedo_version == 1:
-            label = self.psuedo_labeling(label = label,start = start,end = end,num_frames = num_frames,series_id = series_id)
+        if self.use_pseudo_label and self.pseudo_version == 1:
+            label = self.pseudo_labeling(
+                label=label, start=start, end=end, num_frames=num_frames, series_id=series_id
+            )
 
         target_indices = []
         if "event_onset" in self.cfg.labels:
@@ -410,32 +425,36 @@ class TrainDataset(Dataset):
             raise RuntimeError(f"encountered nan/inf in label: {label}")
             target_indices.append(list(self.cfg.labels).index("event_wakeup"))
 
-        #if not self.use_psuedo_label and not self.psuedo_version == 1:
-        #label[:, target_indices] = gaussian_label(
+        # if not self.use_pseudo_label and not self.pseudo_version == 1:
+        # label[:, target_indices] = gaussian_label(
         #    label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
-        #)
+        # )
 
         # ラベルがない区間の疑似ラベリング
-        if self.use_psuedo_label and self.psuedo_version == 0:
-            label = self.psuedo_labeling(label = label,start = start,end = end,num_frames = num_frames,series_id = series_id)
+        if self.use_pseudo_label and self.pseudo_version == 0:
+            label = self.pseudo_labeling(
+                label=label, start=start, end=end, num_frames=num_frames, series_id=series_id
+            )
 
         return {
             "series_id": series_id,
             "feature": feature,  # (..., num_features, upsampled_num_frames)
             "label": torch.FloatTensor(label),  # (pred_length, num_classes)
         }
-    
-    def psuedo_labeling(self,label,start:int,end:int,num_frames:int,series_id:str):
+
+    def psuedo_labeling(self, label, start: int, end: int, num_frames: int, series_id: str):
         """psuedo labeling"""
 
         # ver0 ラベルがない場所に疑似ラベリング
 
         if self.psuedo_version == 0:
-            th_sleep=self.cfg.psuedo_label.v0.th_sleep
+            th_sleep = self.cfg.psuedo_label.v0.th_sleep
             th_prop = self.cfg.psuedo_label.v0.th_prop
-            psuedo_idx = np.arange(start//self.cfg.downsample_rate,end//self.cfg.downsample_rate)
+            psuedo_idx = np.arange(
+                start // self.cfg.downsample_rate, end // self.cfg.downsample_rate
+            )
             is_psuedo = False
-            for wakeup,onset in self.id_to_label_interval[series_id]:
+            for wakeup, onset in self.id_to_label_interval[series_id]:
                 mask = (psuedo_idx >= wakeup) & (psuedo_idx <= onset)
                 if np.any(mask):
                     is_psuedo = True
@@ -444,32 +463,39 @@ class TrainDataset(Dataset):
             if is_psuedo:
                 psuedo_idx = np.arange(num_frames)[mask]
 
-                
                 # Psuedo labelを呼び出し
-                psuedo_label = self.id_to_psuedo_label[series_id].reshape(-1,3)[start:end]
+                psuedo_label = self.id_to_psuedo_label[series_id].reshape(-1, 3)[start:end]
 
                 # down sampling with mean
-                #psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
-                psuedo_label = resize(
-                    torch.from_numpy(psuedo_label).unsqueeze(0),
-                    size=[num_frames, 3],
-                    antialias=False,
-                ).squeeze(0).numpy()
+                # psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
+                psuedo_label = (
+                    resize(
+                        torch.from_numpy(psuedo_label).unsqueeze(0),
+                        size=[num_frames, 3],
+                        antialias=False,
+                    )
+                    .squeeze(0)
+                    .numpy()
+                )
                 psuedo_label = psuedo_label[psuedo_idx]
 
                 # crop sleep
-                psuedo_label[:,0] = np.where(psuedo_label[:,0] <= th_sleep ,0 ,psuedo_label[:,0])
+                psuedo_label[:, 0] = np.where(
+                    psuedo_label[:, 0] <= th_sleep, 0, psuedo_label[:, 0]
+                )
 
                 # crop wakeup and onset prop
-                psuedo_label[:,1] = np.where(psuedo_label[:,1] <= th_prop,0,psuedo_label[:,1])
-                psuedo_label[:,2] = np.where(psuedo_label[:,2] <= th_prop,0,psuedo_label[:,2])
-                #ori_lab = copy.deepcopy(label)
+                psuedo_label[:, 1] = np.where(psuedo_label[:, 1] <= th_prop, 0, psuedo_label[:, 1])
+                psuedo_label[:, 2] = np.where(psuedo_label[:, 2] <= th_prop, 0, psuedo_label[:, 2])
+                # ori_lab = copy.deepcopy(label)
 
-                label[psuedo_idx]  = psuedo_label
+                label[psuedo_idx] = psuedo_label
         elif self.psuedo_version == 1:
-            watch_interval = 12* 60* self.cfg.psuedo_label.v1.watch_interval
-            th_min_interval = 12*10 # 10min
-            df_psuedo = self.df_psuedo_label.query("series_id == @series_id & step <= @end & step >= @start")
+            watch_interval = 12 * 60 * self.cfg.psuedo_label.v1.watch_interval
+            th_min_interval = 12 * 10  # 10min
+            df_psuedo = self.df_psuedo_label.query(
+                "series_id == @series_id & step <= @end & step >= @start"
+            )
             # save psuedo label
             if self.cfg.psuedo_label.save_psuedo:
                 did_labeling = False
@@ -477,9 +503,11 @@ class TrainDataset(Dataset):
 
             if not df_psuedo.empty:
                 labels = list(self.cfg.labels)
-                for idx,event,score in df_psuedo[["step","event","score"]].values:
+                for idx, event, score in df_psuedo[["step", "event", "score"]].values:
                     # idxのwatch_interval間に正解ラベルが存在しないか判定
-                    not_exist_true_label = self.event_df[event][idx-watch_interval:idx+watch_interval].empty
+                    not_exist_true_label = self.event_df[event][
+                        idx - watch_interval : idx + watch_interval
+                    ].empty
 
                     # 周辺に正解ラベルがない場合は早期リターン
                     if not_exist_true_label:
@@ -487,13 +515,41 @@ class TrainDataset(Dataset):
                     did_labeling = True
                     # get_labels関数と処理は同じ
                     label_idx = int((idx - start) / self.cfg.duration * num_frames)
-                    if event == "onset" and 0 <= label_idx < num_frames and "event_onset" in labels :
+                    if (
+                        event == "onset"
+                        and 0 <= label_idx < num_frames
+                        and "event_onset" in labels
+                    ):
                         # 正解ラベルが入っている場合はスキップ
-                        if np.max(label[max(0,label_idx-th_min_interval):min(label_idx+th_min_interval,num_frames), labels.index("event_onset")]) < 1:
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_onset"),
+                                ]
+                            )
+                            < 1
+                        ):
                             label[label_idx, labels.index("event_onset")] = score
-                    if event == "wakeup" and num_frames > label_idx >= 0 and "event_wakeup" in labels:
+                    if (
+                        event == "wakeup"
+                        and num_frames > label_idx >= 0
+                        and "event_wakeup" in labels
+                    ):
                         # 正解ラベルが入っている場合はスキップ
-                        if np.max(label[max(0,label_idx-th_min_interval):min(label_idx+th_min_interval,num_frames), labels.index("event_wakeup")]) < 1:
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_wakeup"),
+                                ]
+                            )
+                            < 1
+                        ):
                             label[label_idx, labels.index("event_wakeup")] = score
             target_indices = []
             if "event_onset" in self.cfg.labels:
@@ -518,8 +574,298 @@ class TrainDataset(Dataset):
                 if did_labeling:
                     path = Path(self.cfg.psuedo_label.save_path)
                     if not path.exists():
-                        path.mkdir(parents = True,exist_ok = True)
-                    np.savez(Path(path) / f"{series_id}_{start}_{end}.npz",label = ori_label,psuedo = label,start = np.array([start]),end= np.array([end]))
+                        path.mkdir(parents=True, exist_ok=True)
+                    np.savez(
+                        Path(path) / f"{series_id}_{start}_{end}.npz",
+                        label=ori_label,
+                        psuedo=label,
+                        start=np.array([start]),
+                        end=np.array([end]),
+                    )
+        return label
+
+    def pseudo_labeling(self, label, start: int, end: int, num_frames: int, series_id: str):
+        """Pseudo labeling"""
+
+        # ver0 ラベルがない場所に疑似ラベリング
+
+        if self.pseudo_version == 0:
+            th_sleep = self.cfg.pseudo_label.v0.th_sleep
+            th_prop = self.cfg.pseudo_label.v0.th_prop
+            pseudo_idx = np.arange(
+                start // self.cfg.downsample_rate, end // self.cfg.downsample_rate
+            )
+            is_pseudo = False
+            for wakeup, onset in self.id_to_label_interval[series_id]:
+                mask = (pseudo_idx >= wakeup) & (pseudo_idx <= onset)
+                if np.any(mask):
+                    is_pseudo = True
+                    break
+
+            if is_pseudo:
+                pseudo_idx = np.arange(num_frames)[mask]
+
+                # Pseudo labelを呼び出し
+                pseudo_label = self.id_to_pseudo_label[series_id].reshape(-1, 3)[start:end]
+
+                # down sampling with mean
+                # pseudo_label = pseudo_label.reshape(num_frames,3,-1).mean(axis = 2)
+                pseudo_label = (
+                    resize(
+                        torch.from_numpy(pseudo_label).unsqueeze(0),
+                        size=[num_frames, 3],
+                        antialias=False,
+                    )
+                    .squeeze(0)
+                    .numpy()
+                )
+                pseudo_label = pseudo_label[pseudo_idx]
+
+                # crop sleep
+                pseudo_label[:, 0] = np.where(
+                    pseudo_label[:, 0] <= th_sleep, 0, pseudo_label[:, 0]
+                )
+
+                # crop wakeup and onset prop
+                pseudo_label[:, 1] = np.where(pseudo_label[:, 1] <= th_prop, 0, pseudo_label[:, 1])
+                pseudo_label[:, 2] = np.where(pseudo_label[:, 2] <= th_prop, 0, pseudo_label[:, 2])
+                # ori_lab = copy.deepcopy(label)
+
+                label[pseudo_idx] = pseudo_label
+        elif self.pseudo_version == 1:
+            watch_interval = 12 * 60 * self.cfg.pseudo_label.v1.watch_interval
+            th_min_interval = 12 * 10  # 10min
+            df_pseudo = self.df_pseudo_label.query(
+                "series_id == @series_id & step <= @end & step >= @start"
+            )
+            # save pseudo label
+            if self.cfg.pseudo_label.save_pseudo:
+                did_labeling = False
+                ori_label = copy.deepcopy(label)
+
+            if not df_pseudo.empty:
+                labels = list(self.cfg.labels)
+                for idx, event, score in df_pseudo[["step", "event", "score"]].values:
+                    # idxのwatch_interval間に正解ラベルが存在しないか判定
+                    not_exist_true_label = self.event_df[event][
+                        idx - watch_interval : idx + watch_interval
+                    ].empty
+
+                    # 周辺に正解ラベルがない場合は早期リターン
+                    if not_exist_true_label:
+                        continue
+                    did_labeling = True
+                    # get_labels関数と処理は同じ
+                    label_idx = int((idx - start) / self.cfg.duration * num_frames)
+                    if (
+                        event == "onset"
+                        and 0 <= label_idx < num_frames
+                        and "event_onset" in labels
+                    ):
+                        # 正解ラベルが入っている場合はスキップ
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_onset"),
+                                ]
+                            )
+                            < 1
+                        ):
+                            label[label_idx, labels.index("event_onset")] = score
+                    if (
+                        event == "wakeup"
+                        and num_frames > label_idx >= 0
+                        and "event_wakeup" in labels
+                    ):
+                        # 正解ラベルが入っている場合はスキップ
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_wakeup"),
+                                ]
+                            )
+                            < 1
+                        ):
+                            label[label_idx, labels.index("event_wakeup")] = score
+            target_indices = []
+            if "event_onset" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_onset"))
+            if "event_wakeup" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_wakeup"))
+
+            label[:, target_indices] = gaussian_label(
+                label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+            )
+            # 1を超えるラベルを補正
+            # NOTE:
+            label[label > 1] = 1
+
+            # save pseudo label (疑似ラベリングの付与したときのみにファイル保存)
+            if self.cfg.pseudo_label.save_pseudo:
+                ori_label[:, target_indices] = gaussian_label(
+                    ori_label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+                )
+
+                # save pseudo
+                if did_labeling:
+                    path = Path(self.cfg.pseudo_label.save_path)
+                    if not path.exists():
+                        path.mkdir(parents=True, exist_ok=True)
+                    np.savez(
+                        Path(path) / f"{series_id}_{start}_{end}.npz",
+                        label=ori_label,
+                        pseudo=label,
+                        start=np.array([start]),
+                        end=np.array([end]),
+                    )
+        return label
+
+    def pseudo_labeling(self, label, start: int, end: int, num_frames: int, series_id: str):
+        """Pseudo labeling"""
+
+        # ver0 ラベルがない場所に疑似ラベリング
+
+        if self.pseudo_version == 0:
+            th_sleep = self.cfg.pseudo_label.v0.th_sleep
+            th_prop = self.cfg.pseudo_label.v0.th_prop
+            pseudo_idx = np.arange(
+                start // self.cfg.downsample_rate, end // self.cfg.downsample_rate
+            )
+            is_pseudo = False
+            for wakeup, onset in self.id_to_label_interval[series_id]:
+                mask = (pseudo_idx >= wakeup) & (pseudo_idx <= onset)
+                if np.any(mask):
+                    is_pseudo = True
+                    break
+
+            if is_pseudo:
+                pseudo_idx = np.arange(num_frames)[mask]
+
+                # Pseudo labelを呼び出し
+                pseudo_label = self.id_to_pseudo_label[series_id].reshape(-1, 3)[start:end]
+
+                # down sampling with mean
+                # pseudo_label = pseudo_label.reshape(num_frames,3,-1).mean(axis = 2)
+                pseudo_label = (
+                    resize(
+                        torch.from_numpy(pseudo_label).unsqueeze(0),
+                        size=[num_frames, 3],
+                        antialias=False,
+                    )
+                    .squeeze(0)
+                    .numpy()
+                )
+                pseudo_label = pseudo_label[pseudo_idx]
+
+                # crop sleep
+                pseudo_label[:, 0] = np.where(
+                    pseudo_label[:, 0] <= th_sleep, 0, pseudo_label[:, 0]
+                )
+
+                # crop wakeup and onset prop
+                pseudo_label[:, 1] = np.where(pseudo_label[:, 1] <= th_prop, 0, pseudo_label[:, 1])
+                pseudo_label[:, 2] = np.where(pseudo_label[:, 2] <= th_prop, 0, pseudo_label[:, 2])
+                # ori_lab = copy.deepcopy(label)
+
+                label[pseudo_idx] = pseudo_label
+        elif self.pseudo_version == 1:
+            watch_interval = 12 * 60 * self.cfg.pseudo_label.v1.watch_interval
+            th_min_interval = 12 * 10  # 10min
+            df_pseudo = self.df_pseudo_label.query(
+                "series_id == @series_id & step <= @end & step >= @start"
+            )
+            # save pseudo label
+            if self.cfg.pseudo_label.save_pseudo:
+                did_labeling = False
+                ori_label = copy.deepcopy(label)
+
+            if not df_pseudo.empty:
+                labels = list(self.cfg.labels)
+                for idx, event, score in df_pseudo[["step", "event", "score"]].values:
+                    # idxのwatch_interval間に正解ラベルが存在しないか判定
+                    not_exist_true_label = self.event_df[event][
+                        idx - watch_interval : idx + watch_interval
+                    ].empty
+
+                    # 周辺に正解ラベルがない場合は早期リターン
+                    if not_exist_true_label:
+                        continue
+                    did_labeling = True
+                    # get_labels関数と処理は同じ
+                    label_idx = int((idx - start) / self.cfg.duration * num_frames)
+                    if (
+                        event == "onset"
+                        and 0 <= label_idx < num_frames
+                        and "event_onset" in labels
+                    ):
+                        # 正解ラベルが入っている場合はスキップ
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_onset"),
+                                ]
+                            )
+                            < 1
+                        ):
+                            label[label_idx, labels.index("event_onset")] = score
+                    if (
+                        event == "wakeup"
+                        and num_frames > label_idx >= 0
+                        and "event_wakeup" in labels
+                    ):
+                        # 正解ラベルが入っている場合はスキップ
+                        if (
+                            np.max(
+                                label[
+                                    max(0, label_idx - th_min_interval) : min(
+                                        label_idx + th_min_interval, num_frames
+                                    ),
+                                    labels.index("event_wakeup"),
+                                ]
+                            )
+                            < 1
+                        ):
+                            label[label_idx, labels.index("event_wakeup")] = score
+            target_indices = []
+            if "event_onset" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_onset"))
+            if "event_wakeup" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_wakeup"))
+
+            label[:, target_indices] = gaussian_label(
+                label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+            )
+            # 1を超えるラベルを補正
+            # NOTE:
+            label[label > 1] = 1
+
+            # save pseudo label (疑似ラベリングの付与したときのみにファイル保存)
+            if self.cfg.pseudo_label.save_pseudo:
+                ori_label[:, target_indices] = gaussian_label(
+                    ori_label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+                )
+
+                # save pseudo
+                if did_labeling:
+                    path = Path(self.cfg.pseudo_label.save_path)
+                    if not path.exists():
+                        path.mkdir(parents=True, exist_ok=True)
+                    np.savez(
+                        Path(path) / f"{series_id}_{start}_{end}.npz",
+                        label=ori_label,
+                        pseudo=label,
+                        start=np.array([start]),
+                        end=np.array([end]),
+                    )
         return label
 
 
@@ -711,7 +1057,6 @@ class SegDataModule(LightningDataModule):
                 next_margin_steps=self.cfg.next_margin_steps,
             )
 
-
     def train_dataloader(self):
         train_dataset = TrainDataset(
             cfg=self.cfg,
@@ -757,4 +1102,3 @@ class SegDataModule(LightningDataModule):
             pin_memory=True,
             drop_last=False,
         )
-
