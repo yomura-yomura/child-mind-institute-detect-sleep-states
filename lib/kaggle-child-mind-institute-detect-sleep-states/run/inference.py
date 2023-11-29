@@ -44,11 +44,12 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp054",
         # "../cmi-dss-ensemble-models/ranchantan/exp055",
         # "../cmi-dss-ensemble-models/jumtras/exp058",
-        "../cmi-dss-ensemble-models/jumtras/exp085",
+        # "../cmi-dss-ensemble-models/jumtras/exp085",
         # "../cmi-dss-ensemble-models/ranchantan/exp060",
         # "../cmi-dss-ensemble-models/ranchantan/exp073_resume",
         # "../cmi-dss-ensemble-models/ranchantan/exp075-onset",
         # "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
+        "../output/train/exp095",
         #
         # "phase=dev",
         "phase=train",
