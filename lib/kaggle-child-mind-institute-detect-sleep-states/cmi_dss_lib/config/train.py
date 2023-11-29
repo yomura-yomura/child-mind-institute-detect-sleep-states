@@ -14,6 +14,7 @@ __all__ = [
     "TrainAugmentationConfig",
     "TrainPostProcessAugmentationConfig",
     "TrainOptimizerConfig",
+    "PsuedoLabelConfig"
 ]
 
 
@@ -35,17 +36,40 @@ class TrainConfig(DictConfig):
     phase: Literal["train", "test"]
     scale_type: Literal["constant", "robust_scaler"]
 
+    # psuedo labeling
+    psuedo_label:"PsuedoLabelConfig"
+
     # weight
 
-    use_amp: bool
-
-    # Dataset
     duration: int
     prev_margin_steps: int
     next_margin_steps: int
 
     downsample_rate: int
     upsample_rate: int
+
+    epoch: int
+    batch_size: int
+    num_workers: int
+    accelerator: Literal["auto"]
+    use_amp: bool
+    debug: bool
+    gradient_clip_val: float
+    accumulate_grad_batches: int
+    monitor: Literal["EventDetectionAP"]
+    monitor_mode: Literal["min", "max"]
+
+    check_val_every_n_epoch: int | None
+    val_check_interval: float | int | None
+    val_after_steps: int
+
+    offset: int
+    sigma: int
+    bg_sampling_rate: float
+
+    augmentation: "TrainAugmentationConfig"
+
+    post_process: "TrainPostProcessAugmentationConfig"
 
     labels: list[Literal["sleep", "event_onset", "event_wakeup"]]
 
@@ -62,31 +86,6 @@ class TrainConfig(DictConfig):
         ]
     ]
 
-    offset: int
-    sigma: int
-
-    bg_sampling_rate: float
-    sampling_with_start_timing_hour: bool
-
-    # Train
-    epoch: int
-    batch_size: int
-    num_workers: int
-    accelerator: Literal["auto"]
-    debug: bool
-    gradient_clip_val: float
-    accumulate_grad_batches: int
-    monitor: Literal["EventDetectionAP"]
-    monitor_mode: Literal["min", "max"]
-
-    check_val_every_n_epoch: int | None
-    val_check_interval: float | int | None
-    val_after_steps: int
-
-    augmentation: "TrainAugmentationConfig"
-
-    post_process: "TrainPostProcessAugmentationConfig"
-
     optimizer: "TrainOptimizerConfig"
 
     scheduler: "TrainSchedulerConfig"
@@ -95,10 +94,25 @@ class TrainConfig(DictConfig):
 
     resume_from_checkpoint: str | None
 
-    # Inference
-    inference_step_offset: int
 
 
+@dataclasses.dataclass
+class PsuedoLabelConfig:
+    use_psuedo: bool
+    save_psuedo: bool
+    save_path:str
+    use_version:int
+    v0:"PsuedoLabelv0Config"
+    v1:"PsuedoLabelv1Config"
+@dataclasses.dataclass
+class PsuedoLabelv0Config:
+    path_psuedo:str
+    th_sleep:float
+    th_prop:float
+
+class PsuedoLabelv1Config:
+    path_psuedo:str
+    watch_interval:float
 @dataclasses.dataclass
 class TrainSplit(DictConfig):
     name: Literal["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]

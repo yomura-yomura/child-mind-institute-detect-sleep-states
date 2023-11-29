@@ -1,6 +1,6 @@
+import copy
 import pathlib
 import random
-import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +9,9 @@ import omegaconf
 import pandas as pd
 import polars as pl
 import torch
+from cmi_dss_lib.utils.load_predicted import load_predicted
+
+# = result_pathfrom cmi_dss_lib.utils.post_process import post_process_for_seg
 from lightning import LightningDataModule
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import resize
@@ -53,11 +56,10 @@ def load_features(
 def load_chunk_features(
     duration: int,
     feature_names: list[str],
-    series_ids: list[str],
+    series_ids: Optional[list[str]],
     processed_dir: Path,
     phase: str,
     scale_type: str,
-    inference_step_offset: int,
     prev_margin_steps: int = 0,
     next_margin_steps: int = 0,
 ) -> dict[str, np.ndarray]:
@@ -66,6 +68,9 @@ def load_chunk_features(
     phase_dir_path = processed_dir / phase / scale_type
     if not phase_dir_path.exists():
         raise FileNotFoundError(f"{phase_dir_path.resolve()}")
+
+    if series_ids is None:
+        series_ids = [series_dir.name for series_dir in phase_dir_path.glob("*")]
 
     for series_id in series_ids:
         series_dir = phase_dir_path / series_id
@@ -79,9 +84,6 @@ def load_chunk_features(
             ],
             axis=1,
         )  # (duration, feature)
-
-        if inference_step_offset is not None:
-            this_feature = this_feature[inference_step_offset:]
 
         indexer = Indexer(this_feature.shape[0], duration, prev_margin_steps, next_margin_steps)
 
@@ -220,6 +222,22 @@ def negative_sampling(this_event_df: pd.DataFrame, labels: list[str], num_steps:
 
 
 ###################
+# Psuedo label
+###################
+
+def get_labeling_interval(this_event_df:pd.DataFrame,max_steps:int,th_nan_label:int = 24*60*12,buffer:int = 8*60*12):
+    
+    this_event_df["shift_onset"] = this_event_df["onset"].shift(-1).fillna(max_steps)
+    psuedo_interval = this_event_df[this_event_df["shift_onset"] - this_event_df["wakeup"] >= th_nan_label][["wakeup","shift_onset"]].values
+    first_onset = this_event_df.head(1)["onset"].values[0]
+    if first_onset >= th_nan_label:
+        psuedo_interval = np.concatenate([np.array([[-buffer,first_onset+buffer]]),psuedo_interval])
+    psuedo_interval[:,0] +=  buffer
+    psuedo_interval[:,1] -=  buffer
+    return psuedo_interval
+
+
+###################
 # Dataset
 ###################
 def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
@@ -233,6 +251,7 @@ def nearest_valid_size(input_size: int, downsample_rate: int) -> int:
     assert (input_size // downsample_rate) % 32 == 0
 
     return input_size
+
 
 
 class TrainDataset(Dataset):
@@ -250,26 +269,33 @@ class TrainDataset(Dataset):
             .to_pandas()
         )
         self.features = features
-        # self.num_features = len(cfg.features)
+        self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
-        self.num_features = num_features
+        self.use_psuedo_label = self.cfg.psuedo_label.use_psuedo
+        if self.use_psuedo_label:
+            self.psuedo_version = self.cfg.psuedo_label.use_version
+
+            # psuedo label version 0
+            if self.psuedo_version == 0:
+                self.id_to_psuedo_label = load_predicted(self.cfg.psuedo_label.v0.path_psuedo)
+                self.id_to_label_interval = {}
+                for s_id,df in self.event_df.groupby("series_id"):
+                    self.id_to_label_interval[s_id] =get_labeling_interval(this_event_df =df.reset_index(drop = True),max_steps = self.id_to_psuedo_label[s_id].shape[0])//self.cfg.downsample_rate
+
+            # psuedo label version 1
+            elif self.psuedo_version == 1:
+                self.df_psuedo_label = pd.read_csv(self.cfg.psuedo_label.v1.path_psuedo)
+
 
         self.available_target_labels = [
             mapping[label] for label in self.cfg.labels if label in mapping
         ]
 
-        if self.cfg.sampling_with_start_timing_hour:
-            assert self.cfg.duration == 17280
-            assert self.cfg.prev_margin_steps == self.cfg.next_margin_steps == 0
-            from run.anl_start_timing_for_each_series_id import get_kde, get_start_timing_hour_dict
-
-            self.start_timing_hour_dict = get_start_timing_hour_dict()
-            self.start_timing_hour_sampler = get_kde()
-        else:
-            self.start_timing_hour_dict = None
-            self.start_timing_hour_sampler = None
+        self.available_target_labels = [
+            mapping[label] for label in self.cfg.labels if label in mapping
+        ]
 
     def __len__(self):
         return len(self.event_df)
@@ -283,7 +309,6 @@ class TrainDataset(Dataset):
         )
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
-
         # extract data matching series_id
         this_feature = self.features[series_id]  # (..., n_steps, num_features)
 
@@ -297,39 +322,13 @@ class TrainDataset(Dataset):
             pos = self.event_df.at[idx, event]
 
         # crop
-        if self.cfg.sampling_with_start_timing_hour:
-            this_start_hour = self.start_timing_hour_dict[series_id]
-            sampled_start_hour = self.start_timing_hour_sampler.resample(size=1)[0][0]
+        start, end = random_crop(
+            pos,
+            self.cfg.duration,
+            n_steps,
+        )
 
-            pos_to_sample = np.arange(pos - self.cfg.duration, pos) + 1
-            hours_to_sample = (this_start_hour + pos_to_sample / (12 * 60)) % 24
-
-            order = np.argsort(hours_to_sample)
-            start = int(
-                pos_to_sample[
-                    order[
-                        min(
-                            np.searchsorted(hours_to_sample[order], sampled_start_hour),
-                            len(hours_to_sample) - 1,
-                        )
-                    ]
-                ]
-            )
-            if start < 0:
-                warnings.warn("pos < 0", UserWarning)
-                start = max(start, 0)
-            if start > n_steps - self.cfg.duration:
-                warnings.warn("pos > n_steps - duration", UserWarning)
-                start = min(start, n_steps - self.cfg.duration)
-            end = start + self.cfg.duration
-        else:
-            start, end = random_crop(
-                pos,
-                self.cfg.duration,
-                n_steps,
-            )
-
-        feature = this_feature[..., start:end, :]  # (..., duration, num_features)
+        feature = this_feature[start:end]  # (duration, num_features)
 
         # upsample
         feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(0)
@@ -339,36 +338,133 @@ class TrainDataset(Dataset):
             antialias=False,
         ).squeeze(0)
 
-        if not np.isfinite(feature).all():
-            raise RuntimeError(f"encountered nan/inf in feature: {feature}")
-
         # from hard label to gaussian label
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
         label = get_label(
             this_event_df, list(self.cfg.labels), num_frames, self.cfg.duration, start, end
         )
+
+        # 正解ラベル周辺の予測値を使った疑似ラベリング
+        if self.use_psuedo_label and self.psuedo_version == 1:
+            label = self.psuedo_labeling(label = label,start = start,end = end,num_frames = num_frames,series_id = series_id)
+
+        target_indices = []
         if "event_onset" in self.cfg.labels:
-            i = list(self.cfg.labels).index("event_onset")
-            label[:, [i]] = gaussian_label(
-                label[:, [i]],
-                offset=self.cfg.offset_onset or self.cfg.offset,
-                sigma=self.cfg.sigma_onset or self.cfg.sigma,
-            )
+            target_indices.append(list(self.cfg.labels).index("event_onset"))
         if "event_wakeup" in self.cfg.labels:
-            i = list(self.cfg.labels).index("event_wakeup")
-            label[:, [i]] = gaussian_label(
-                label[:, [i]],
-                offset=self.cfg.offset_wakeup or self.cfg.offset,
-                sigma=self.cfg.sigma_wakeup or self.cfg.sigma,
-            )
-        if not np.isfinite(label).all():
-            raise RuntimeError(f"encountered nan/inf in label: {label}")
+            target_indices.append(list(self.cfg.labels).index("event_wakeup"))
+
+        #if not self.use_psuedo_label and not self.psuedo_version == 1:
+        #label[:, target_indices] = gaussian_label(
+        #    label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+        #)
+
+        # ラベルがない区間の疑似ラベリング
+        if self.use_psuedo_label and self.psuedo_version == 0:
+            label = self.psuedo_labeling(label = label,start = start,end = end,num_frames = num_frames,series_id = series_id)
 
         return {
             "series_id": series_id,
             "feature": feature,  # (..., num_features, upsampled_num_frames)
             "label": torch.FloatTensor(label),  # (pred_length, num_classes)
         }
+    
+    def psuedo_labeling(self,label,start:int,end:int,num_frames:int,series_id:str):
+        """psuedo labeling"""
+
+        # ver0 ラベルがない場所に疑似ラベリング
+
+        if self.psuedo_version == 0:
+            th_sleep=self.cfg.psuedo_label.v0.th_sleep
+            th_prop = self.cfg.psuedo_label.v0.th_prop
+            psuedo_idx = np.arange(start//self.cfg.downsample_rate,end//self.cfg.downsample_rate)
+            is_psuedo = False
+            for wakeup,onset in self.id_to_label_interval[series_id]:
+                mask = (psuedo_idx >= wakeup) & (psuedo_idx <= onset)
+                if np.any(mask):
+                    is_psuedo = True
+                    break
+
+            if is_psuedo:
+                psuedo_idx = np.arange(num_frames)[mask]
+
+                
+                # Psuedo labelを呼び出し
+                psuedo_label = self.id_to_psuedo_label[series_id].reshape(-1,3)[start:end]
+
+                # down sampling with mean
+                #psuedo_label = psuedo_label.reshape(num_frames,3,-1).mean(axis = 2)
+                psuedo_label = resize(
+                    torch.from_numpy(psuedo_label).unsqueeze(0),
+                    size=[num_frames, 3],
+                    antialias=False,
+                ).squeeze(0).numpy()
+                psuedo_label = psuedo_label[psuedo_idx]
+
+                # crop sleep
+                psuedo_label[:,0] = np.where(psuedo_label[:,0] <= th_sleep ,0 ,psuedo_label[:,0])
+
+                # crop wakeup and onset prop
+                psuedo_label[:,1] = np.where(psuedo_label[:,1] <= th_prop,0,psuedo_label[:,1])
+                psuedo_label[:,2] = np.where(psuedo_label[:,2] <= th_prop,0,psuedo_label[:,2])
+                #ori_lab = copy.deepcopy(label)
+
+                label[psuedo_idx]  = psuedo_label
+        elif self.psuedo_version == 1:
+            watch_interval = 12* 60* self.cfg.psuedo_label.v1.watch_interval
+            th_min_interval = 12*10 # 10min
+            df_psuedo = self.df_psuedo_label.query("series_id == @series_id & step <= @end & step >= @start")
+            # save psuedo label
+            if self.cfg.psuedo_label.save_psuedo:
+                did_labeling = False
+                ori_label = copy.deepcopy(label)
+
+            if not df_psuedo.empty:
+                labels = list(self.cfg.labels)
+                for idx,event,score in df_psuedo[["step","event","score"]].values:
+                    # idxのwatch_interval間に正解ラベルが存在しないか判定
+                    not_exist_true_label = self.event_df[event][idx-watch_interval:idx+watch_interval].empty
+
+                    # 周辺に正解ラベルがない場合は早期リターン
+                    if not_exist_true_label:
+                        continue
+                    did_labeling = True
+                    # get_labels関数と処理は同じ
+                    label_idx = int((idx - start) / self.cfg.duration * num_frames)
+                    if event == "onset" and 0 <= label_idx < num_frames and "event_onset" in labels :
+                        # 正解ラベルが入っている場合はスキップ
+                        if np.max(label[max(0,label_idx-th_min_interval):min(label_idx+th_min_interval,num_frames), labels.index("event_onset")]) < 1:
+                            label[label_idx, labels.index("event_onset")] = score
+                    if event == "wakeup" and num_frames > label_idx >= 0 and "event_wakeup" in labels:
+                        # 正解ラベルが入っている場合はスキップ
+                        if np.max(label[max(0,label_idx-th_min_interval):min(label_idx+th_min_interval,num_frames), labels.index("event_wakeup")]) < 1:
+                            label[label_idx, labels.index("event_wakeup")] = score
+            target_indices = []
+            if "event_onset" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_onset"))
+            if "event_wakeup" in self.cfg.labels:
+                target_indices.append(list(self.cfg.labels).index("event_wakeup"))
+
+            label[:, target_indices] = gaussian_label(
+                label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+            )
+            # 1を超えるラベルを補正
+            # NOTE:
+            label[label > 1] = 1
+
+            # save psuedo label (疑似ラベリングの付与したときのみにファイル保存)
+            if self.cfg.psuedo_label.save_psuedo:
+                ori_label[:, target_indices] = gaussian_label(
+                    ori_label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+                )
+
+                # save psuedo
+                if did_labeling:
+                    path = Path(self.cfg.psuedo_label.save_path)
+                    if not path.exists():
+                        path.mkdir(parents = True,exist_ok = True)
+                    np.savez(Path(path) / f"{series_id}_{start}_{end}.npz",label = ori_label,psuedo = label,start = np.array([start]),end= np.array([end]))
+        return label
 
 
 class ValidDataset(Dataset):
@@ -442,11 +538,15 @@ class ValidDataset(Dataset):
 
 
 class TestDataset(Dataset):
-    def __init__(self, cfg: TrainConfig, chunk_features: dict[str, np.ndarray], num_features: int):
+    def __init__(
+        self,
+        cfg: TrainConfig,
+        chunk_features: dict[str, np.ndarray],
+    ):
         self.cfg = cfg
         self.chunk_features = chunk_features
         self.keys = [key for key in chunk_features.keys() if not key.endswith("_mask")]
-        self.num_features = num_features
+        self.num_features = len(cfg.features)
         self.upsampled_num_frames = nearest_valid_size(
             int(self.cfg.duration * self.cfg.upsample_rate), self.cfg.downsample_rate
         )
@@ -457,9 +557,7 @@ class TestDataset(Dataset):
     def __getitem__(self, idx):
         key = self.keys[idx]
         feature = self.chunk_features[key]
-        feature = torch.FloatTensor(feature.swapaxes(-2, -1)).unsqueeze(
-            0
-        )  # (1, ..., num_features, duration)
+        feature = torch.FloatTensor(feature.T).unsqueeze(0)  # (1, num_features, duration)
         feature = resize(
             feature,
             size=[self.num_features, self.upsampled_num_frames],
@@ -523,17 +621,14 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase=self.cfg.phase,
                 scale_type=self.cfg.scale_type,
-                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
-
-        series_ids = [
-            series_dir.name
-            for series_dir in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
-            if series_dir.is_dir() and not series_dir.name.startswith(".")
-        ]
         if stage == "test":
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -541,12 +636,15 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="test",
                 scale_type=self.cfg.scale_type,
-                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
 
         if stage == "dev":
+            series_ids = [
+                x.name
+                for x in (self.processed_dir / self.cfg.phase / self.cfg.scale_type).glob("*")
+            ]
             self.test_chunk_features = load_chunk_features(
                 duration=self.cfg.duration,
                 feature_names=self.cfg.features,
@@ -554,10 +652,10 @@ class SegDataModule(LightningDataModule):
                 processed_dir=self.processed_dir,
                 phase="dev",
                 scale_type=self.cfg.scale_type,
-                inference_step_offset=self.cfg.inference_step_offset,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
+
 
     def train_dataloader(self):
         train_dataset = TrainDataset(
@@ -591,11 +689,7 @@ class SegDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):
-        test_dataset = TestDataset(
-            self.cfg,
-            chunk_features=self.test_chunk_features,
-            num_features=len(self.cfg.features),
-        )
+        test_dataset = TestDataset(self.cfg, chunk_features=self.test_chunk_features)
         return torch.utils.data.DataLoader(
             test_dataset,
             batch_size=self.cfg.batch_size,
@@ -604,3 +698,4 @@ class SegDataModule(LightningDataModule):
             pin_memory=True,
             drop_last=False,
         )
+

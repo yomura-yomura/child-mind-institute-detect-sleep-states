@@ -28,8 +28,15 @@ use_amp: false
 phase: train
 scale_type: constant
 
+duration: 5760 # duration * 5 = 秒数
+prev_margin_steps: 0
+next_margin_steps: 0
+
+downsample_rate: 2
+upsample_rate: 1
+
 # training
-epoch: 70
+epoch: 50
 #batch_size: 64
 batch_size: 32  # 0.0005
 #batch_size: 16
@@ -52,26 +59,27 @@ val_after_steps: 0
 resume_from_checkpoint: null
 
 # Dataset
-duration: 5760 # duration * 5 = 秒数
-prev_margin_steps: 0
-next_margin_steps: 0
-
-downsample_rate: 2
-upsample_rate: 1
-
-sigma: 10
 offset: 10  # how long gaussian sigma spreads at most on half side
-
-sigma_onset: null
-offset_onset: null
-
-sigma_wakeup: null
-offset_wakeup: null
+sigma: 10
 
 bg_sampling_rate: 0.5
-sampling_with_start_timing_hour: false
 
 early_stopping_patience: 20
+
+# PsuedoLabeling
+psuedo_label:
+  use_psuedo: False
+  save_psuedo: False
+  save_path: None
+  use_version: 1
+
+  v0:
+    path_psuedo: None
+    th_sleep: 0.9
+    th_prop: 0.5
+  v1:
+    path_psuedo: None
+    watch_interval: 2
 
 # augmentation
 augmentation:
@@ -106,13 +114,9 @@ features:
 
 # optimizer
 optimizer:
-#  lr: 0.0005
-  lr: 0.00025
+  lr: 0.0005
+#  lr: 0.00025
 
 # scheduler
 scheduler:
   num_warmup_steps: 0
-
-
-# Inference
-inference_step_offset: null
