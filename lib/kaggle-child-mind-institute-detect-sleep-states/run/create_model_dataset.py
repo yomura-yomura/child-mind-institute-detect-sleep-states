@@ -44,13 +44,14 @@ train_type = "train"
 # exp_name = "exp060"
 # exp_name = "exp073_resume"
 # exp_name = "exp075-onset"
-exp_name = "exp088"
+# exp_name = "exp088"
+exp_name = "exp100"
 
 # train_type = "stacking"
 # exp_name = "s_exp006"
 
-# upload = False
-upload = True
+upload = False
+# upload = True
 
 
 @hydra.main(config_path="conf", config_name=train_type, version_base="1.2")
@@ -76,7 +77,9 @@ def main(cfg: DictConfig):
     else:
         raise ValueError(f"unexpected {train_type=}")
 
-    output_dir_path = dataset_output_dir_path / best_model_path.relative_to(train_output_dir_path).parent
+    output_dir_path = (
+        dataset_output_dir_path / best_model_path.relative_to(train_output_dir_path).parent
+    )
     output_dir_path.mkdir(exist_ok=True, parents=True)
 
     (output_dir_path / ".hydra").mkdir(exist_ok=True)
@@ -97,7 +100,9 @@ def main(cfg: DictConfig):
 
 
 if __name__ == "__main__":
-    train_output_dir_path = project_root_path / "output" / ("train" if train_type == "train" else "train_stacking")
+    train_output_dir_path = (
+        project_root_path / "output" / ("train" if train_type == "train" else "train_stacking")
+    )
     print(f"{train_output_dir_path.resolve()=}")
 
     path_df = pd.DataFrame(
@@ -111,13 +116,19 @@ if __name__ == "__main__":
         ],
         columns=["path", "i_fold", "version"],
     )
-    path_df = path_df.sort_values(["i_fold", "version"], ascending=[True, False]).groupby(["i_fold"]).head(1)
+    path_df = (
+        path_df.sort_values(["i_fold", "version"], ascending=[True, False])
+        .groupby(["i_fold"])
+        .head(1)
+    )
     print(path_df)
 
     scores = []
     for best_model_path, i_fold, version in tqdm.tqdm(path_df.itertuples(index=False)):
         print(best_model_path.readlink().name)
-        scores.append(float(best_model_path.readlink().stem.split("EventDetectionAP=", maxsplit=1)[1]))
+        scores.append(
+            float(best_model_path.readlink().stem.split("EventDetectionAP=", maxsplit=1)[1])
+        )
         best_model_path = best_model_path.parent / best_model_path.readlink().name
         overrides_args = OmegaConf.load(best_model_path.parent / ".hydra" / "overrides.yaml")
         sys.argv = overrides_args
@@ -140,7 +151,9 @@ if __name__ == "__main__":
             }
 
         dataset_dir_path = project_root_path / (
-            "cmi-dss-ensemble-models" if train_type == "train" else "cmi-dss-ensemble-stacking-models"
+            "cmi-dss-ensemble-models"
+            if train_type == "train"
+            else "cmi-dss-ensemble-stacking-models"
         )
         dataset_dir_path.mkdir(exist_ok=True, parents=True)
         with open(dataset_dir_path / "dataset-metadata.json", "w") as f:

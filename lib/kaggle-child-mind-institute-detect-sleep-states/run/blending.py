@@ -16,7 +16,8 @@ np.seterr(all="raise")
 project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    args = ["-s", "grid_search", "-f", "0"]
+    #     args = ["-s", "grid_search", "-f", "0"]
+    args = None
 else:
     args = None
 
@@ -84,6 +85,7 @@ all_model_dir_path_dict = {
     "75": ranchantan_pred_dir_path / "exp075-wakeup_5",
     "85": jumtras_pred_dir_path / "exp085",
     "88": jumtras_pred_dir_path / "exp088",
+    "100": ranchantan_pred_dir_path / "exp100",
 } | {
     "s6": stacking_pred_dir_path / "s_exp006",
 }
@@ -109,17 +111,18 @@ all_model_dir_path_dict = {
 
 # weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
 # weight_dict = {"19": 0.05, "27": 0.05, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}
-weight_dict = {
-    # "7": 0.05,
-    "19": 0.05,
-    "27": 0.05,
-    "50": 0.2,
-    "53": 0.3,
-    "58": 0.1,
-    "85": 0.2,
-    "88": 0.1,
-}
-
+# weight_dict = {
+#     # "7": 0.05,
+#     "19": 0.05,
+#     "27": 0.05,
+#     "50": 0.2,
+#     "53": 0.3,
+#     "58": 0.1,
+#     "85": 0.2,
+#     "88": 0.1,
+# }  # 25
+# weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1}  # 24
+weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1, "100": 0}
 
 score_th = 0.005
 distance = 96
@@ -144,7 +147,9 @@ if __name__ == "__main__":
     model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths, folds)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
 
     def calc_all_scores(
         weights: list[float],
@@ -183,7 +188,8 @@ if __name__ == "__main__":
             list(weight_dict.values()),
             score_th=1e-4,
             distance=88,
-            n_records_per_series_id=1000,
+            n_records_per_series_id=2000,
+            # n_records_per_series_id=None,
             post_process_modes=post_process_modes,
             print_msg=True,
             calc_type="normal",
@@ -200,10 +206,8 @@ if __name__ == "__main__":
     else:
         models_dir_name = "_".join(str(exp) for exp in weight_dict)
 
-        # weight = get_grid(step=0.1)
-        # weight = get_grid(step=0.1, target_sum=1)
         weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
-        # weight = get_grid(step=0.02, target_sum=1)
+        # weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.05, target_sum=1)
 
         if folds == [0, 1, 2, 3, 4]:
             models_dir_name = f"blending/{models_dir_name}"

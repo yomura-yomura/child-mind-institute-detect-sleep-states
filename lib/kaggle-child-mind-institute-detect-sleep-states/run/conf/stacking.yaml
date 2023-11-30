@@ -75,6 +75,8 @@ resume_from_checkpoint: null
 
 early_stopping_patience: 20
 
+soft_label_type: gaussian
+
 # post_process
 post_process:
   score_th: 0.005

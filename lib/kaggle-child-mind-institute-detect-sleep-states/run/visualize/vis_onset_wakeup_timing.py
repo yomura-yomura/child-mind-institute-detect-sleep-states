@@ -11,10 +11,11 @@ event_df = (
         "train", as_polars=True
     )
     .with_columns(
-        pl.col("timestamp").str.to_datetime()
-        # .dt
-        # # .convert_time_zone("America/Caracas")
-        # .convert_time_zone("America/Chicago")
+        pl.col("timestamp")
+        .str.to_datetime()
+        .dt
+        # .convert_time_zone("America/Caracas")
+        .convert_time_zone("America/Chicago")
     )
     .with_columns(
         hour=pl.col("timestamp").dt.hour(),
@@ -36,8 +37,8 @@ fig = px.histogram(
     color="event",
     barmode="overlay",
     # facet_row="is_holiday",
-    facet_row="is_valid_holiday",
-    # facet_row="weekday",
+    # facet_row="is_valid_holiday",
+    facet_row="weekday",
     histnorm="probability density",
     category_orders={"weekday": event_df["weekday"].unique()},
 )

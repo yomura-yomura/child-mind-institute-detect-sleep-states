@@ -16,6 +16,10 @@ import child_mind_institute_detect_sleep_states.score
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
+import cmi_dss_lib.data.utils
+
+start_timing_dict = cmi_dss_lib.data.utils.get_start_timing_dict("train")
+
 
 def calc_score(
     i_fold: int,
@@ -39,6 +43,12 @@ def calc_score(
     for series_id, preds in zip(series_ids, preds_dict[i_fold], strict=True):
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
+
+        # p = pathlib.Path("mean_preds") / f"fold_{i_fold}" / f"{series_id}.npz"
+        # p.parent.mkdir(exist_ok=True, parents=True)
+        # np.savez_compressed(p, mean_preds)
+        # print(f"Info: saved as {p}")
+
         df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             series_id=series_id,
             preds=mean_preds,
@@ -49,10 +59,9 @@ def calc_score(
             distance=distance,
             post_process_modes=post_process_modes,
             print_msg=print_msg,
-            n_records_per_series_id=None,
-        ).drop(columns=["row_id"])
-        if n_records_per_series_id is not None:
-            df = df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
+            n_records_per_series_id=n_records_per_series_id,
+            start_timing_dict=start_timing_dict,
+        )
         df_submit_list.append(df)
     df_submit = pd.concat(df_submit_list)
     df_submit = df_submit.sort_values(["series_id", "step"])

@@ -59,16 +59,6 @@ def calc_score(
     sub_df_list = []
     for series_id in tqdm.tqdm(series_ids):
         preds = np.load(predicted_fold_dir_path / f"{series_id}.npz")["arr_0"]
-        timing = (
-            pd.Series(np.arange(preds.shape[0]).astype("m8[s]") * 5) + start_timing_dict[series_id]
-        )
-        sel = ((13 <= timing.dt.hour) & (timing.dt.hour <= 18)).to_numpy(bool)
-        print(series_id, preds[sel].max(axis=0))
-        preds[sel, 1] = 0
-
-        sel = ((20 <= timing.dt.hour) | (timing.dt.hour <= 3)).to_numpy(bool)
-        print(series_id, preds[sel].max(axis=0))
-        preds[sel, 2] = 0
 
         sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             series_id,
@@ -78,6 +68,7 @@ def calc_score(
             score_th=score_th,
             distance=distance,
             post_process_modes=post_process_modes,
+            start_timing_dict=start_timing_dict,
         )
         if n_records_per_series_id is not None:
             sub_df = sub_df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
@@ -133,7 +124,7 @@ if __name__ == "__main__":
             labels=["sleep", "event_onset", "event_wakeup"],
             score_th=1e-4,
             distance=88,
-            n_records_per_series_id=1000,
+            n_records_per_series_id=1500,
             # score_th=0.005,
             # distance=96,
             downsample_rate=2,

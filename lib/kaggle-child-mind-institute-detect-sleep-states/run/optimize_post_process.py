@@ -8,26 +8,32 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 
 project_root_path = pathlib.Path(__file__).parent.parent
 ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan"
+train_pred_dir_path = project_root_path / "run" / "predicted" / "train"
 
-model_dir_path = ranchantan_pred_dir_path / "exp050-transformer-decoder_retry"
-
+# model_dir_path = ranchantan_pred_dir_path / "exp050-transformer-decoder_retry"
+model_dir_path = train_pred_dir_path / "exp104_2"
+folds = [0]
 
 if __name__ == "__main__":
-    # post_process_type = "base"
+    post_process_type = "base"
     # post_process_type = "cutting_probs_by_sleep_prob"
-    post_process_type = "sleeping_edges_as_probs"
+    # post_process_type = "sleeping_edges_as_probs"
 
-    keys_dict, preds_dict = get_keys_and_preds([model_dir_path])
+    keys_dict, preds_dict = get_keys_and_preds([model_dir_path], folds=folds)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
+        "train"
+    ).dropna()
 
     import pandas as pd
 
     if post_process_type == "base":
-        # score_ths = np.logspace(-3, 1, 100)
+        # score_ths = np.logspace(-3, 1, 10)
         # distances = np.linspace(1, 1 * 12 * 60, 100)
-        score_ths = np.logspace(-10, np.log10(0.05), 100)[::-1]
-        distances = np.linspace(1, 100, 101)
+        # score_ths = np.logspace(-10, np.log10(0.05), 100)[::-1]
+        # distances = np.linspace(1, 100, 101)
+        score_ths = np.logspace(-3, 0, 10)
+        distances = np.linspace(200, 300, 10)
         grid_parameters = pd.merge(
             pd.Series(score_ths, name="score_th"),
             pd.Series(distances, name="distance"),
@@ -48,7 +54,7 @@ if __name__ == "__main__":
                     distance=distance,
                     calc_type=calc_type,
                 )
-                for i_fold in tqdm.trange(5, desc="calc score over n-folds")
+                for i_fold in tqdm.tqdm(folds, desc="calc score over n-folds")
             ]
             mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
             print(f"{mean_score_str} ({', '.join(score_strs)}) at {grid_parameter}")
@@ -73,7 +79,9 @@ if __name__ == "__main__":
             how="cross",
         ).to_numpy()
 
-        def calc_all_scores(grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"):
+        def calc_all_scores(
+            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
+        ):
             # sleep_occupancy_th, watch_interval_hour = grid_parameter
             (
                 sleep_occupancy_th_onset,
@@ -106,7 +114,7 @@ if __name__ == "__main__":
                     ),
                     print_msg=False,
                 )
-                for i_fold in tqdm.trange(5, desc="calc score over n-folds")
+                for i_fold in tqdm.tqdm(folds, desc="calc score over n-folds")
             ]
             mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
             print(f"{mean_score_str} ({', '.join(score_strs)}) at {grid_parameter}")
@@ -121,7 +129,9 @@ if __name__ == "__main__":
             how="cross",
         ).to_numpy()
 
-        def calc_all_scores(grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"):
+        def calc_all_scores(
+            grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
+        ):
             sleep_prob_th, min_sleeping_hours = grid_parameter
 
             scores = [
@@ -135,11 +145,13 @@ if __name__ == "__main__":
                     distance=distance,
                     calc_type=calc_type,
                     post_process_modes=dict(
-                        sleeping_edges_as_probs=dict(sleep_prob_th=sleep_prob_th, min_sleeping_hours=min_sleeping_hours)
+                        sleeping_edges_as_probs=dict(
+                            sleep_prob_th=sleep_prob_th, min_sleeping_hours=min_sleeping_hours
+                        )
                     ),
                     print_msg=False,
                 )
-                for i_fold in tqdm.trange(5, desc="calc score over n-folds")
+                for i_fold in tqdm.tqdm(folds, desc="calc score over n-folds")
             ]
             mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
             print(f"{mean_score_str} ({', '.join(score_strs)}) at {grid_parameter}")

@@ -99,6 +99,8 @@ class EventMetrics:
     def get_metrics(self) -> dict:
         matches = np.concatenate(self.matches, axis=0)
         probs = np.concatenate(self.probs, axis=0)
+        if len(probs) == 0:
+            return {"precision": np.nan, "recall": np.nan, "average_precision": np.nan, "prob": probs}
 
         # sort by probs in descending order
         indices = np.argsort(probs)[::-1]

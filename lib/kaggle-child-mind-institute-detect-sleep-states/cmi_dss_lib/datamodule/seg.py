@@ -62,6 +62,7 @@ def load_chunk_features(
     phase: str,
     scale_type: str,
     inference_step_offset: int,
+    fix_start_timing_hour_with: float | None,
     prev_margin_steps: int = 0,
     next_margin_steps: int = 0,
 ) -> dict[str, np.ndarray]:
@@ -83,11 +84,19 @@ def load_chunk_features(
             ],
             axis=1,
         )  # (duration, feature)
+        n_steps = this_feature.shape[0]
 
         if inference_step_offset is not None:
             this_feature = this_feature[inference_step_offset:]
 
-        indexer = Indexer(this_feature.shape[0], duration, prev_margin_steps, next_margin_steps)
+        indexer = Indexer(
+            n_steps,
+            duration,
+            prev_margin_steps,
+            next_margin_steps,
+            fix_start_timing_hour_with=fix_start_timing_hour_with,
+            series_id=series_id,
+        )
 
         num_chunks = (len(this_feature) // indexer.interest_duration) + 1
         for i in range(num_chunks):
@@ -95,23 +104,56 @@ def load_chunk_features(
 
             start, end = indexer.get_interest_range(i)
 
-            mask = np.zeros(this_feature.shape[0], dtype=bool)
+            mask = np.zeros(n_steps, dtype=bool)
             mask[start:end] = True
 
             # extend crop area with margins
             start, end = indexer.get_cropping_range(i)
 
-            features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
-
-            chunk_feature = pad_if_needed(this_feature[start:end], duration, pad_value=0)
+            # chunk_feature = pad_if_needed(this_feature[start:end], duration, pad_value=0)
+            # features[f"{key}_mask"] = pad_if_needed(mask[start:end], duration, pad_value=0)
+            chunk_feature = pad_features_if_needed(this_feature, start, end, n_steps, duration)
+            features[f"{key}_mask"] = pad_features_if_needed(
+                mask[..., np.newaxis], start, end, n_steps, duration
+            )[..., 0]
             features[key] = chunk_feature
 
     return features  # type: ignore
 
 
+def pad_features_if_needed(feature, start, end, n_steps, duration):
+    if start >= 0:
+        n_steps_to_pad = 0
+    else:
+        n_steps_to_pad = -start
+        start = 0
+    feature = feature[..., start:end, :]
+
+    if n_steps_to_pad > 0:
+        feature = np.pad(
+            feature,
+            pad_width=[*([(0, 0)] * (feature.ndim - 2)), (n_steps_to_pad, 0), (0, 0)],
+        )
+
+    if end > n_steps:
+        n_steps_to_pad = end - n_steps
+        feature = np.pad(
+            feature,
+            pad_width=[*([(0, 0)] * (feature.ndim - 2)), (0, n_steps_to_pad), (0, 0)],
+        )
+    assert feature.shape[-2] == duration, (feature.shape[-2], duration)
+    return feature
+
+
 class Indexer:
     def __init__(
-        self, total_duration: int, duration: int, prev_margin_steps: int, next_margin_steps: int
+        self,
+        total_duration: int,
+        duration: int,
+        prev_margin_steps: int,
+        next_margin_steps: int,
+        fix_start_timing_hour_with: int | None,
+        series_id: str | None = None,
     ):
         self.total_duration = total_duration
         self.interest_duration = duration - prev_margin_steps - next_margin_steps
@@ -119,9 +161,22 @@ class Indexer:
         self.prev_margin_steps = prev_margin_steps
         self.next_margin_steps = next_margin_steps
 
+        if fix_start_timing_hour_with is None:
+            self.start_timing_hour = None
+        else:
+            from run.anl_start_timing_for_each_series_id import get_start_timing_hour_dict
+
+            self.start_timing_hour = get_start(
+                0, duration, get_start_timing_hour_dict()[series_id], fix_start_timing_hour_with
+            )
+
     def get_interest_range(self, i: int) -> tuple[int, int]:
-        start = i * self.interest_duration
-        end = (i + 1) * self.interest_duration
+        if self.start_timing_hour is None:
+            offset = 0
+        else:
+            offset = self.start_timing_hour
+        start = offset + i * self.interest_duration
+        end = offset + (i + 1) * self.interest_duration
         return start, end
 
     def get_cropping_range(self, i: int) -> tuple[int, int]:
@@ -136,6 +191,24 @@ class Indexer:
             end = self.total_duration - 1
         assert end - start == self.duration, (start, end, self.duration)
         return start, end
+
+
+def get_start(pos, duration, this_start_hour, sampled_start_hour):
+    pos_to_sample = np.arange(pos - duration, pos) + 1
+    hours_to_sample = (this_start_hour + pos_to_sample / (12 * 60)) % 24
+
+    order = np.argsort(hours_to_sample)
+    start = int(
+        pos_to_sample[
+            order[
+                min(
+                    np.searchsorted(hours_to_sample[order], sampled_start_hour),
+                    len(hours_to_sample) - 1,
+                )
+            ]
+        ]
+    )
+    return start
 
 
 ###################
@@ -167,6 +240,7 @@ def get_label(
     #     this_event_df = this_event_df[start <= this_event_df["wakeup"]]
     # if "event_wakeup" in labels:
     #     this_event_df = this_event_df[this_event_df["onset"] <= end]
+    start = max(start, 0)
     this_event_df = this_event_df.query("@start <= wakeup & onset <= @end")
 
     label = np.zeros((num_frames, len(labels)))
@@ -188,19 +262,45 @@ def get_label(
 
 
 # ref: https://www.kaggle.com/competitions/dfl-bundesliga-data-shootout/discussion/360236#2004730
-def gaussian_kernel(length: int, sigma: int = 3) -> np.ndarray:
-    x = np.ogrid[-length : length + 1]
+def gaussian_kernel(length_on_half_side: int, sigma: int = 3) -> np.ndarray:
+    x = np.ogrid[-length_on_half_side : length_on_half_side + 1]
     h = np.exp(-(x**2) / (2 * sigma * sigma))  # type: ignore
     h[h < np.finfo(h.dtype).eps * h.max()] = 0
     return h
 
 
-def gaussian_label(label: np.ndarray, offset: int, sigma: int) -> np.ndarray:
+def apply_soft_labeling(
+    label: np.ndarray, offset: int, sigma: int, sampling_rate: float, soft_label_type: str
+) -> np.ndarray:
+    if soft_label_type == "gaussian":
+        kernel = gaussian_kernel(offset, sigma)
+    elif soft_label_type == "event_detection_ap_th":
+        kernel = event_detection_ap_th_label("onset", sampling_rate)
+    else:
+        raise ValueError(f"unexpected {soft_label_type=}")
+
     num_events = label.shape[1]
     for i in range(num_events):
-        label[:, i] = np.convolve(label[:, i], gaussian_kernel(offset, sigma), mode="same")
+        label[:, i] = np.convolve(label[:, i], kernel, mode="same")
 
     return label
+
+
+import cmi_dss_lib.utils.metrics
+
+
+def event_detection_ap_th_label(event: str, sampling_rate: float):
+    tolerances = [
+        int(tol * sampling_rate) for tol in cmi_dss_lib.utils.metrics.default_tolerances[event]
+    ]
+    print(f"{tolerances = }")
+    max_length = max(tolerances)
+    return np.array(
+        [
+            [0] * (max_length - interval) + [1 / 10] * 2 * interval + [0] * (max_length - interval)
+            for interval in tolerances
+        ]
+    ).sum(axis=0)
 
 
 mapping = {"event_onset": "onset", "event_wakeup": "wakeup"}
@@ -344,11 +444,11 @@ class TrainDataset(Dataset):
         )
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
-
+        print(this_event_df.shape)
         # extract data matching series_id
-        this_feature = self.features[series_id]  # (..., n_steps, num_features)
+        feature = self.features[series_id]  # (..., n_steps, num_features)
 
-        n_steps = this_feature.shape[-2]
+        n_steps = feature.shape[-2]
 
         if random.random() < self.cfg.bg_sampling_rate:
             # sample background (potentially include labels in duration)
@@ -356,7 +456,7 @@ class TrainDataset(Dataset):
         else:
             # always include labels in duration
             pos = self.event_df.at[idx, event]
-
+        print(f"{pos=}")
         # crop
         if self.cfg.sampling_with_start_timing_hour or self.cfg.fix_start_timing_hour_with:
             this_start_hour = self.start_timing_hour_dict[series_id]
@@ -367,20 +467,7 @@ class TrainDataset(Dataset):
             else:
                 assert False
 
-            pos_to_sample = np.arange(pos - self.cfg.duration, pos) + 1
-            hours_to_sample = (this_start_hour + pos_to_sample / (12 * 60)) % 24
-
-            order = np.argsort(hours_to_sample)
-            start = int(
-                pos_to_sample[
-                    order[
-                        min(
-                            np.searchsorted(hours_to_sample[order], sampled_start_hour),
-                            len(hours_to_sample) - 1,
-                        )
-                    ]
-                ]
-            )
+            start = get_start(pos, self.cfg.duration, this_start_hour, sampled_start_hour)
             # if start < 0:
             #     warnings.warn("pos < 0", UserWarning)
             #     start = max(start, 0)
@@ -394,15 +481,10 @@ class TrainDataset(Dataset):
                 self.cfg.duration,
                 n_steps,
             )
-        if start >= 0:
-            feature = this_feature[..., start:end, :]
-        else:
-            n_steps_to_pad = -start
-            start = 0
-            feature = np.pad(
-                this_feature[..., start:end, :],
-                pad_width=[*([(0, 0)] * (this_feature.ndim - 2)), (n_steps_to_pad, 0), (0, 0)],
-            )
+
+        print(start, end, n_steps, feature.shape)
+        feature = pad_features_if_needed(feature, start, end, n_steps, self.cfg.duration)
+        print(feature.shape)
         # feature: (..., duration, num_features)
 
         # upsample
@@ -411,7 +493,9 @@ class TrainDataset(Dataset):
             feature,
             size=[self.num_features, self.upsampled_num_frames],
             antialias=False,
-        ).squeeze(0)
+        ).squeeze(
+            0
+        )  # (..., num_features, duration)
 
         if not np.isfinite(feature).all():
             raise RuntimeError(f"encountered nan/inf in feature: {feature}")
@@ -424,28 +508,32 @@ class TrainDataset(Dataset):
 
         # 正解ラベル周辺の予測値を使った疑似ラベリング
         if self.use_pseudo_label and self.pseudo_version == 1:
+            print(f"pseudo label")
             label = self.pseudo_labeling(
                 label=label, start=start, end=end, num_frames=num_frames, series_id=series_id
             )
 
-        target_indices = []
         if "event_onset" in self.cfg.labels:
             i = list(self.cfg.labels).index("event_onset")
-            label[:, [i]] = gaussian_label(
+            label[:, [i]] = apply_soft_labeling(
                 label[:, [i]],
                 offset=self.cfg.offset_onset or self.cfg.offset,
                 sigma=self.cfg.sigma_onset or self.cfg.sigma,
+                sampling_rate=num_frames / self.cfg.duration,
+                soft_label_type=self.cfg.soft_label_type,
             )
         if "event_wakeup" in self.cfg.labels:
             i = list(self.cfg.labels).index("event_wakeup")
-            label[:, [i]] = gaussian_label(
+            label[:, [i]] = apply_soft_labeling(
                 label[:, [i]],
                 offset=self.cfg.offset_wakeup or self.cfg.offset,
                 sigma=self.cfg.sigma_wakeup or self.cfg.sigma,
+                sampling_rate=num_frames / self.cfg.duration,
+                soft_label_type=self.cfg.soft_label_type,
             )
+
         if not np.isfinite(label).all():
             raise RuntimeError(f"encountered nan/inf in label: {label}")
-            target_indices.append(list(self.cfg.labels).index("event_wakeup"))
 
         # if not self.use_pseudo_label and not self.pseudo_version == 1:
         # label[:, target_indices] = gaussian_label(
@@ -466,6 +554,7 @@ class TrainDataset(Dataset):
 
     def pseudo_labeling(self, label, start: int, end: int, num_frames: int, series_id: str):
         """Pseudo labeling"""
+        start = max(start, 0)
 
         # ver0 ラベルがない場所に疑似ラベリング
 
@@ -476,11 +565,13 @@ class TrainDataset(Dataset):
                 start // self.cfg.downsample_rate, end // self.cfg.downsample_rate
             )
             is_pseudo = False
+            mask = None
             for wakeup, onset in self.id_to_label_interval[series_id]:
                 mask = (pseudo_idx >= wakeup) & (pseudo_idx <= onset)
                 if np.any(mask):
                     is_pseudo = True
                     break
+            assert mask is not None
 
             if is_pseudo:
                 pseudo_idx = np.arange(num_frames)[mask]
@@ -522,6 +613,9 @@ class TrainDataset(Dataset):
             if self.cfg.pseudo_label.save_pseudo:
                 did_labeling = False
                 ori_label = copy.deepcopy(label)
+            else:
+                did_labeling = False
+                ori_label = None
 
             if not df_pseudo.empty:
                 labels = list(self.cfg.labels)
@@ -573,14 +667,19 @@ class TrainDataset(Dataset):
                             < 1
                         ):
                             label[label_idx, labels.index("event_wakeup")] = score
+
             target_indices = []
             if "event_onset" in self.cfg.labels:
                 target_indices.append(list(self.cfg.labels).index("event_onset"))
             if "event_wakeup" in self.cfg.labels:
                 target_indices.append(list(self.cfg.labels).index("event_wakeup"))
 
-            label[:, target_indices] = gaussian_label(
-                label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+            label[:, target_indices] = apply_soft_labeling(
+                label[:, target_indices],
+                offset=self.cfg.offset,
+                sigma=self.cfg.sigma,
+                sampling_rate=num_frames / self.cfg.duration,
+                soft_label_type=self.cfg.soft_label_type,
             )
             # 1を超えるラベルを補正
             # NOTE:
@@ -588,8 +687,12 @@ class TrainDataset(Dataset):
 
             # save pseudo label (疑似ラベリングの付与したときのみにファイル保存)
             if self.cfg.pseudo_label.save_pseudo:
-                ori_label[:, target_indices] = gaussian_label(
-                    ori_label[:, target_indices], offset=self.cfg.offset, sigma=self.cfg.sigma
+                ori_label[:, target_indices] = apply_soft_labeling(
+                    ori_label[:, target_indices],
+                    offset=self.cfg.offset,
+                    sigma=self.cfg.sigma,
+                    sampling_rate=num_frames / self.cfg.duration,
+                    soft_label_type=self.cfg.soft_label_type,
                 )
 
                 # save pseudo
@@ -657,6 +760,8 @@ class ValidDataset(Dataset):
             self.cfg.duration,
             self.cfg.prev_margin_steps,
             self.cfg.next_margin_steps,
+            fix_start_timing_hour_with=self.cfg.fix_start_timing_hour_with,
+            series_id=series_id,
         ).get_cropping_range(chunk_id)
 
         num_frames = self.upsampled_num_frames // self.cfg.downsample_rate
@@ -760,6 +865,7 @@ class SegDataModule(LightningDataModule):
                 phase=self.cfg.phase,
                 scale_type=self.cfg.scale_type,
                 inference_step_offset=self.cfg.inference_step_offset,
+                fix_start_timing_hour_with=self.cfg.fix_start_timing_hour_with,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
@@ -778,6 +884,7 @@ class SegDataModule(LightningDataModule):
                 phase="test",
                 scale_type=self.cfg.scale_type,
                 inference_step_offset=self.cfg.inference_step_offset,
+                fix_start_timing_hour_with=self.cfg.fix_start_timing_hour_with,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )
@@ -791,6 +898,7 @@ class SegDataModule(LightningDataModule):
                 phase="dev",
                 scale_type=self.cfg.scale_type,
                 inference_step_offset=self.cfg.inference_step_offset,
+                fix_start_timing_hour_with=self.cfg.fix_start_timing_hour_with,
                 prev_margin_steps=self.cfg.prev_margin_steps,
                 next_margin_steps=self.cfg.next_margin_steps,
             )

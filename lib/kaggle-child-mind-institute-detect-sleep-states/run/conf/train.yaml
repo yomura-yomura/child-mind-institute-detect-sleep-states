@@ -74,6 +74,8 @@ fix_start_timing_hour_with: null
 
 early_stopping_patience: 20
 
+soft_label_type: gaussian
+
 # PseudoLabeling
 pseudo_label:
   use_pseudo: False
