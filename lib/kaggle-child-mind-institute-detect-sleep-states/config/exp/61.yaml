@@ -22,6 +22,6 @@
 - check_val_every_n_epoch=null
 - val_after_steps=8000
 
-- psuedo_label.path_psuedo=../../psuedo_label/
-- psuedo_label.use_psuedo=true
-- psuedo_label.th_prop=0.1
+- pseudo_label.path_pseudo=../../pseudo_label/
+- pseudo_label.use_pseudo=true
+- pseudo_label.th_prop=0.1

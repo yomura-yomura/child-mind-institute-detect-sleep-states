@@ -287,7 +287,7 @@ if __name__ == "__main__":
             series_id = p.stem
             preds = np.load(p)["arr_0"]
             sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-                keys=[series_id] * len(preds),
+                series_id = series_id,
                 preds=preds,
                 labels=plotter.cfg.labels,
                 downsample_rate=plotter.cfg.downsample_rate,

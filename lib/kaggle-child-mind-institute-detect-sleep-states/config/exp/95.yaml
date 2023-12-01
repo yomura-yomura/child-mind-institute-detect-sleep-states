@@ -23,7 +23,7 @@
 - check_val_every_n_epoch=null
 - val_after_steps=5000
 
-- psuedo_label.use_psuedo=true
-- psuedo_label.use_version = 1
-- psuedo_label.v1.path_psuedo=/data/exp058/train
-- psuedo_label.v1.watch_interval=2
+- pseudo_label.use_pseudo=true
+- pseudo_label.use_version=1
+- pseudo_label.v1.path_pseudo=/home/jumpei.uchida/develop/child-mind-institute-detect-sleep-states/lib/kaggle-child-mind-institute-detect-sleep-states/pseudo_label/pseudo_label_0.5.csv
+- pseudo_label.v1.watch_interval=2

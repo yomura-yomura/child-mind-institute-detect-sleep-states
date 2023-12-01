@@ -1,4 +1,4 @@
-- exp_name=exp009-StackedGRU-feature-layer4-psuedo4
+- exp_name=exp009-StackedGRU-feature-layer4-pseudo4
 - feature_extractor=StackedGRUFeatureExtractor
 - use_amp=true
 - epoch=70

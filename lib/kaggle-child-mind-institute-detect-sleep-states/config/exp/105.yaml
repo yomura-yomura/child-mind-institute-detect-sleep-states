@@ -1,12 +1,11 @@
 #- exp_name=exp047
-- exp_name=exp094
+- exp_name=exp105
 
 - split_type=base
 
 - scale_type=robust_scaler
 
-- feature_extractor=StackedGRUFeatureExtractor
-- feature_extractor.num_layers=4
+- feature_extractor=CNNSpectrogram
 
 - duration=17280  # 24h
 
@@ -19,11 +18,6 @@
 
 - early_stopping_patience=20
 
-- val_check_interval=100
+- val_check_interval=200
 - check_val_every_n_epoch=null
-- val_after_steps=5000
-
-- pseudo_label.use_pseudo=true
-- pseudo_label.use_version = 1
-- pseudo_label.v1.path_pseudo=/data/exp058/train
-- pseudo_label.v1.watch_interval=2
+- val_after_steps=8000
