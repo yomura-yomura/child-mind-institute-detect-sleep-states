@@ -113,7 +113,7 @@ class VitGru(nn.Module):
         # else:
         self.embed = nn.Sequential(
             PatchEmbed(
-                img_size=(seq, 3), patch_size=(1, 3), in_chans=self.ch, embed_dim=dims, bias=not self.patch_norm
+                img_size=(seq, 3), #(duration,feature_num) patch_size=(1, 3), in_chans=self.ch, embed_dim=dims, bias=not self.patch_norm
             ),
             GroupNorm1d(4, dims) if self.patch_norm else nn.Identity(),
         )
@@ -136,14 +136,15 @@ class VitGru(nn.Module):
         )
 
     def forward(self, x):
-        # x: (batch_size, in_channels, time_steps)
+        # x: (batch_size, featurenum, time_steps)
         patch = self.patch
         x = x.reshape(x.shape[0], x.shape[1], self.seq // patch, patch)
-        # x: (batch_size, in_channels, ,patch)
+        # x: (batch_size, featurenum,duration//patch ,patch)
 
         attn = x.reshape(x.shape[0], -1, patch * 3)
         attn = 1 * (attn.std(-1) > 1e-5)
         x = x.permute(0, 2, 1, 3)
+　　　　# x: (batch_size,duration//patch, featurenum,patch)
 
         if len(x.shape) == 3:
             x = x.unsqueeze(1)
@@ -151,6 +152,7 @@ class VitGru(nn.Module):
         x = self.patch_act(x)
         if self.seg:
             x = x.mean(-1).permute(0, 2, 1)
+            # x (batch_size,featurenum,duration//patch)
         if self.pre_norm:
             x = self.norm(x)
         x = x * attn.unsqueeze(-1)
