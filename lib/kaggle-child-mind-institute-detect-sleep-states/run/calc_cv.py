@@ -117,8 +117,9 @@ if __name__ == "__main__":
         #     ),
         # ),
         cutting_probs_on_repeating=cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
-            prepare_data_dir_path="../output/prepare_data/train/robust_scaler"
-        )
+            prepare_data_dir_path="../output/prepare_data/train/robust_scaler",
+            interval_th=15 * 60 // 5,
+        ),
     )
 
     scores = []

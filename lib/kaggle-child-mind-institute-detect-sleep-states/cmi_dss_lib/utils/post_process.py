@@ -36,6 +36,7 @@ class CuttingProbsBySleepProbSettingByEvent(TypedDict):
 
 class CuttingProbsOnRepeating(TypedDict):
     prepare_data_dir_path: str
+    interval_th: int
 
 
 class PostProcessModeWithSetting(TypedDict, total=False):
@@ -130,6 +131,8 @@ def post_process_for_seg(
                 series_id,
             )
         ):
+            if interval < setting["interval_th"]:
+                continue
             preds[i : i + interval] = 0
 
     if preds.shape[-1] == 3:
@@ -282,8 +285,17 @@ def get_repeating_indices_and_intervals(
 ) -> tuple[NDArray[Shape['"*"'], Int], NDArray[Shape['"*"'], Int]]:
     repeating_interval = repeating_interval_hour // 5
     data_dir_path = pathlib.Path(data_dir_path)
-    anglez_data = np.load(data_dir_path / series_id / "anglez.npy")
-    enmo_data = np.load(data_dir_path / series_id / "enmo.npy")
+    series_id_dir_path = data_dir_path / series_id
+    anglez_data = np.load(
+        series_id_dir_path / "anglez.npz"
+        if (series_id_dir_path / "anglez.npz").exists()
+        else series_id_dir_path / "anglez.npy"
+    )
+    enmo_data = np.load(
+        series_id_dir_path / "enmo.npz"
+        if (series_id_dir_path / "enmo.npz").exists()
+        else series_id_dir_path / "enmo.npy"
+    )
 
     is_same = np.all(
         [
