@@ -75,9 +75,8 @@ else:
 def load_model(cfg: TrainConfig) -> L.LightningModule:
     model_fold_dir_path = pathlib.Path(cfg.dir.model_dir)
 
-    if (
-        weight_path := model_fold_dir_path / (model_fold_dir_path / "best.ckpt").readlink().name
-    ).exists():
+    try:
+        weight_path = model_fold_dir_path / (model_fold_dir_path / "best.ckpt").readlink().name
         module = SegChunkModule.load_from_checkpoint(
             weight_path,
             cfg=cfg,
@@ -86,7 +85,7 @@ def load_model(cfg: TrainConfig) -> L.LightningModule:
             num_classes=len(cfg.labels),
             duration=cfg.duration,
         )
-    else:
+    except FileNotFoundError:
         module = SegChunkModule(
             cfg,
             val_event_df=None,
