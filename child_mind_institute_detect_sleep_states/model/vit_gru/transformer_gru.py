@@ -136,41 +136,48 @@ class VitGru(nn.Module):
         )
 
     def forward(self, x):
-        # x: (batch_size, featurenum, time_steps)
+        # must reshape to x:(b, seq, patch_img, ch = x.shape )
+        # x: (batch_size, inchannels, time_steps)
         patch = self.patch
         x = x.reshape(x.shape[0], x.shape[1], self.seq // patch, patch)
-        # x: (batch_size, featurenum,duration//patch ,patch)
+        # x: (batch_size, inchannels,duration//patch ,patch)
+        x=x.permute(0,2,3,1)
+        # x: (batch, duration//patch, patch, inchannels)
 
         attn = x.reshape(x.shape[0], -1, patch * 3)
         attn = 1 * (attn.std(-1) > 1e-5)
         x = x.permute(0, 2, 1, 3)
-　　　　# x: (batch_size,duration//patch, featurenum,patch)
+　　　　  # x: (batch_size,duration//patch, inchannels,patch)
 
         if len(x.shape) == 3:
             x = x.unsqueeze(1)
         x = self.embed(x)
         x = self.patch_act(x)
+        # not use
         if self.seg:
             x = x.mean(-1).permute(0, 2, 1)
             # x (batch_size,featurenum,duration//patch)
         if self.pre_norm:
             x = self.norm(x)
         x = x * attn.unsqueeze(-1)
-        x = self.xformer(x, attn)["last_hidden_state"] if self.deberta else (self.xformer(x) if self.xformer else x)
-        x = x * attn.unsqueeze(-1)
+        #x = self.xformer(x, attn)["last_hidden_state"] if self.deberta else (self.xformer(x) if self.xformer else x)
+        # use only vit
+        x = self.xformer(x)
+        #x = x * attn.unsqueeze(-1)
         if self.rnn is not None:
             x = self.dropout(x)
             x = self.patch_dropout(x)
-        xt = x
+        #xt = x
         x = (
             self.rnn(x, self.h0.unsqueeze(1).repeat(1, x.shape[0], 1) if torch.is_tensor(self.h0) else self.h0)[0]
             if self.rnn is not None
             else x
         )
-        if self.xformer is None:
-            xt = x
+        # # x: (batch_size, output_size, hidden_size * 2)
+        #if self.xformer is None:
+            #xt = x
 
-        return x, xt
+        return x#xt
 
 
 # send only the relevant params to the model
