@@ -45,10 +45,10 @@ def calc_score(
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
 
-        # p = pathlib.Path("mean_preds") / "train" / f"fold_{i_fold}" / f"{series_id}.npz"
-        # p.parent.mkdir(exist_ok=True, parents=True)
-        # np.savez_compressed(p, mean_preds)
-        # print(f"Info: saved as {p}")
+        p = pathlib.Path("mean_preds") / "train" / f"fold_{i_fold}" / f"{series_id}.npz"
+        p.parent.mkdir(exist_ok=True, parents=True)
+        np.savez_compressed(p, mean_preds)
+        print(f"Info: saved as {p}")
 
         df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             series_id=series_id,

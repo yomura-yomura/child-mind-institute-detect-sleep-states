@@ -286,16 +286,15 @@ def get_repeating_indices_and_intervals(
     repeating_interval = repeating_interval_hour // 5
     data_dir_path = pathlib.Path(data_dir_path)
     series_id_dir_path = data_dir_path / series_id
-    anglez_data = np.load(
-        series_id_dir_path / "anglez.npz"
-        if (series_id_dir_path / "anglez.npz").exists()
-        else series_id_dir_path / "anglez.npy"
-    )
-    enmo_data = np.load(
-        series_id_dir_path / "enmo.npz"
-        if (series_id_dir_path / "enmo.npz").exists()
-        else series_id_dir_path / "enmo.npy"
-    )
+    if (series_id_dir_path / "anglez.npz").exists():
+        anglez_data = np.load(series_id_dir_path / "anglez.npz")["arr_0"]
+    else:
+        anglez_data = np.load(series_id_dir_path / "anglez.npy")
+
+    if (series_id_dir_path / "enmo.npz").exists():
+        enmo_data = np.load(series_id_dir_path / "enmo.npz")["arr_0"]
+    else:
+        enmo_data = np.load(series_id_dir_path / "enmo.npy")
 
     is_same = np.all(
         [

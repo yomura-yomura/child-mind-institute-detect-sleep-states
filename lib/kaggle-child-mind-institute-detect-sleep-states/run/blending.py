@@ -16,8 +16,9 @@ np.seterr(all="raise")
 project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
-    #     args = ["-s", "grid_search", "-f", "0"]
-    args = None
+    args = [
+        # "-s", "grid_search", "-f", "0"
+    ]
 else:
     args = None
 
@@ -142,15 +143,15 @@ all_model_dir_path_dict = (
 #     "100": 0.2,
 # }  # 28
 
-# weight_dict = {
-#     "50": 0.085,
-#     "53": 0.17,
-#     "58": 0.085,
-#     "85": 0.17,
-#     "88": 0.17,
-#     "100": 0.17,
-#     "101": 0.15,
-# }  # 29
+weight_dict = {
+    "50": 0.085,
+    "53": 0.17,
+    "58": 0.085,
+    "85": 0.17,
+    "88": 0.17,
+    "100": 0.17,
+    "101": 0.15,
+}  # 29
 
 # weight_dict = {
 #     "19": 0.045,
@@ -163,15 +164,15 @@ all_model_dir_path_dict = (
 #     "101": 0.1,
 # }  # 30
 
-weight_dict = {
-    "50": 0.1,
-    "53": 0.1,
-    "58": 0.1,
-    "85": 0.2,
-    "88": 0.1,
-    "100": 0.2,
-    "101": 0.2,
-}
+# weight_dict = {
+#     "50": 0.1,
+#     "53": 0.1,
+#     "58": 0.1,
+#     "85": 0.2,
+#     "88": 0.1,
+#     "100": 0.2,
+#     "101": 0.2,
+# }
 
 # weight_dict = {"b26": 0.85, "101": 0.15}
 # weight_dict = {"b28": 0.9, "101": 0.1}
