@@ -1,10 +1,16 @@
-- exp_name=exp099_resume
+- exp_name=exp101_resume
 
 - split_type=base
 
 - scale_type=robust_scaler
 
-- feature_extractor=WaveNet
+- feature_extractor=StackedAttentionLSTMFeatureExtractor
+- feature_extractor.patch_size=6
+- feature_extractor.n_encoder_layers=5
+- feature_extractor.n_lstm_layers=2
+
+- model.segmentation_model_name=null
+- decoder=TransformerDecoder
 
 - duration=17280  # 24h
 
@@ -21,4 +27,4 @@
 
 - val_check_interval=100
 - check_val_every_n_epoch=null
-- val_after_steps=15000
+- val_after_steps=10000

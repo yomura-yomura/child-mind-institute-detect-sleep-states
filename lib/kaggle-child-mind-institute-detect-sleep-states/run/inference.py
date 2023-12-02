@@ -50,7 +50,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp075-onset",
         # "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
         # "../output/train/exp095",
-        "../cmi-dss-ensemble-models/ranchantan/exp100",
+        # "../cmi-dss-ensemble-models/ranchantan/exp100",
+        "../output/train/exp101",
         # "../output/train/exp104_2",
         #
         # "phase=dev",
@@ -58,8 +59,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         "batch_size=32",
         # "batch_size=16",
         # "batch_size=8",
-        # "--folds",
-        # "2,3,4",
+        "--folds",
+        "2",
         # "inference_step_offset=0,2880,5760,8640,11520,14400",
         #
         # "dir.sub_dir=tmp",
@@ -74,7 +75,9 @@ else:
 def load_model(cfg: TrainConfig) -> L.LightningModule:
     model_fold_dir_path = pathlib.Path(cfg.dir.model_dir)
 
-    if (weight_path := model_fold_dir_path / "best.ckpt").exists():
+    if (
+        weight_path := model_fold_dir_path / (model_fold_dir_path / "best.ckpt").readlink().name
+    ).exists():
         module = SegChunkModule.load_from_checkpoint(
             weight_path,
             cfg=cfg,

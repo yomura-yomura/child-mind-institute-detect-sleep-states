@@ -264,19 +264,6 @@ import child_mind_institute_detect_sleep_states.score
 event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
 
-def get_sub_df(
-    series_id: str, preds: NDArray, labels: list[str], score_th=0.0005, distance=96
-) -> DataFrame:
-    sub_df = cmi_dss_lib.utils.post_process.post_process_for_seg(
-        series_id=series_id,
-        preds=preds,
-        labels=labels,
-        downsample_rate=2,
-        score_th=score_th,
-        distance=distance,
-    )
-    return sub_df
-
 
 def get_score(
     series_id: str, sub_df: DataFrame, labels: list[str], start: int, end: int

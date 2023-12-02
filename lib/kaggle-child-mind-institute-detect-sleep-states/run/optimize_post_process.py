@@ -9,10 +9,15 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 project_root_path = pathlib.Path(__file__).parent.parent
 ranchantan_pred_dir_path = project_root_path / "run" / "predicted" / "ranchantan"
 train_pred_dir_path = project_root_path / "run" / "predicted" / "train"
+blending_pred_dir_path = project_root_path / "run" / "predicted" / "blending"
 
 # model_dir_path = ranchantan_pred_dir_path / "exp050-transformer-decoder_retry"
+
 model_dir_path = train_pred_dir_path / "exp104_2"
 folds = [0]
+
+# model_dir_path = blending_pred_dir_path / "exp026"
+# folds = [0, 1, 2, 3, 4]
 
 if __name__ == "__main__":
     post_process_type = "base"
@@ -28,20 +33,35 @@ if __name__ == "__main__":
     import pandas as pd
 
     if post_process_type == "base":
-        # score_ths = np.logspace(-3, 1, 10)
-        # distances = np.linspace(1, 1 * 12 * 60, 100)
-        # score_ths = np.logspace(-10, np.log10(0.05), 100)[::-1]
+        score_ths = np.logspace(-3, 1, 10)
+        distances = np.linspace(1, 1 * 12 * 60, 100)
+        # score_ths = np.logspace(-5, np.log10(0.1), 10)[::-1]
         # distances = np.linspace(1, 100, 101)
-        score_ths = np.logspace(-3, 0, 10)
-        distances = np.linspace(200, 300, 10)
-        grid_parameters = pd.merge(
+        # score_ths = [1e-5]
+        # distances = [90]
+        widths = np.linspace(0, 300, 30)
+        # score_ths = np.logspace(-3, 0, 10)
+        # distances = np.linspace(200, 300, 10)
+        base_parameters = [
             pd.Series(score_ths, name="score_th"),
             pd.Series(distances, name="distance"),
-            how="cross",
-        ).to_numpy()
+            pd.Series(widths, name="width"),
+        ]
+        grid_parameters = None
+        for param in base_parameters:
+            if grid_parameters is None:
+                grid_parameters = param
+            else:
+                grid_parameters = pd.merge(
+                    grid_parameters,
+                    param,
+                    how="cross",
+                )
+        grid_parameters = grid_parameters.to_numpy()
+        print(f"{grid_parameters = }")
 
         def calc_all_scores(grid_parameter, calc_type="fast"):
-            score_th, distance = grid_parameter
+            score_th, distance, width = grid_parameter
             scores = [
                 calc_score(
                     i_fold,
@@ -52,6 +72,7 @@ if __name__ == "__main__":
                     None,
                     score_th=score_th,
                     distance=distance,
+                    width=width,
                     calc_type=calc_type,
                 )
                 for i_fold in tqdm.tqdm(folds, desc="calc score over n-folds")
@@ -162,7 +183,7 @@ if __name__ == "__main__":
 
     record_at_max = optimize(
         "grid_search",
-        f"post_process/{post_process_type}-v2/{model_dir_path.name}",
+        f"post_process/{post_process_type}-v3/{model_dir_path.name}",
         calc_all_scores,
         grid_parameters,
     )

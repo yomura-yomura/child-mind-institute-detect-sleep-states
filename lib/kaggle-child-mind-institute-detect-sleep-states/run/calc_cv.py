@@ -16,10 +16,12 @@ import child_mind_institute_detect_sleep_states.score
 # exp_name = "ranchantan/exp036-stacked-gru-4-layers-24h-duration-4bs-108sigma-with-step-validation"
 # exp_name = "jumtras/exp027-TimesNetFeatureExtractor-1DUnet-Unet"
 # exp_name = "jumtras/exp043"
-exp_name = "ranchantan/exp050-transformer-decoder_retry"
+# exp_name = "ranchantan/exp050-transformer-decoder_retry"
 # exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
 # exp_name = "combined/exp050_exp75-wakeup"
 # exp_name = "ranchantan/exp075-wakeup_6"
+exp_name = "blending/exp026"
+# exp_name = "train/exp101"
 
 # predicted_fold_dir_path = pathlib.Path("tmp/predicted/ranchantan/exp041/train/fold_0/")
 # predicted_dir_path = pathlib.Path("predicted/ranchantan/exp047/train/")
@@ -96,15 +98,15 @@ if __name__ == "__main__":
     if not predicted_dir_path.exists():
         raise FileNotFoundError(predicted_dir_path)
 
-    post_process_modes = {
+    post_process_modes = cmi_dss_lib.utils.post_process.PostProcessModeWithSetting(
         # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
         #     sleep_prob_th=0.2, min_sleeping_hours=6
         # ),
-        # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        # cutting_probs_by_sleep_prob=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
         #     watch_interval_hour=7.5,
         #     sleep_occupancy_th=0.03,
         # ),
-        # "cutting_probs_by_sleep_prob": dict(
+        # cutting_probs_by_sleep_prob=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSettingByEvent(
         #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
         #         watch_interval_hour=7.5,
         #         sleep_occupancy_th=0.04,
@@ -113,8 +115,11 @@ if __name__ == "__main__":
         #         watch_interval_hour=6.0,
         #         sleep_occupancy_th=0.03,
         #     ),
-        # )
-    }
+        # ),
+        cutting_probs_on_repeating=cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
+            prepare_data_dir_path="../output/prepare_data/train/robust_scaler"
+        )
+    )
 
     scores = []
     for i_fold in range(5):
@@ -124,14 +129,14 @@ if __name__ == "__main__":
             labels=["sleep", "event_onset", "event_wakeup"],
             score_th=1e-4,
             distance=88,
-            n_records_per_series_id=1500,
+            n_records_per_series_id=2000,
             # score_th=0.005,
             # distance=96,
             downsample_rate=2,
             calc_type="normal",
             post_process_modes=post_process_modes,
         )
-        print(f"fold {i_fold}: {score = :.3f}")
+        print(f"fold {i_fold}: {score = :.4f}")
         scores.append(score)
-    mean_score_str, *score_strs = map("{:.3f}".format, [np.mean(scores), *scores])
+    mean_score_str, *score_strs = map("{:.4f}".format, [np.mean(scores), *scores])
     print(f"{mean_score_str} ({', '.join(score_strs)})")

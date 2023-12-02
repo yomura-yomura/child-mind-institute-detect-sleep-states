@@ -31,6 +31,7 @@ def calc_score(
     calc_type: str = "fast",
     score_th=0.005,
     distance=96,
+    width=None,
     n_records_per_series_id=None,
     print_msg=False,
 ):
@@ -44,7 +45,7 @@ def calc_score(
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
 
-        # p = pathlib.Path("mean_preds") / f"fold_{i_fold}" / f"{series_id}.npz"
+        # p = pathlib.Path("mean_preds") / "train" / f"fold_{i_fold}" / f"{series_id}.npz"
         # p.parent.mkdir(exist_ok=True, parents=True)
         # np.savez_compressed(p, mean_preds)
         # print(f"Info: saved as {p}")
@@ -57,6 +58,7 @@ def calc_score(
             downsample_rate=2,
             score_th=score_th,
             distance=distance,
+            width=width,
             post_process_modes=post_process_modes,
             print_msg=print_msg,
             n_records_per_series_id=n_records_per_series_id,
@@ -129,12 +131,12 @@ def get_keys_and_preds(model_dir_paths: list[pathlib.Path | str], folds: list[in
 
     keys_dict = {}
     preds_dict = {}
-    for i_fold in tqdm.tqdm(folds):
+    for i, i_fold in enumerate(tqdm.tqdm(folds)):
         (
             keys_dict[i_fold],
             preds_dict[i_fold],
         ) = cmi_dss_lib.utils.common.load_predicted_npz_group_by_series_id(
-            predicted_npz_dir_paths[i_fold], min_duration_dict
+            predicted_npz_dir_paths[i], min_duration_dict
         )
     return keys_dict, preds_dict
 
@@ -143,7 +145,8 @@ def optimize(
     search_type: str,
     models_dir_name: str,
     calc_all_scores: Callable[
-        [Sequence[float], dict | None, float, float, str], tuple[Sequence[float], Sequence[float]]
+        [list[float], dict | None, float, float, str, int, bool],
+        tuple[Sequence[float], Sequence[float]],
     ],
     all_weights_to_find,
     initial_weight_dict=None,

@@ -1,3 +1,4 @@
+import pathlib
 from typing import Literal, TypeAlias, TypedDict
 
 import cmi_dss_lib.datamodule.seg
@@ -5,7 +6,7 @@ import numpy as np
 import numpy_utility as npu
 import pandas as pd
 import polars as pl
-from nptyping import DataFrame, Float, NDArray, Shape, Structure
+from nptyping import DataFrame, Float, Int, NDArray, Shape, Structure
 from scipy.signal import find_peaks
 
 SubmissionDataFrame = DataFrame[
@@ -18,19 +19,29 @@ class SleepingEdgesAsProbsSetting(TypedDict):
     min_sleeping_hours: int
 
 
+class SleepingEdgesAsProbsSettingByEvent(TypedDict):
+    onset: SleepingEdgesAsProbsSetting
+    wakeup: SleepingEdgesAsProbsSetting
+
+
 class CuttingProbsBySleepProbSetting(TypedDict):
     watch_interval_hour: float
     sleep_occupancy_th: float
 
 
-class PostProcessModeWithSetting(TypedDict, total=False):
-    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | dict[
-        Literal["onset", "wakeup"], SleepingEdgesAsProbsSetting
-    ]
+class CuttingProbsBySleepProbSettingByEvent(TypedDict):
+    onset: CuttingProbsBySleepProbSetting
+    wakeup: CuttingProbsBySleepProbSetting
 
-    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | dict[
-        Literal["onset", "wakeup"], CuttingProbsBySleepProbSetting
-    ]
+
+class CuttingProbsOnRepeating(TypedDict):
+    prepare_data_dir_path: str
+
+
+class PostProcessModeWithSetting(TypedDict, total=False):
+    sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | SleepingEdgesAsProbsSettingByEvent
+    cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | CuttingProbsBySleepProbSettingByEvent
+    cutting_probs_on_repeating: CuttingProbsOnRepeating
 
 
 PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
@@ -43,6 +54,7 @@ def post_process_for_seg(
     downsample_rate: int,
     score_th: float = 0.01,
     distance: int = 5000,
+    width: int | None = None,
     post_process_modes: PostProcessModes = None,
     start_timing_dict: dict | None = None,
     n_records_per_series_id: int | None = None,
@@ -57,7 +69,9 @@ def post_process_for_seg(
         downsample_rate: see conf
         score_th: threshold for score. Defaults to 0.5.
         distance: minimum interval between detectable peaks
+        width:
         post_process_modes: extra post process names can be given
+        start_timing_dict:
         n_records_per_series_id:
         print_msg: print info
     Returns:
@@ -86,16 +100,6 @@ def post_process_for_seg(
     if "cutting_probs_by_sleep_prob" in post_process_modes:
         if print_msg:
             print("enable 'cutting_probs_by_sleep_prob'")
-        # data = adapt_cutting_probs_by_sleep_prob(
-        #     keys,
-        #     preds,
-        #     downsample_rate=downsample_rate,
-        #     **post_process_modes["cutting_probs_by_sleep_prob"],
-        # )
-        # keys = data["key"]
-        # preds = data["pred"]
-        #
-        # series_ids = np.array(list(map(lambda x: x.split("_")[0], keys)))
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
         if "onset" in setting and "wakeup" in setting:
             sleep_occupancy_th = {
@@ -115,6 +119,18 @@ def post_process_for_seg(
             }
     else:
         sleep_occupancy_th = watch_interval_hour = None
+
+    if "cutting_probs_on_repeating" in post_process_modes:
+        if print_msg:
+            print("enable 'cutting_probs_on_repeating'")
+        setting = post_process_modes["cutting_probs_on_repeating"]
+        for i, interval in zip(
+            *get_repeating_indices_and_intervals(
+                setting["prepare_data_dir_path"],
+                series_id,
+            )
+        ):
+            preds[i : i + interval] = 0
 
     if preds.shape[-1] == 3:
         label_index_dict = {event: i for i, event in enumerate(["sleep", "onset", "wakeup"])}
@@ -137,7 +153,7 @@ def post_process_for_seg(
     records = []
     for i, event_name in enumerate(possible_events):
         this_event_preds = preds[:, label_index_dict[event_name]]
-        steps = find_peaks(this_event_preds, height=score_th, distance=distance)[0]
+        steps = find_peaks(this_event_preds, height=score_th, distance=distance, width=width)[0]
         scores = this_event_preds[steps]
 
         for step, score in zip(steps, scores, strict=True):
@@ -257,3 +273,54 @@ def adapt_cutting_probs_by_sleep_prob(
         corrected_data_list.append(corrected_data)
 
     return np.concatenate(corrected_data_list)
+
+
+def get_repeating_indices_and_intervals(
+    data_dir_path: str | pathlib.Path[str],
+    series_id: str,
+    repeating_interval_hour: int = 24 * 60 * 60,
+) -> tuple[NDArray[Shape['"*"'], Int], NDArray[Shape['"*"'], Int]]:
+    repeating_interval = repeating_interval_hour // 5
+    data_dir_path = pathlib.Path(data_dir_path)
+    anglez_data = np.load(data_dir_path / series_id / "anglez.npy")
+    enmo_data = np.load(data_dir_path / series_id / "enmo.npy")
+
+    is_same = np.all(
+        [
+            np.isclose(data[repeating_interval:], data[:-repeating_interval])
+            for data in [anglez_data, enmo_data]
+        ],
+        axis=0,
+    )
+
+    indices_at_same = np.where(is_same)[0]
+    if len(indices_at_same) == 0:
+        return np.array([], dtype="i8"), np.array([], dtype="i8")
+    intervals = (
+        np.array(
+            list(
+                map(
+                    len,
+                    "".join(
+                        (indices_at_same[1:] - indices_at_same[:-1] > 1).astype(int).astype(str)
+                    ).split("1"),
+                )
+            )
+        )
+        + 1
+    )
+    assert np.sum(intervals) == len(indices_at_same)
+    start_indices_at_same = indices_at_same[[0, *np.cumsum(intervals[:-1])]]
+
+    # validation
+    _start_prev_indices_at_same = start_indices_at_same - 1
+    _start_prev_indices_at_same = _start_prev_indices_at_same[_start_prev_indices_at_same >= 0]
+    assert np.all(is_same[_start_prev_indices_at_same] == np.False_)
+    assert np.all(is_same[start_indices_at_same] == np.True_)
+    assert np.all(is_same[start_indices_at_same + intervals - 1] == np.True_)
+    _start_next_indices_at_same = start_indices_at_same + intervals
+    _start_next_indices_at_same = _start_next_indices_at_same[
+        _start_next_indices_at_same < len(is_same)
+    ]
+    assert np.all(is_same[_start_next_indices_at_same] == np.False_)
+    return repeating_interval + start_indices_at_same, intervals
