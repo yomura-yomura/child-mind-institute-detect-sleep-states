@@ -9,7 +9,7 @@
 - duration=17280  # 24h
 
 - use_amp=true
-- batch_size=4
+- batch_size=2
 
 - optimizer.lr=0.00005
 
