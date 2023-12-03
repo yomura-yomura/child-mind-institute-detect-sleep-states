@@ -113,14 +113,21 @@ class VitGru(nn.Module):
         # else:
         self.embed = nn.Sequential(
             PatchEmbed(
-                img_size=(seq, 3), #(duration,feature_num) patch_size=(1, 3), in_chans=self.ch, embed_dim=dims, bias=not self.patch_norm
+                img_size=(seq, 3), #(duration,feature_num) maybe Mel features 3
+                patch_size=(1, 3), 
+                in_chans=self.ch, 
+                embed_dim=dims, 
+                bias=not,
+                self.patch_norm
             ),
+            # why 4
             GroupNorm1d(4, dims) if self.patch_norm else nn.Identity(),
         )
         self.norm = nn.LayerNorm(dims)
         self.patch_act = getattr(nn, patch_act)()
         self.dropout = nn.Dropout(dropout)
         self.patch_dropout = nn.Dropout1d(patch_dropout)
+        # use init hidden for run
         self.h0 = nn.Parameter(h0 * torch.randn(2 * rnn_layers, dims // 2 * final_mult)) if h0 else None
         self.rnn = (
             getattr(nn, rnn)(
@@ -144,7 +151,7 @@ class VitGru(nn.Module):
         x=x.permute(0,2,3,1)
         # x: (batch, duration//patch, patch, inchannels)
 
-        attn = x.reshape(x.shape[0], -1, patch * 3)
+        attn = x.reshape(x.shape[0], -1, patch * self.ch)
         attn = 1 * (attn.std(-1) > 1e-5)
         x = x.permute(0, 2, 1, 3)
 　　　　  # x: (batch_size,duration//patch, inchannels,patch)
