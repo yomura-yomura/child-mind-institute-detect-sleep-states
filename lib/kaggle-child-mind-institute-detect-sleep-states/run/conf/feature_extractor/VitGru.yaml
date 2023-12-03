@@ -1,0 +1,20 @@
+name: VitGru
+
+patch: 10
+dims: 128
+nheads: 8
+act_layer: "GELU"
+dropout: 0.2
+rnn: "GRU"
+rnn_layers: 1
+final_mult: 4
+patch_dropout: 0.0
+patch_act: "Identity"
+pre_norm: False
+patch_norm: False
+xformer_layers: 2
+xformer_init_1: 0.1
+xformer_init_2: 0.1
+xformer_init_scale: 1.0
+xformer_attn_drop_rate: 0.1
+xformer_drop_path_rate: 0.1

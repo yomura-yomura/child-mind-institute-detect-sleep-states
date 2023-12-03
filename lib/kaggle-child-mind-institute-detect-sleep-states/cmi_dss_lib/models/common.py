@@ -3,6 +3,7 @@ from typing import Union
 import torch.nn as nn
 
 from child_mind_institute_detect_sleep_states.model.multi_res_bi_lstm_attention.model import FOGModel
+from child_mind_institute_detect_sleep_states.model.vit_gru.model import VitGru
 
 from ..config import TrainConfig
 from ..models.spec1D import Spec1D
@@ -29,6 +30,7 @@ FEATURE_EXTRACTORS = Union[
     StackedLSTMFeatureExtractor,
     TimesNetFeatureExtractor,
     FOGModel,
+    VitGru,
     WaveNet,
 ]
 DECODERS = Union[UNet1DDecoder, LSTMDecoder, TransformerDecoder, MLPDecoder]
@@ -141,6 +143,32 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
             out_channels=out_channels,
         )
         feature_extractor.height = out_channels
+        feature_extractor.out_chans = 1
+    elif cfg.feature_extractor.name == "VitGru":
+        feature_extractor = VitGru(
+            duration=cfg.duration,
+            feature_num = len(cfg.features),
+            patch=cfg.feature_extractor.patch,
+            dims=cfg.feature_extractor.dims,
+            nheads=cfg.feature_extractor.nheads,
+            act_layer=cfg.feature_extractor.act_layer,
+            dropout=cfg.feature_extractor.dropout,
+            rnn=cfg.feature_extractor.rnn,
+            rnn_layers=cfg.feature_extractor.rnn_layers,
+            final_mult=cfg.feature_extractor.final_mult,
+            patch_dropout=cfg.feature_extractor.patch_dropout,
+            patch_act=cfg.feature_extractor.patch_act,
+            pre_norm=cfg.feature_extractor.pre_norm,
+            patch_norm=cfg.feature_extractor.patch_norm,
+            xformer_layers=cfg.feature_extractor.xformer_layers,
+            xformer_init_1=cfg.feature_extractor.xformer_init_1,
+            xformer_init_2=cfg.feature_extractor.xformer_init_2,
+            xformer_init_scale=cfg.feature_extractor.xformer_init_scale,
+            xformer_attn_drop_rate=cfg.feature_extractor.xformer_attn_drop_rate,
+            xformer_drop_path_rate=cfg.feature_extractor.xformer_drop_path_rate,
+            out_size = num_time_steps
+        )
+        feature_extractor.height = cfg.feature_extractor.dims * 4
         feature_extractor.out_chans = 1
     else:
         raise ValueError(f"Invalid feature extractor name: {cfg.feature_extractor.name}")
