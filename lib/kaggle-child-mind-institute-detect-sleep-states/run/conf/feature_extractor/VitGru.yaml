@@ -1,7 +1,7 @@
 name: VitGru
 
 patch: 10
-dims: 128
+dims: 256
 nheads: 8
 act_layer: "GELU"
 dropout: 0.2
