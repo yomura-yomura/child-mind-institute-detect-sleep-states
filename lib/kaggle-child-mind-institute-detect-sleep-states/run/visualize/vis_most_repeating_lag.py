@@ -14,9 +14,7 @@ lag_list = np.arange(int(0.8 * 24 * 60 * 60 // 5), int(1.2 * 24 * 60 * 60 // 5))
 
 def get_counts(series_id: str):
     data = np.load(data_dir_path / series_id / "anglez.npy")
-    return np.array(
-        [np.count_nonzero(np.isclose(data[i:], data[: len(data) - i])) for i in lag_list]
-    )
+    return np.array([np.count_nonzero(np.isclose(data[i:], data[: len(data) - i])) for i in lag_list])
 
 
 import cmi_dss_lib.utils.post_process
@@ -25,9 +23,7 @@ for series_id in series_ids:
     (
         start_indices_at_same,
         intervals,
-    ) = cmi_dss_lib.utils.post_process.get_repeating_indices_and_intervals(
-        data_dir_path, series_id
-    )
+    ) = cmi_dss_lib.utils.post_process.get_repeating_indices_and_intervals(data_dir_path, series_id)
     print(series_id, intervals)
 
 fads

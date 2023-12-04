@@ -147,7 +147,7 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
     elif cfg.feature_extractor.name == "VitGru":
         feature_extractor = VitGru(
             duration=cfg.duration,
-            feature_num = len(cfg.features),
+            feature_num=len(cfg.features),
             patch=cfg.feature_extractor.patch,
             dims=cfg.feature_extractor.dims,
             nheads=cfg.feature_extractor.nheads,
@@ -166,7 +166,7 @@ def get_feature_extractor(cfg: TrainConfig, feature_dim: int, num_time_steps: in
             xformer_init_scale=cfg.feature_extractor.xformer_init_scale,
             xformer_attn_drop_rate=cfg.feature_extractor.xformer_attn_drop_rate,
             xformer_drop_path_rate=cfg.feature_extractor.xformer_drop_path_rate,
-            out_size = num_time_steps
+            out_size=num_time_steps,
         )
         feature_extractor.height = cfg.feature_extractor.dims * 4
         feature_extractor.out_chans = 1

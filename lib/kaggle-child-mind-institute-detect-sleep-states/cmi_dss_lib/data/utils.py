@@ -9,9 +9,7 @@ import child_mind_institute_detect_sleep_states.data.comp_dataset
 def get_duration_dict(phase: Literal["train", "test", "dev"]) -> dict[str, int]:
     dataset_type = cast(Literal["train", "test"], "test" if phase == "test" else "train")
     count_by_series_id_df = (
-        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
-            dataset_type, as_polars=True
-        )
+        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(dataset_type, as_polars=True)
         .group_by("series_id")
         .count()
         .collect()
@@ -22,9 +20,7 @@ def get_duration_dict(phase: Literal["train", "test", "dev"]) -> dict[str, int]:
 def get_start_timing_dict(phase: Literal["train", "test", "dev"]) -> dict[str, pd.Timestamp]:
     dataset_type = cast(Literal["train", "test"], "test" if phase == "test" else "train")
     timestamp_by_series_id_df = (
-        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(
-            dataset_type, as_polars=True
-        )
+        child_mind_institute_detect_sleep_states.data.comp_dataset.get_series_df(dataset_type, as_polars=True)
         .sort(["series_id", "step"])
         .group_by("series_id")
         .head(1)

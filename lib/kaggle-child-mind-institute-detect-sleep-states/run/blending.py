@@ -11,8 +11,6 @@ import tqdm
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 
-# np.seterr(all="raise")
-
 project_root_path = pathlib.Path(__file__).parent.parent
 
 if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
@@ -29,9 +27,9 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-    #     watch_interval_hour=7.5, sleep_occupancy_th=0.03, version=0, n_continuous=0
-    # ),
+    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+        watch_interval_hour=7.5, sleep_occupancy_th=0.03, version=0, n_continuous=0
+    ),
     # "cutting_probs_by_sleep_prob": dict(
     #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
     #         watch_interval_hour=7.5,
@@ -42,10 +40,10 @@ post_process_modes = {
     #         sleep_occupancy_th=0.03,
     #     ),
     # )
-    # "cutting_probs_on_repeating": cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
-    #     prepare_data_dir_path=f"../output/prepare_data/train/robust_scaler",
-    #     interval_th=15 * 60 // 5,
-    # ),
+    "cutting_probs_on_repeating": cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
+        prepare_data_dir_path=f"../output/prepare_data/train/robust_scaler",
+        interval_th=15 * 60 // 5,
+    ),
 }
 
 
@@ -98,8 +96,9 @@ all_model_dir_path_dict = (
         "101": ranchantan_pred_dir_path / "exp101",
         "105": ranchantan_pred_dir_path / "exp105",
         "107": ranchantan_pred_dir_path / "exp107",
-        "109": pred_dir_path / "exp109",
+        "109": jumtras_pred_dir_path / "exp109",
         "110": ranchantan_pred_dir_path / "exp110",
+        "111": jumtras_pred_dir_path / "exp111",
     }
     | {
         "s6": stacking_pred_dir_path / "s_exp006",
@@ -112,6 +111,7 @@ all_model_dir_path_dict = (
         "b32": blending_pred_dir_path / "exp032",
         "b33": blending_pred_dir_path / "exp033",
         "b34": blending_pred_dir_path / "exp034",
+        "b36": blending_pred_dir_path / "exp036",
     }
 )
 
@@ -250,19 +250,96 @@ all_model_dir_path_dict = (
 #     "107": 0.12,
 # }  # 34
 
-weight_dict = {"b34": 1, "110": 0}
+# weight_dict = {
+#     "19": 0.03240715681975809,
+#     "50": 0.0774435422732664,
+#     "53": 0.1340411465608707,
+#     "58": 0.02002779587999157,
+#     "85": 0.10973088299057174,
+#     "88": 0.15532783574467615,
+#     "99": 0.14235580750477644,
+#     "100": 0.14981621673332152,
+#     "101": 0.08232022855263771,
+#     "107": 0.0965293869401298,
+# }  # 35
+
+# weight_dict = {
+#     "19": 0.020001831678386477,
+#     "50": 0.09939756576794027,
+#     "53": 0.12318930136390506,
+#     "58": 0.01511048209266464,
+#     "85": 0.0939985196411388,
+#     "88": 0.1448855621996377,
+#     "99": 0.11197573911930546,
+#     "100": 0.1382228441908953,
+#     "101": 0.08257590317787979,
+#     "107": 0.11633076644963841,
+#     "110": 0.054311484318608105,
+# }  # 36
+
+# weight_dict = {
+#     "19": 0.016571815568563034,
+#     "50": 0.09644173693814145,
+#     "53": 0.11284072472928357,
+#     "58": 0.008824527534403081,
+#     "85": 0.10396142544863056,
+#     "88": 0.15151093724042705,
+#     "99": 0.12123332567289301,
+#     "100": 0.14097816100266153,
+#     "101": 0.07998710256903321,
+#     "107": 0.10745930040842043,
+#     "110": 0.06019094288754312,
+# }  # 37
+
+# weight_dict = {
+#     "19": 0.007483401819102358,
+#     "50": 0.09034006438347958,
+#     "53": 0.10464808274267524,
+#     "58": 0.011140401117534804,
+#     "85": 0.10127702042945205,
+#     "88": 0.14270593048080857,
+#     "99": 0.114534282682458,
+#     "100": 0.13046749142433564,
+#     "101": 0.07169315272965165,
+#     "107": 0.0983861489932318,
+#     "110": 0.04826507664003969,
+#     "111": 0.07905894655723045,
+# }  # 38
+
+
+weight_dict = {
+    "19": 0.003967475159751132,
+    "50": 0.09564847908155215,
+    "53": 0.10955915649972488,
+    "58": 0.013481401294750724,
+    "85": 0.10307559364854763,
+    "88": 0.14598850766923363,
+    "99": 0.11039377455236636,
+    "100": 0.13573864580774048,
+    "101": 0.07226011825826058,
+    "107": 0.09343593141718157,
+    "110": 0.041422488489084024,
+    "111": 0.07502842812180677,
+}  # 39
+
+# weight_dict = {"b34": 1, "110": 0}
+# weight_dict = {"b36": 1, "111": 0}
+
 
 limit_dict = {
-    "19": (0, 0.04),
+    "19": (0, 0.05),
     "50": (0, 0.1),
     "53": (0.1, 0.2),
     "58": (0, 0.05),
-    "85": (0.05, 1.5),
+    "85": (0.05, 0.15),
     "88": (0.1, 0.2),
     "99": (0.05, 0.15),
     "100": (0.05, 0.15),
     "101": (0, 0.1),
     "107": (0.05, 0.15),
+    "109": (0, 1),
+    "110": (0, 0.15),
+    "111": (0, 0.3),
 }
 
 # weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1, "100": 0}
@@ -295,9 +372,7 @@ if __name__ == "__main__":
 
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths, folds)
 
-    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
     def calc_all_scores(
         weights: list[float],
@@ -305,7 +380,7 @@ if __name__ == "__main__":
         score_th: float = score_th,
         distance: float = distance,
         calc_type: str = "fast",
-        n_records_per_series_id: int = None,
+        n_records_per_series_id: int = 2000,
         print_msg: bool = False,
     ) -> tuple[list[float], list[float]]:
         scores = []
@@ -351,9 +426,7 @@ if __name__ == "__main__":
         # weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
         # weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.05, target_sum=1)
         if args.search_type == "grid_search":
-            weight = cmi_dss_lib.blending.get_grid(
-                len(model_dir_paths), step=0.04, target_sum=1, limits=limits
-            )
+            weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.04, target_sum=1, limits=limits)
         else:
             weight = None
 

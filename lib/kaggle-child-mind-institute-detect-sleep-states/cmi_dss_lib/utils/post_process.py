@@ -9,9 +9,7 @@ import polars as pl
 from nptyping import DataFrame, Float, Int, NDArray, Shape, Structure
 from scipy.signal import find_peaks
 
-SubmissionDataFrame = DataFrame[
-    Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]
-]
+SubmissionDataFrame = DataFrame[Structure["row_id: Int, series_id: Str, step: Int, event: Str, score: Float"]]
 
 
 class SleepingEdgesAsProbsSetting(TypedDict):
@@ -91,9 +89,7 @@ def post_process_for_seg(
         post_process_modes = {}
 
     possible_events = [
-        cmi_dss_lib.datamodule.seg.mapping[label]
-        for label in labels
-        if label in cmi_dss_lib.datamodule.seg.mapping
+        cmi_dss_lib.datamodule.seg.mapping[label] for label in labels if label in cmi_dss_lib.datamodule.seg.mapping
     ]
 
     if "sleeping_edges_as_probs" in post_process_modes:
@@ -113,21 +109,16 @@ def post_process_for_seg(
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
 
         if "onset" in setting and "wakeup" in setting:
-            sleep_occupancy_th = {
-                event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]
-            }
+            sleep_occupancy_th = {event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]}
             watch_interval_hour = {
                 event: int(setting[event]["watch_interval_hour"] * 60 * 12 / downsample_rate)
                 for event in ["onset", "wakeup"]
             }
             n_continuous = {event: setting[event]["n_continuous"] for event in ["onset", "wakeup"]}
         else:
-            sleep_occupancy_th = {
-                event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]
-            }
+            sleep_occupancy_th = {event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]}
             watch_interval_hour = {
-                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
-                for event in ["onset", "wakeup"]
+                event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate) for event in ["onset", "wakeup"]
             }
             n_continuous = {event: setting["n_continuous"] for event in ["onset", "wakeup"]}
 
@@ -154,9 +145,7 @@ def post_process_for_seg(
         }
 
     if start_timing_dict is not None:
-        timing = (
-            pd.Series(np.arange(preds.shape[0]).astype("m8[s]") * 5) + start_timing_dict[series_id]
-        )
+        timing = pd.Series(np.arange(preds.shape[0]).astype("m8[s]") * 5) + start_timing_dict[series_id]
         sel = ((15 <= timing.dt.hour) & (timing.dt.hour <= 18)).to_numpy(bool)
         preds[sel, 1] = 0
 
@@ -240,9 +229,7 @@ def post_process_for_seg(
 
     if "average_submission_over_steps" in post_process_modes:
         setting = post_process_modes["average_submission_over_steps"]
-        sub_df = adapt_averaging_submission_over_interval(
-            sub_df, step_interval=setting["interval"]
-        )
+        sub_df = adapt_averaging_submission_over_interval(sub_df, step_interval=setting["interval"])
 
     if n_records_per_series_id is not None:
         sub_df = sub_df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
@@ -299,9 +286,7 @@ def adapt_cutting_probs_by_sleep_prob(
         n = len(grouped_data)
         concat_pred = grouped_data["pred"].reshape(-1, 3)
 
-        median_sleep_probs = np.median(
-            rolling(concat_pred[:, 0], window=watch_interval_hour, axis=0), axis=1
-        )
+        median_sleep_probs = np.median(rolling(concat_pred[:, 0], window=watch_interval_hour, axis=0), axis=1)
         n_invalid_steps = len(concat_pred) - len(median_sleep_probs)
 
         # onset
@@ -338,10 +323,7 @@ def get_repeating_indices_and_intervals(
         enmo_data = np.load(series_id_dir_path / "enmo.npy")
 
     is_same = np.all(
-        [
-            np.isclose(data[repeating_interval:], data[:-repeating_interval])
-            for data in [anglez_data, enmo_data]
-        ],
+        [np.isclose(data[repeating_interval:], data[:-repeating_interval]) for data in [anglez_data, enmo_data]],
         axis=0,
     )
 
@@ -353,9 +335,7 @@ def get_repeating_indices_and_intervals(
             list(
                 map(
                     len,
-                    "".join(
-                        (indices_at_same[1:] - indices_at_same[:-1] > 1).astype(int).astype(str)
-                    ).split("1"),
+                    "".join((indices_at_same[1:] - indices_at_same[:-1] > 1).astype(int).astype(str)).split("1"),
                 )
             )
         )
@@ -371,9 +351,7 @@ def get_repeating_indices_and_intervals(
     assert np.all(is_same[start_indices_at_same] == np.True_)
     assert np.all(is_same[start_indices_at_same + intervals - 1] == np.True_)
     _start_next_indices_at_same = start_indices_at_same + intervals
-    _start_next_indices_at_same = _start_next_indices_at_same[
-        _start_next_indices_at_same < len(is_same)
-    ]
+    _start_next_indices_at_same = _start_next_indices_at_same[_start_next_indices_at_same < len(is_same)]
     assert np.all(is_same[_start_next_indices_at_same] == np.False_)
     return repeating_interval + start_indices_at_same, intervals
 
@@ -406,9 +384,7 @@ def adapt_averaging_submission_over_interval(
                     segment_df = pd.DataFrame(current_segment)
                     # average_step = segment_df["step"].mean()
                     average_score = segment_df["score"].mean()
-                    average_step = int(
-                        np.round(np.average(segment_df["step"], weights=segment_df["score"]))
-                    )
+                    average_step = int(np.round(np.average(segment_df["step"], weights=segment_df["score"])))
 
                     aggregated_data.append(
                         {

@@ -50,15 +50,9 @@ def calc_score(
     post_process_modes=None,
 ):
     series_ids = [p.stem for p in predicted_fold_dir_path.glob("*.npz")]
-    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
     event_df = event_df[event_df["series_id"].isin(series_ids)]
-    event_df = event_df[
-        event_df["event"].isin(
-            [event for event in ["onset", "wakeup"] if f"event_{event}" in labels]
-        )
-    ]
+    event_df = event_df[event_df["event"].isin([event for event in ["onset", "wakeup"] if f"event_{event}" in labels])]
 
     import cmi_dss_lib.data.utils
 
@@ -90,9 +84,7 @@ def calc_score(
     sub_df = sub_df.sort_values(["series_id", "step"])
 
     if calc_type == "fast":
-        score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(
-            event_df, sub_df
-        )
+        score = child_mind_institute_detect_sleep_states.score.calc_event_detection_ap(event_df, sub_df)
     elif calc_type == "normal":
         score = cmi_dss_lib.utils.metrics.event_detection_ap(event_df, sub_df)
     else:

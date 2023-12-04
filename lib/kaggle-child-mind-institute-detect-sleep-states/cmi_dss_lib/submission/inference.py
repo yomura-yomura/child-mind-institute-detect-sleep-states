@@ -12,9 +12,7 @@ def replace_predicted_pred_dirs_with_mean_preds_dir(
     model_dir_path: pathlib.Path,
     phase: Literal["train", "test", "dev"],
 ):
-    predicted_phase_dir_path = (
-        predicted_dir_path / pathlib.Path(*model_dir_path.parts[-2:]) / phase
-    )
+    predicted_phase_dir_path = predicted_dir_path / pathlib.Path(*model_dir_path.parts[-2:]) / phase
 
     predicted_fold_dir_paths = sorted(predicted_phase_dir_path.glob("fold_*"))
     assert len(predicted_fold_dir_paths) == 5
@@ -31,9 +29,7 @@ def replace_predicted_pred_dirs_with_mean_preds_dir(
     predicted_mean_dir_path = predicted_phase_dir_path / "mean"
     predicted_mean_dir_path.mkdir(exist_ok=True)
 
-    for series_id in tqdm.tqdm(
-        common_unique_series_ids, desc="averaging preds for each series_id"
-    ):
+    for series_id in tqdm.tqdm(common_unique_series_ids, desc="averaging preds for each series_id"):
         mean_preds = None
         for predicted_fold_dir_path in predicted_fold_dir_paths:
             preds = np.load(predicted_fold_dir_path / f"{series_id}.npz")["arr_0"]
@@ -61,11 +57,7 @@ def save_overlapping_mean_as_npz(
         for inference_step_offset in inference_step_offsets
     ]
     series_ids = list(
-        set(
-            p.stem
-            for target_pred_dir_path in target_pred_dir_paths
-            for p in target_pred_dir_path.glob("*.npz")
-        )
+        set(p.stem for target_pred_dir_path in target_pred_dir_paths for p in target_pred_dir_path.glob("*.npz"))
     )
 
     def apply(preds, inference_step_offset):

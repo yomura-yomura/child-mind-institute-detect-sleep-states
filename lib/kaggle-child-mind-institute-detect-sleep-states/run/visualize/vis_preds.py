@@ -70,20 +70,14 @@ class Plotter:
         if exp_name.startswith("train_stacking"):
             self.cfg = cast(
                 StackingConfig,
-                hydra.compose(
-                    "stacking", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))
-                ),
+                hydra.compose("stacking", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))),
             )
         else:
             self.cfg = cast(
                 TrainConfig,
-                hydra.compose(
-                    "train", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))
-                ),
+                hydra.compose("train", overrides=list(omegaconf.OmegaConf.load(overrides_yaml_path))),
             )
-        self.cfg.dir.data_dir = (
-            project_root_path.parent.parent / "data" / "child-mind-institute-detect-sleep-states"
-        )
+        self.cfg.dir.data_dir = project_root_path.parent.parent / "data" / "child-mind-institute-detect-sleep-states"
         self.cfg.dir.sub_dir = project_root_path / "run"
 
         self.target_pred_dir_path = self.get_pred_dir_path(exp_name, i_fold, inference_step_offset)
@@ -95,9 +89,7 @@ class Plotter:
 
         self.cfg.inference_step_offset = int(inference_step_offset)
 
-        self.events = [
-            label[6:] if label.startswith("event_") else label for label in self.cfg.labels
-        ]
+        self.events = [label[6:] if label.startswith("event_") else label for label in self.cfg.labels]
 
         # cfg.prev_margin_steps = 6 * 12 * 60
         # cfg.next_margin_steps = 6 * 12 * 60
@@ -229,9 +221,7 @@ class Plotter:
                 )
 
         if "wakeup" in self.events:
-            wakeup_label_steps = label_df[(label_df["wakeup"] == 1).astype(bool)][
-                "step"
-            ].to_numpy()
+            wakeup_label_steps = label_df[(label_df["wakeup"] == 1).astype(bool)]["step"].to_numpy()
             for step in tqdm.tqdm(wakeup_label_steps, desc="add wakeup line"):
                 fig.add_vline(
                     x=step,
@@ -264,10 +254,7 @@ import child_mind_institute_detect_sleep_states.score
 event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train")
 
 
-
-def get_score(
-    series_id: str, sub_df: DataFrame, labels: list[str], start: int, end: int
-) -> dict[str, list[float]]:
+def get_score(series_id: str, sub_df: DataFrame, labels: list[str], start: int, end: int) -> dict[str, list[float]]:
     target_event_df = event_df[
         (event_df["series_id"] == series_id)
         & (start <= event_df["step"])
@@ -312,13 +299,9 @@ if __name__ == "__main__":
     import child_mind_institute_detect_sleep_states.data.comp_dataset
     import child_mind_institute_detect_sleep_states.score
 
-    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train"
-    ).dropna()
+    event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train").dropna()
 
-    plotters = [
-        Plotter(exp_name, i_fold=i_fold, dataset_type="valid") for i_fold in tqdm.trange(5)
-    ]
+    plotters = [Plotter(exp_name, i_fold=i_fold, dataset_type="valid") for i_fold in tqdm.trange(5)]
 
     records = []
     for i_fold in range(5):
@@ -342,12 +325,8 @@ if __name__ == "__main__":
                 metric_dict = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
                     target_event_df, sub_df, n_jobs=1
                 )
-                score_onset = np.mean(
-                    [metric["average_precision"] for metric in metric_dict["onset"]]
-                )
-                score_wakeup = np.mean(
-                    [metric["average_precision"] for metric in metric_dict["wakeup"]]
-                )
+                score_onset = np.mean([metric["average_precision"] for metric in metric_dict["onset"]])
+                score_wakeup = np.mean([metric["average_precision"] for metric in metric_dict["wakeup"]])
 
             records.append(
                 {
@@ -375,24 +354,18 @@ if __name__ == "__main__":
         distance=96,
         post_process_modes=None,
     )
-    metric_dict = (
-        child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
-            event_df[event_df["series_id"] == series_id].dropna(), sub_df
-        )
+    metric_dict = child_mind_institute_detect_sleep_states.score.fast_event_detection_ap.get_score_dict(
+        event_df[event_df["series_id"] == series_id].dropna(), sub_df
     )
     metric_df = pd.DataFrame(
         [
             {"event": event, "th": th, "precision": p, "recall": r, "prob": prob}
             for event, metric_list in metric_dict.items()
             for th, metric in enumerate(metric_list)
-            for p, r, prob in zip(
-                metric["precision"], metric["recall"], metric["prob"], strict=True
-            )
+            for p, r, prob in zip(metric["precision"], metric["recall"], metric["prob"], strict=True)
         ]
     )
-    fig = px.line(
-        metric_df, title=series_id, x="recall", y="precision", color="th", facet_col="event"
-    )
+    fig = px.line(metric_df, title=series_id, x="recall", y="precision", color="th", facet_col="event")
     fig.update_traces(mode="lines+markers")
     fig.show()
 
@@ -418,9 +391,7 @@ if __name__ == "__main__":
 
         records = []
         for i, event in enumerate(["onset", "wakeup"]):
-            for series_id, steps in event_df[event_df["event"] == event].groupby("series_id")[
-                "step"
-            ]:
+            for series_id, steps in event_df[event_df["event"] == event].groupby("series_id")["step"]:
                 try:
                     preds = np.load(target_pred_fold_dir_path / f"{series_id}.npz")["arr_0"]
                 except FileNotFoundError:

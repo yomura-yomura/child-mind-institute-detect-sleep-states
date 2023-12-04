@@ -7,9 +7,7 @@ cal = USFederalHolidayCalendar()
 holidays = cal.holidays()
 
 event_df = (
-    child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
-        "train", as_polars=True
-    )
+    child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df("train", as_polars=True)
     .with_columns(
         pl.col("timestamp")
         .str.to_datetime()
