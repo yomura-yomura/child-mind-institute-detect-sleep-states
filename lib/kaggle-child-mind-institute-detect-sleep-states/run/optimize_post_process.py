@@ -92,7 +92,7 @@ if __name__ == "__main__":
         # watch_interval_hours = np.linspace(0, 12, 24 + 1)
         sleep_occupancy_ths = np.linspace(0, 1, 10 + 1)
         watch_interval_hours = np.arange(6, 9, 0.5)
-        n_continuous_list = np.arange(0, 9, 1)
+        n_continuous_list = np.arange(0, 9, 1) * 12 * 60
         # grid_parameters = pd.merge(
         #     pd.merge(
         #         pd.Series(sleep_occupancy_ths, name="sleep_occupancy_th_onset"),
@@ -115,6 +115,9 @@ if __name__ == "__main__":
             pd.Series(n_continuous_list, name="n_continuous"),
             how="cross",
         )
+
+        grid_parameters = grid_parameters.to_numpy()
+        print(f"{grid_parameters = }")
 
         def calc_all_scores(
             grid_parameter, score_th: float = 0.0005, distance: int = 96, calc_type: str = "fast"
