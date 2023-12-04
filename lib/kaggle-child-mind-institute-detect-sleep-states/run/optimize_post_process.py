@@ -91,8 +91,12 @@ if __name__ == "__main__":
         # sleep_occupancy_ths = np.linspace(0, 0.1, 10 + 1)
         # watch_interval_hours = np.linspace(0, 12, 24 + 1)
         sleep_occupancy_ths = np.linspace(0, 1, 10 + 1)
-        watch_interval_hours = np.arange(6, 9, 0.5)
-        n_continuous_list = np.arange(0, 9, 1) * 12 * 60
+        watch_interval_hours = np.arange(0, 9, 0.5)
+        n_continuous_list = np.arange(0, 9, 0.1) * 12 * 60
+
+        sleep_occupancy_ths = sleep_occupancy_ths[sleep_occupancy_ths > 0]
+        watch_interval_hours = watch_interval_hours[watch_interval_hours > 0]
+        n_continuous_list = n_continuous_list[n_continuous_list > 0]
         # grid_parameters = pd.merge(
         #     pd.merge(
         #         pd.Series(sleep_occupancy_ths, name="sleep_occupancy_th_onset"),
