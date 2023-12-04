@@ -25,8 +25,10 @@ class SleepingEdgesAsProbsSettingByEvent(TypedDict):
 
 
 class CuttingProbsBySleepProbSetting(TypedDict):
+    version: Literal[0, 1]
     watch_interval_hour: float
     sleep_occupancy_th: float
+    n_continuous: int
 
 
 class CuttingProbsBySleepProbSettingByEvent(TypedDict):
@@ -39,10 +41,15 @@ class CuttingProbsOnRepeating(TypedDict):
     interval_th: int
 
 
+class AveragingSubmissionOverSteps(TypedDict):
+    interval: int
+
+
 class PostProcessModeWithSetting(TypedDict, total=False):
     sleeping_edges_as_probs: SleepingEdgesAsProbsSetting | SleepingEdgesAsProbsSettingByEvent
     cutting_probs_by_sleep_prob: CuttingProbsBySleepProbSetting | CuttingProbsBySleepProbSettingByEvent
     cutting_probs_on_repeating: CuttingProbsOnRepeating
+    average_submission_over_steps: AveragingSubmissionOverSteps
 
 
 PostProcessModes: TypeAlias = PostProcessModeWithSetting | None
@@ -98,10 +105,13 @@ def post_process_for_seg(
             **post_process_modes["sleeping_edges_as_probs"],
         )
 
+    sleep_occupancy_th = watch_interval_hour = n_continuous = None
     if "cutting_probs_by_sleep_prob" in post_process_modes:
         if print_msg:
             print("enable 'cutting_probs_by_sleep_prob'")
+
         setting = post_process_modes["cutting_probs_by_sleep_prob"]
+
         if "onset" in setting and "wakeup" in setting:
             sleep_occupancy_th = {
                 event: setting[event]["sleep_occupancy_th"] for event in ["onset", "wakeup"]
@@ -110,6 +120,7 @@ def post_process_for_seg(
                 event: int(setting[event]["watch_interval_hour"] * 60 * 12 / downsample_rate)
                 for event in ["onset", "wakeup"]
             }
+            n_continuous = {event: setting[event]["n_continuous"] for event in ["onset", "wakeup"]}
         else:
             sleep_occupancy_th = {
                 event: setting["sleep_occupancy_th"] for event in ["onset", "wakeup"]
@@ -118,8 +129,7 @@ def post_process_for_seg(
                 event: int(setting["watch_interval_hour"] * 60 * 12 / downsample_rate)
                 for event in ["onset", "wakeup"]
             }
-    else:
-        sleep_occupancy_th = watch_interval_hour = None
+            n_continuous = {event: setting["n_continuous"] for event in ["onset", "wakeup"]}
 
     if "cutting_probs_on_repeating" in post_process_modes:
         if print_msg:
@@ -131,7 +141,7 @@ def post_process_for_seg(
                 series_id,
             )
         ):
-            if interval < setting["interval_th"]:
+            if interval < setting.get("interval_th", 0):
                 continue
             preds[i : i + interval] = 0
 
@@ -164,24 +174,48 @@ def post_process_for_seg(
                 n_steps = preds.shape[0]
                 sleep_preds = preds[:, label_index_dict["sleep"]]
 
-                if event_name == "onset":
-                    max_step = min(step + watch_interval_hour[event_name], n_steps - 1)
-                    if step < max_step:
-                        sleep_score = np.median(sleep_preds[step:max_step])
+                version = post_process_modes["cutting_probs_by_sleep_prob"]["version"]
+                if version == 0:
+                    if event_name == "onset":
+                        max_step = min(step + watch_interval_hour[event_name], n_steps - 1)
+                        if step < max_step:
+                            sleep_score = np.median(sleep_preds[step:max_step])
+                        else:
+                            sleep_score = np.nan
+                    elif event_name == "wakeup":
+                        min_step = max(step - watch_interval_hour[event_name], 0)
+                        if min_step < step:
+                            sleep_score = np.median(sleep_preds[min_step:step])
+                        else:
+                            sleep_score = np.nan
                     else:
-                        sleep_score = np.nan
-                elif event_name == "wakeup":
-                    min_step = max(step - watch_interval_hour[event_name], 0)
-                    if min_step < step:
-                        sleep_score = np.median(sleep_preds[min_step:step])
+                        assert False
+
+                    # skip
+                    if sleep_score < sleep_occupancy_th[event_name]:
+                        continue
+
+                elif version == 1:
+                    if event_name == "onset":
+                        max_step = min(step + watch_interval_hour[event_name], n_steps - 1)
+                        a = sleep_occupancy_th[event_name] <= sleep_preds[step:max_step]
+                        if np.count_nonzero(~a) > 1:
+                            c = a.cumsum()[~a]
+                            max_continuous = np.max(c[1:] - c[:-1])
+                            if max_continuous < n_continuous[event_name]:
+                                continue
+                    elif event_name == "wakeup":
+                        min_step = max(step - watch_interval_hour[event_name], 0)
+                        a = sleep_occupancy_th[event_name] <= sleep_preds[min_step:step]
+                        if np.count_nonzero(~a) > 1:
+                            c = a.cumsum()[~a]
+                            max_continuous = np.max(c[1:] - c[:-1])
+                            if max_continuous < n_continuous[event_name]:
+                                continue
                     else:
-                        sleep_score = np.nan
+                        assert False
                 else:
                     assert False
-
-                # skip
-                if sleep_score < sleep_occupancy_th[event_name]:
-                    continue
 
             records.append(
                 {
@@ -203,6 +237,13 @@ def post_process_for_seg(
         )
 
     sub_df = pd.DataFrame(records).sort_values(by=["series_id", "step"])
+
+    if "average_submission_over_steps" in post_process_modes:
+        setting = post_process_modes["average_submission_over_steps"]
+        sub_df = adapt_averaging_submission_over_interval(
+            sub_df, step_interval=setting["interval"]
+        )
+
     if n_records_per_series_id is not None:
         sub_df = sub_df.sort_values(["score"], ascending=False).head(n_records_per_series_id)
     sub_df = sub_df[["series_id", "step", "event", "score"]]
@@ -335,3 +376,73 @@ def get_repeating_indices_and_intervals(
     ]
     assert np.all(is_same[_start_next_indices_at_same] == np.False_)
     return repeating_interval + start_indices_at_same, intervals
+
+
+def adapt_averaging_submission_over_interval(
+    df: DataFrame[Structure["series_id: Str, event: Str, step: Int, score: Float"]],
+    step_interval: int,
+) -> DataFrame:
+    """
+    :param df: DataFrame to aggregate.
+    :param step_interval: The range within which steps are considered close.
+    :return: A single DataFrame with aggregated rows.
+    """
+
+    aggregated_data = []
+
+    # Sorting the DataFrame by 'series_id' and 'step'
+    sorted_df = df.sort_values(by=["series_id", "step"])
+
+    for (series_id, event), group in sorted_df.groupby(["series_id", "event"]):
+        start_step = group["step"].iloc[0]
+        current_segment = []
+
+        for idx in group.index:
+            row = group.loc[idx]
+            if row["step"] - start_step <= step_interval:
+                current_segment.append(row)
+            else:
+                if current_segment:
+                    segment_df = pd.DataFrame(current_segment)
+                    # average_step = segment_df["step"].mean()
+                    average_score = segment_df["score"].mean()
+                    average_step = int(
+                        np.round(np.average(segment_df["step"], weights=segment_df["score"]))
+                    )
+
+                    aggregated_data.append(
+                        {
+                            "series_id": series_id,
+                            "event": event,
+                            "step": average_step,
+                            "score": average_score,
+                        }
+                    )
+                start_step = row["step"]
+                current_segment = [row]
+
+        # Aggregating the last segment for each series_id and event
+        if current_segment:
+            segment_df = pd.DataFrame(current_segment)
+            average_step = segment_df["step"].mean()
+            average_score = segment_df["score"].mean()
+            aggregated_data.append(
+                {
+                    "series_id": series_id,
+                    "event": event,
+                    "step": average_step,
+                    "score": average_score,
+                }
+            )
+
+    # Creating the final DataFrame, converting 'step' to int64, and adding 'row_id'
+    final_df = pd.DataFrame(aggregated_data)
+    final_df["step"] = final_df["step"].astype("int64")
+    final_df = final_df.sort_values(by=["series_id", "step"]).reset_index(drop=True)
+    final_df.reset_index(inplace=True)
+    final_df.rename(columns={"index": "row_id"}, inplace=True)
+
+    # Reordering the columns to match the desired structure
+    final_df = final_df[["row_id", "series_id", "step", "event", "score"]]
+
+    return final_df

@@ -1,22 +1,23 @@
 import multiprocessing
 import os
 import pathlib
+import time
 from typing import Callable, Sequence
 
+import cmi_dss_lib.data.utils
 import cmi_dss_lib.utils.common
 import cmi_dss_lib.utils.metrics
 import cmi_dss_lib.utils.post_process
 import numpy as np
 import pandas as pd
 import tqdm
-from numpy.typing import NDArray
+from nptyping import NDArray, Shape
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 import child_mind_institute_detect_sleep_states.score
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
-import cmi_dss_lib.data.utils
 
 start_timing_dict = cmi_dss_lib.data.utils.get_start_timing_dict("train")
 
@@ -45,10 +46,10 @@ def calc_score(
         assert preds.shape[0] == len(weights), (preds.shape, len(weights))
         mean_preds = np.average(preds, axis=0, weights=weights)
 
-        p = pathlib.Path("mean_preds") / "train" / f"fold_{i_fold}" / f"{series_id}.npz"
-        p.parent.mkdir(exist_ok=True, parents=True)
-        np.savez_compressed(p, mean_preds)
-        print(f"Info: saved as {p}")
+        # p = pathlib.Path("mean_preds") / "train" / f"fold_{i_fold}" / f"{series_id}.npz"
+        # p.parent.mkdir(exist_ok=True, parents=True)
+        # np.savez_compressed(p, mean_preds)
+        # print(f"Info: saved as {p}")
 
         df = cmi_dss_lib.utils.post_process.post_process_for_seg(
             series_id=series_id,
@@ -86,8 +87,12 @@ def calc_score(
 
 
 def get_grid(
-    n_cols: int, step: float, target_sum: float = 1, start: float = 0
-) -> NDArray[np.float_]:
+    n_cols: int,
+    step: float,
+    target_sum: float = 1,
+    start: float = 0,
+    limits: list[tuple[float, float]] | None = None,
+) -> NDArray[Shape["*, *"], np.float_]:
     assert step < 1
     assert 0 <= target_sum
 
@@ -96,10 +101,20 @@ def get_grid(
         np.arange(round(1 / step) + 1) + round(start * round(1 / step)), dtype="i4"
     )
 
-    weight = base_weight.copy()
-    for i, _ in enumerate(tqdm.trange(n_cols - 1)):
-        weight = weight.merge(base_weight.rename(columns={0: i + 1}), how="cross")
-        weight = weight[np.sum(weight, axis=1) <= target_sum].reset_index(drop=True)
+    weight = None
+    for i, _ in enumerate(tqdm.trange(n_cols)):
+        if weight is None:
+            weight = base_weight.copy()
+        else:
+            weight = weight.merge(base_weight.rename(columns={0: i + 1}), how="cross")
+        weight = weight[np.sum(weight, axis=1) <= target_sum]
+        if limits is not None:
+            min_w, max_w = limits[i]
+            weight = weight[
+                (np.floor(min_w / step) <= weight.iloc[:, -1])
+                & (weight.iloc[:, -1] <= np.ceil(max_w / step))
+            ]
+        weight = weight.reset_index(drop=True)
     weight = weight.to_numpy()
     weight = weight[np.sum(weight, axis=1) == target_sum]
     print(f"{weight.shape = }")
@@ -148,9 +163,11 @@ def optimize(
         [list[float], dict | None, float, float, str, int, bool],
         tuple[Sequence[float], Sequence[float]],
     ],
-    all_weights_to_find,
+    all_weights_to_find: NDArray | None,
+    limits: list[tuple[float, float]] | None,
     initial_weight_dict=None,
     n_cpus=None,
+    objective=None,
 ):
     if n_cpus is None:
         n_cpus = os.cpu_count()
@@ -172,64 +189,6 @@ def optimize(
                 df["weights"] = df["weights"].apply(
                     lambda w: [float(n.strip("' ")) for n in w.strip("[]").split(",")]
                 )
-
-                # df = pd.concat(
-                #     [
-                #         df,
-                #         pd.DataFrame(
-                #             [(score_th, distance) for score_th, distance in df["weights"]],
-                #             columns=["score_th", "distance"],
-                #         ),
-                #     ],
-                #     axis=1,
-                # ).sort_values(["score_th", "distance"])
-                #
-                # unique_score_ths = df["score_th"].unique()
-                # unique_distances = df["distance"].unique()
-                # grid = (
-                #     pd.merge(
-                #         pd.Series(unique_score_ths, name="score_th"),
-                #         pd.Series(unique_distances, name="distance"),
-                #         how="cross",
-                #     )
-                #     .to_numpy()
-                #     .reshape((len(unique_score_ths), len(unique_distances), 2))
-                # )
-                #
-                # indices = [
-                #     np.argmax(
-                #         np.isclose(score_th, grid[..., 0].flatten())
-                #         & np.isclose(distance, grid[..., 1].flatten())
-                #     )
-                #     for score_th, distance in df[["score_th", "distance"]].values
-                # ]
-                # grid_score = np.full(grid.shape[:-1], np.nan).reshape(-1)
-                # grid_score[indices] = df["CV"]
-                # grid_score = grid_score.reshape(grid.shape[:-1])
-                # import plotly.express as px
-                # import plotly_utility.offline
-                #
-                # fig = px.imshow(
-                #     grid_score,
-                #     y=unique_score_ths,
-                #     x=unique_distances,
-                #     aspect=unique_distances.max() / unique_score_ths.max(),
-                # )
-                # fig = px.imshow(
-                #     grid_score[:, :1],
-                #     y=unique_score_ths,
-                #     x=unique_distances[:1],
-                #     aspect=unique_distances[:1].max() / unique_score_ths.max(),
-                #     text_auto=".2f",
-                # )
-                # plotly_utility.offline.mpl_plot(fig)
-                # if True:
-                #     target_weight = df.iloc[df["CV"].argmax()]["weights"]
-                #     print(f"{target_weight = }")
-                #     new_weight = target_weight + get_grid(0.05, 0, -0.5)
-                #     new_weight = new_weight[np.all(new_weight > 0, axis=1)]
-                #     assert np.all(np.isclose(np.sum(new_weight, axis=1), 1))
-                #     weight = np.concatenate([weight, new_weight], axis=0)
 
                 loaded_weight = np.array(df["weights"].tolist())
                 all_weights_to_find = np.array(
@@ -262,29 +221,27 @@ def optimize(
             record_at_max = print_best_score_so_far(records, target_csv_path)
             return record_at_max
         case "optuna":
+            assert all_weights_to_find is None
+
             import optuna
 
-            def objective(trial: optuna.Trial):
-                total = 0
+            from .optuna_blending import run
 
-                weights = []
-                for i in range(len(initial_weight_dict) - 1):
-                    weight = trial.suggest_float(f"w{i}", 0, 1 - total)
-                    total += weight
-                    weights.append(weight)
-                weights.append(1 - total)
-                assert len(weights) == len(initial_weight_dict)
-                scores, _ = calc_all_scores(weights)
-                return np.mean(scores)
-
+            db_path = pathlib.Path("optuna-history") / f"{models_dir_name}.db"
+            db_path.parent.mkdir(exist_ok=True, parents=True)
             study = optuna.create_study(
                 direction="maximize",
-                storage="sqlite:///optuna-history.db",
+                storage=f"sqlite:///{db_path}",
                 load_if_exists=True,
                 study_name=models_dir_name,
             )
             study.enqueue_trial({f"w{i}": w for i, w in enumerate(initial_weight_dict.values())})
-            study.optimize(objective, n_trials=100, n_jobs=n_cpus, show_progress_bar=True)
+
+            with multiprocessing.Pool(n_cpus) as p:
+                for _ret in p.starmap(
+                    run, [(i_cpu, models_dir_name, db_path, objective) for i_cpu in range(n_cpus)]
+                ):
+                    pass
 
 
 def print_best_score_so_far(

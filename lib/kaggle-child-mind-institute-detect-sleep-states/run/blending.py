@@ -11,7 +11,7 @@ import tqdm
 
 import child_mind_institute_detect_sleep_states.data.comp_dataset
 
-np.seterr(all="raise")
+# np.seterr(all="raise")
 
 project_root_path = pathlib.Path(__file__).parent.parent
 
@@ -29,9 +29,9 @@ post_process_modes = {
     # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
     #     sleep_prob_th=0.2, min_sleeping_hours=6
     # ),
-    "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-        watch_interval_hour=7.5, sleep_occupancy_th=0.03
-    ),
+    # "cutting_probs_by_sleep_prob": cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+    #     watch_interval_hour=7.5, sleep_occupancy_th=0.03, version=0, n_continuous=0
+    # ),
     # "cutting_probs_by_sleep_prob": dict(
     #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
     #         watch_interval_hour=7.5,
@@ -42,6 +42,10 @@ post_process_modes = {
     #         sleep_occupancy_th=0.03,
     #     ),
     # )
+    # "cutting_probs_on_repeating": cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
+    #     prepare_data_dir_path=f"../output/prepare_data/train/robust_scaler",
+    #     interval_th=15 * 60 // 5,
+    # ),
 }
 
 
@@ -89,8 +93,11 @@ all_model_dir_path_dict = (
         "75": ranchantan_pred_dir_path / "exp075-wakeup_5",
         "85": jumtras_pred_dir_path / "exp085",
         "88": jumtras_pred_dir_path / "exp088",
+        "99": ranchantan_pred_dir_path / "exp099_resume",
         "100": ranchantan_pred_dir_path / "exp100",
         "101": ranchantan_pred_dir_path / "exp101",
+        "105": ranchantan_pred_dir_path / "exp105",
+        "107": ranchantan_pred_dir_path / "exp107",
     }
     | {
         "s6": stacking_pred_dir_path / "s_exp006",
@@ -98,7 +105,10 @@ all_model_dir_path_dict = (
     | {
         "b26": blending_pred_dir_path / "exp026",
         "b28": blending_pred_dir_path / "exp028",
-        "b29": blending_pred_dir_path / "exp029",
+        # "b29": blending_pred_dir_path / "exp029",
+        "b30": blending_pred_dir_path / "exp030",
+        "b32": blending_pred_dir_path / "exp032",
+        "b33": blending_pred_dir_path / "exp033",
     }
 )
 
@@ -157,29 +167,99 @@ all_model_dir_path_dict = (
 #     "101": 0.15,
 # }  # 29
 
-weight_dict = {
-    "19": 0.045,
-    "50": 0.09,
-    "53": 0.18,
-    "58": 0.045,
-    "85": 0.18,
-    "88": 0.18,
-    "100": 0.18,
-    "101": 0.1,
-}  # 30
+# weight_dict = {
+#     "19": 0.045,
+#     "50": 0.09,
+#     "53": 0.18,
+#     "58": 0.045,
+#     "85": 0.18,
+#     "88": 0.18,
+#     "100": 0.18,
+#     "101": 0.1,
+# }  # 30
 
 # weight_dict = {
-#     "50": 0.1,
-#     "53": 0.1,
-#     "58": 0.1,
-#     "85": 0.2,
-#     "88": 0.1,
-#     "100": 0.2,
-#     "101": 0.2,
+#     "19": 0.0405,
+#     "50": 0.081,
+#     "53": 0.162,
+#     "58": 0.0405,
+#     "85": 0.162,
+#     "88": 0.162,
+#     "99": 0.1,
+#     "100": 0.162,
+#     "101": 0.09,
+# }  # 31
+
+# weight_dict = {
+#     "19": 0.03864959320010797,
+#     "50": 0.08553410217905172,
+#     "53": 0.16561358858285558,
+#     "58": 0.030066808112389563,
+#     "85": 0.14162568745283677,
+#     "88": 0.17845648941370792,
+#     "99": 0.11488021220066767,
+#     "100": 0.16421709597493192,
+#     "101": 0.08095642288345084,
+# }  # 32
+
+
+# weight_dict = {
+#     "19": 0.03710360947210365,
+#     "50": 0.08211273809188965,
+#     "53": 0.15898904503954134,
+#     "58": 0.02886413578789398,
+#     "85": 0.13596065995472328,
+#     "88": 0.1713182298371596,
+#     "99": 0.15028500371264097,
+#     "100": 0.15764841213593464,
+#     "101": 0.0777181659681128,
+# }  # 33
+
+
+# limit_dict = {
+#     "19": (0, 0.1),
+#     "50": (0, 0.1),
+#     "53": (0.1, 0.2),
+#     "58": (0, 0.1),
+#     "85": (0.1, 0.2),
+#     "88": (0.1, 0.2),
+#     "99": (0, 0.2),
+#     "100": (0.1, 0.2),
+#     "101": (0, 0.15),
+#     "107": (0.5, 0.15),
 # }
 
 # weight_dict = {"b26": 0.85, "101": 0.15}
 # weight_dict = {"b28": 0.9, "101": 0.1}
+# weight_dict = {"b30": 0.9, "99": 0.1}
+# weight_dict = {"b32": 0.96, "99": 0.04}
+# weight_dict = {"b33": 0.88, "107": 0.12}
+weight_dict = {
+    "19": 0.03265117633545121,
+    "50": 0.0722592095208629,
+    "53": 0.13991035963479637,
+    "58": 0.0254004394933467,
+    "85": 0.11964538076015649,
+    "88": 0.15076004225670045,
+    "99": 0.13225080326712405,
+    "100": 0.13873060267962248,
+    "101": 0.06839198605193927,
+    "107": 0.12,
+}  # 34
+
+
+limit_dict = {
+    "19": (0, 0.04),
+    "50": (0, 0.1),
+    "53": (0.1, 0.2),
+    "58": (0, 0.05),
+    "85": (0.05, 1.5),
+    "88": (0.1, 0.2),
+    "99": (0.05, 0.15),
+    "100": (0.05, 0.15),
+    "101": (0, 0.1),
+    "107": (0.05, 0.15),
+}
 
 # weight_dict = {"19": 0.1, "50": 0.2, "53": 0.3, "58": 0.1, "85": 0.2, "88": 0.1, "100": 0}
 
@@ -203,7 +283,12 @@ if __name__ == "__main__":
     folds = sorted(map(int, set(args.folds.split(","))))
     print(f"{folds = }")
 
-    model_dir_paths = [all_model_dir_path_dict[i_exp] for i_exp in weight_dict]
+    model_dir_paths = [all_model_dir_path_dict[exp] for exp in weight_dict]
+    if limit_dict is None:
+        limits = [(0, 1) for _ in weight_dict]
+    else:
+        limits = [limit_dict.get(exp, (0, 1)) for exp in weight_dict]
+
     keys_dict, preds_dict = cmi_dss_lib.blending.get_keys_and_preds(model_dir_paths, folds)
 
     all_event_df = child_mind_institute_detect_sleep_states.data.comp_dataset.get_event_df(
@@ -259,21 +344,51 @@ if __name__ == "__main__":
     else:
         models_dir_name = "_".join(str(exp) for exp in weight_dict)
 
-        weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
+        # weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.1, target_sum=1)
         # weight = cmi_dss_lib.blending.get_grid(len(model_dir_paths), step=0.05, target_sum=1)
+        if args.search_type == "grid_search":
+            weight = cmi_dss_lib.blending.get_grid(
+                len(model_dir_paths), step=0.04, target_sum=1, limits=limits
+            )
+        else:
+            weight = None
 
         if folds == [0, 1, 2, 3, 4]:
             models_dir_name = f"blending/{models_dir_name}"
         else:
             models_dir_name = f"blending/{models_dir_name}/{'_'.join(map(str, folds))}"
 
+        import optuna
+
+        def objective(trial: optuna.trial.FrozenTrial) -> float:
+            weights = []
+            for i in range(len(weight_dict) - 1):
+                weight = trial.suggest_float(f"w{i}", *limits[i])
+                weights.append(weight)
+            weight = 1 - sum(weights)
+            weights.append(weight)
+
+            trial.set_user_attr("constraint", (1 - sum(weights), sum(weights) - 1))
+
+            min_w, max_w = limits[-1]
+            if not ((min_w <= weight) and (weight <= max_w)):
+                return np.nan
+
+            print(f"{weights = }")
+            scores, _ = calc_all_scores(weights)
+            score = float(np.mean(scores))
+            print(f"{score = }")
+            return score
+
         record_at_max = cmi_dss_lib.blending.optimize(
             args.search_type,
             models_dir_name,
             calc_all_scores,
             weight,
+            limits,
             weight_dict,
             args.n_cpus,
+            objective,
         )
         calc_all_scores(
             record_at_max["weights"],

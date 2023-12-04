@@ -20,10 +20,12 @@ import child_mind_institute_detect_sleep_states.score
 # exp_name = "ranchantan/exp050-transformer-decoder_retry_resume"
 # exp_name = "combined/exp050_exp75-wakeup"
 # exp_name = "ranchantan/exp075-wakeup_6"
+# exp_name = "ranchantan/exp099_resume"
 
 # exp_name = "blending/exp026"
 # exp_name = "blending/exp028"
-exp_name = "blending/exp029"
+# exp_name = "blending/exp029"
+exp_name = "blending/exp032"
 
 # exp_name = "train/exp101"
 
@@ -106,10 +108,9 @@ if __name__ == "__main__":
         # "sleeping_edges_as_probs": cmi_dss_lib.utils.post_process.SleepingEdgesAsProbsSetting(
         #     sleep_prob_th=0.2, min_sleeping_hours=6
         # ),
-        # cutting_probs_by_sleep_prob=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
-        #     watch_interval_hour=7.5,
-        #     sleep_occupancy_th=0.03,
-        # ),
+        cutting_probs_by_sleep_prob=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
+            watch_interval_hour=7.5, sleep_occupancy_th=0.03, version=1, n_continuous=12 * 60 * 5
+        ),
         # cutting_probs_by_sleep_prob=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSettingByEvent(
         #     onset=cmi_dss_lib.utils.post_process.CuttingProbsBySleepProbSetting(
         #         watch_interval_hour=7.5,
@@ -120,10 +121,13 @@ if __name__ == "__main__":
         #         sleep_occupancy_th=0.03,
         #     ),
         # ),
-        cutting_probs_on_repeating=cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
-            prepare_data_dir_path="../output/prepare_data/train/robust_scaler",
-            interval_th=15 * 60 // 5,
-        ),
+        # cutting_probs_on_repeating=cmi_dss_lib.utils.post_process.CuttingProbsOnRepeating(
+        #     prepare_data_dir_path="../output/prepare_data/train/robust_scaler",
+        #     interval_th=15 * 60 // 5,
+        # ),
+        # average_submission_over_steps=cmi_dss_lib.utils.post_process.AveragingSubmissionOverSteps(
+        #     interval=12 * 10
+        # ),
     )
 
     scores = []
@@ -132,8 +136,10 @@ if __name__ == "__main__":
         score = calc_score(
             predicted_fold_dir_path,
             labels=["sleep", "event_onset", "event_wakeup"],
-            score_th=1e-4,
-            distance=88,
+            # score_th=1e-4,
+            # distance=88,
+            score_th=1e-5,
+            distance=95,
             n_records_per_series_id=2000,
             # score_th=0.005,
             # distance=96,

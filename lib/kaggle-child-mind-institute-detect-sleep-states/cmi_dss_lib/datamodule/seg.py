@@ -444,7 +444,7 @@ class TrainDataset(Dataset):
         )
         series_id = self.event_df.at[idx, "series_id"]
         this_event_df = self.event_df.query("series_id == @series_id").reset_index(drop=True)
-        print(this_event_df.shape)
+        # print(this_event_df.shape)
         # extract data matching series_id
         feature = self.features[series_id]  # (..., n_steps, num_features)
 
@@ -456,7 +456,7 @@ class TrainDataset(Dataset):
         else:
             # always include labels in duration
             pos = self.event_df.at[idx, event]
-        print(f"{pos=}")
+        # print(f"{pos=}")
         # crop
         if self.cfg.sampling_with_start_timing_hour or self.cfg.fix_start_timing_hour_with:
             this_start_hour = self.start_timing_hour_dict[series_id]
@@ -482,9 +482,9 @@ class TrainDataset(Dataset):
                 n_steps,
             )
 
-        print(start, end, n_steps, feature.shape)
+        # print(start, end, n_steps, feature.shape)
         feature = pad_features_if_needed(feature, start, end, n_steps, self.cfg.duration)
-        print(feature.shape)
+        # print(feature.shape)
         # feature: (..., duration, num_features)
 
         # upsample

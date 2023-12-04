@@ -51,7 +51,7 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         # "../cmi-dss-ensemble-models/ranchantan/exp075-wakeup_6",
         # "../output/train/exp095",
         # "../cmi-dss-ensemble-models/ranchantan/exp100",
-        "../output/train/exp101",
+        "../output/train/exp105",
         # "../output/train/exp104_2",
         #
         # "phase=dev",
@@ -59,8 +59,8 @@ if os.environ.get("RUNNING_INSIDE_PYCHARM", False):
         "batch_size=32",
         # "batch_size=16",
         # "batch_size=8",
-        "--folds",
-        "2",
+        # "--folds",
+        # "2",
         # "inference_step_offset=0,2880,5760,8640,11520,14400",
         #
         # "dir.sub_dir=tmp",

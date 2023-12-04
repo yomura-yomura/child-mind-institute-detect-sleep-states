@@ -1,11 +1,11 @@
-- exp_name=exp107
+- exp_name=exp110
 
 - split_type=base
 
 - scale_type=robust_scaler
 
 - feature_extractor=StackedAttentionLSTMFeatureExtractor
-- feature_extractor.patch_size=4
+- feature_extractor.patch_size=8
 #- feature_extractor.mha_embed_dim=320
 #- feature_extractor.mha_n_heads=5
 - feature_extractor.n_encoder_layers=5
@@ -15,7 +15,7 @@
 
 - duration=17280  # 24h
 
-- use_amp=true
+#- use_amp=true
 
 - batch_size=4
 - optimizer.lr=0.00005
