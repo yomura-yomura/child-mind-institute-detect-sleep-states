@@ -1,0 +1,27 @@
+- exp_name=exp109-3
+
+- split_type=base
+
+- scale_type=robust_scaler
+
+- feature_extractor=VitGru
+- feature_extractor.dims=64
+- feature_extractor.nheads=4
+
+
+- duration=17280  # 24h
+
+- use_amp=true
+- batch_size=4
+
+- optimizer.lr=0.00005
+
+- sigma=108
+
+- features=[anglez,enmo,anglez_lag_diff_abs,enmo_lag_diff_abs,hour_sin,hour_cos,week_sin,week_cos]
+
+- early_stopping_patience=40
+
+- val_check_interval=100
+- check_val_every_n_epoch=null
+- val_after_steps=5000
